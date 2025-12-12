@@ -18,8 +18,8 @@ These formats can be used to see the contents of the can frames on a can bus, an
 
 It is also useful to debug J1939 stack designs as the individual can frames that make up transport protocol can be seen separately, not as the blocks of data that the decoded output will produce.
 
-[1] [CAN Binary](can_frame_bst_95_binary.md)
-[2] [CAN Ascii](can_packet_raw_ascii.md)
-[3] [0183 MXPGN](can_frame_mxpgn_0183.md)
+[1] [CAN Binary](bst_95_binary.md)
+[2] [CAN Ascii](ascii_type_1.md)
+[3] [0183 MXPGN](mxpgn_0183.md)
 
 Updated 28th Sept 2025
