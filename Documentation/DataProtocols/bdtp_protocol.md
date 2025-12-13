@@ -1,6 +1,6 @@
 # Binary Data Transfer Protocol (BDTP) encoding
 
-BDTP is the term for a framing layer used in Actisense protocols that that can carry binary records. It is based upon use DLE (Data Link Escape) Escaped Data Block Sending. All Actisense products have one or more protocols that use BDTP.
+BDTP is the term for a framing layer used in Actisense protocols that can carry binary records. It is based upon using DLE (Data Link Escape) Escaped Data Block Sending. All Actisense products have one or more protocols that use BDTP.
 
 ## History
 
@@ -34,7 +34,7 @@ Actisense developed BDTP as a robust implementation of DLE escaped framing, addi
 
 DLE is a technique used in communication protocols to ensure that special control characters (e.g., start-of-text, end-of-text) are transmitted unambiguously within a data stream. This is particularly useful in asynchronous transmission media where control characters are used for message framing.
 
-Actisense BDTP protocol uses DLE as the escape character and STX / ETX for strat and end control codes.  It also adds a checksum character to the message frame to add simple error checking.
+Actisense BDTP protocol uses DLE as the escape character and STX / ETX for start and end control codes.  It also adds a checksum character to the message frame to add simple error checking.
 
 ## Uses
 
@@ -59,10 +59,92 @@ Where
 - `DLE` Datalink escape code, 10 Hex (16 Decimal)
 - `STX` Start of Text. 02 Hex (2 decimal) Indicates start of message frame.
 - `Data Block` The data block is the message data block.
-**Note:** If a message data byte has the value 10 hex (DLE) then it must also be esacped, i.e. two DLE bytes will be sent over the link.
-- `Checksum` - A checksum must be added to the data block to verify it has been correctly sent.  The 8-bit summation of all decoded bytes including the checksum byte must be zero for the message contents to be verified.  To claculate this on the sending end, the checksum is calculated by simply starting with zero, and subtracting each byte in the non-escaped data sequence. The resulting byte is the checksum. The checksum bytes must also be escaped if it has a value of DLE (0x10)
+**Note:** If a message data byte has the value 10 hex (DLE) then it must also be escaped, i.e. two DLE bytes will be sent over the link.
+- `Checksum` - An 8-bit checksum for error detection. See the Checksum Calculation section below for details.
 - `DLE` Datalink escape code
 - `ETX` End of Text. 03 Hex (3 decimal) Indicates end of message frame.
+
+## Checksum Calculation
+
+The BDTP checksum is designed so that the 8-bit sum of all data bytes (including the checksum itself) equals zero. This provides a simple integrity check.
+
+### Calculation Method (Sender)
+
+To calculate the checksum when sending a message:
+
+1. Start with a checksum value of `0x00`
+2. For each byte in the **unescaped** data block, subtract it from the checksum (using 8-bit arithmetic)
+3. The final result is the checksum byte
+4. If the checksum equals `0x10` (DLE), it must also be escaped when transmitted
+
+**Important:** The checksum is calculated on the **unescaped** data, but if the checksum value itself is `0x10`, it must be escaped when transmitted.
+
+### Validation Method (Receiver)
+
+To validate a received message:
+
+1. Start with a sum of `0x00`
+2. Add each byte in the **unescaped** data block (using 8-bit arithmetic)
+3. Add the checksum byte
+4. If the final 8-bit sum equals `0x00`, the message is valid
+5. If the sum is non-zero, the message is corrupted
+
+### Worked Example
+
+Using the BST 95 message from the example below:
+
+**Original data:** `95 1E 01 20 30 02 F8 09 FF FC 37 0A 00 10 FF FF`
+
+**Step-by-step calculation:**
+
+```
+Start:     checksum = 0x00
+Subtract:  0x00 - 0x95 = 0x6B  (using 8-bit arithmetic)
+Subtract:  0x6B - 0x1E = 0x4D
+Subtract:  0x4D - 0x01 = 0x4C
+Subtract:  0x4C - 0x20 = 0x2C
+Subtract:  0x2C - 0x30 = 0xFC
+Subtract:  0xFC - 0x02 = 0xFA
+Subtract:  0xFA - 0xF8 = 0x02
+Subtract:  0x02 - 0x09 = 0xF9
+Subtract:  0xF9 - 0xFF = 0xFA
+Subtract:  0xFA - 0xFC = 0xFE
+Subtract:  0xFE - 0x37 = 0xC7
+Subtract:  0xC7 - 0x0A = 0xBD
+Subtract:  0xBD - 0x00 = 0xBD
+Subtract:  0xBD - 0x10 = 0xAD
+Subtract:  0xAD - 0xFF = 0xAE
+Subtract:  0xAE - 0xFF = 0xAF
+
+Result: checksum = 0xAF
+```
+
+**Verification:** Adding all data bytes plus checksum: `95 + 1E + 01 + 20 + 30 + 02 + F8 + 09 + FF + FC + 37 + 0A + 00 + 10 + FF + FF + AF = 0x00` (8-bit sum)
+
+### Pseudo Code
+
+**Calculating checksum (sender):**
+```
+checksum = 0x00
+for each byte in unescaped_data_block:
+    checksum = (checksum - byte) & 0xFF  // 8-bit subtraction
+end for
+return checksum
+```
+
+**Validating checksum (receiver):**
+```
+sum = 0x00
+for each byte in unescaped_data_block:
+    sum = (sum + byte) & 0xFF  // 8-bit addition
+end for
+sum = (sum + received_checksum) & 0xFF
+if sum == 0x00:
+    message is valid
+else:
+    message is corrupted
+end if
+```
 
 ## Examples
 
