@@ -7,4 +7,14 @@ This is the main documentation repository for the SDK. It contains comprehensive
 - **Developer Resources** – Code examples, best practices, and integration guides
 - **Reference Materials** – Specifications, standards compliance, and technical definitions
 
-Updated 12th Dec 2025
+## Data Formats and Protocols
+
+### Overview
+
+**Data Formats** define the structure and encoding of information - how data is organized, represented, and stored. They specify the layout, field types, byte order, and encoding schemes used to represent meaningful information in a standardized way.
+
+**Data Protocols** define the rules and procedures for communication - how data is exchanged between systems. They specify message sequences, timing requirements, error handling, and the behavior needed for reliable transmission and reception of data.
+
+In essence: **formats** describe *what* the data looks like, while **protocols** describe *how* to exchange it.
+
+Updated 13th Dec 2025
