@@ -1,6 +1,6 @@
-# BST D0 NMEA 2000 Protocol
+# NMEA 2000 BST D0 Format
 
-Tx Format: `N2K Actisense`
+The latest binary format used in newer Actisense devices such as WGX and PRO-NDC-1-E2K
 
 ## Description
 
@@ -20,7 +20,7 @@ As a binary format, the BST D0 protocol header fields are not easy to read. The 
 
 ## Format of BST D0
 
-Messages sent in this format are binary encoded using [1] [BDTP encoding](bdtp_encoding.md)
+Messages sent in this format are binary encoded using [BDTP encoding](../../DataProtocols/bdtp_encoding.md)
 
 The output from the BDTP decoder is a BST message. The first byte identifies the message type. If it is D0 Hex, it is a BST D0 message in the following form:
 
@@ -48,4 +48,4 @@ The output from the BDTP decoder is a BST message. The first byte identifies the
 
 ---
 
-[1] [BDTP encoding](bdtp_encoding.md)
+[1] [BDTP encoding](../../DataProtocols/bdtp_encoding.md)
