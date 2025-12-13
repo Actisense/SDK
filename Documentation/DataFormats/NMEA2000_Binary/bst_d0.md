@@ -26,25 +26,18 @@ The output from the BDTP decoder is a BST message. The first byte identifies the
 
 **`ID` `LL` `D` `S` `PDUS` `PDUF` `DPP` `C` `TTTT` `b0b1b2b3b4b5b6b7..bn`**
 
-- `ID` BST Message ID, always D0 Hex (208 Decimal)
-
-- `LL` Payload Length - encoded as two bytes, little endian - the maximum length of an N2K message is 1785.
-
-- `D` Destination Address - 1 byte holding address of the device receiving the message.
-
-- `S` Source Address - 1 byte holding the address of the device sending the message.
-
-- `PDUS` PDU Specific - Lowest byte of PGN, depending on PDUF this will contain an address (PDU1) or a Group Extension (PDU2).
-
-- `PDUF` PDU Format - PDU Format determines contents of PDUS.
-
-- `DPP` Data page and priority - Data Page and message Priority bits.
-
-- `C` Control - PGN control ID bits and 3-bit Fast-Packet sequence ID.
-
-- `TTTT` Timestamp - Four bytes for timestamp in milliseconds, little endian.
-
-- `(b0...bn)` Message data - Message's data payload.
+| Field | Size | Description |
+|-------|------|-------------|
+| `ID` | 1 byte | BST Message ID, always D0 Hex (208 Decimal) |
+| `LL` | 2 bytes | Payload Length - encoded as little endian - the maximum length of an N2K message is 1785 |
+| `D` | 1 byte | Destination Address - address of the device receiving the message |
+| `S` | 1 byte | Source Address - address of the device sending the message |
+| `PDUS` | 1 byte | PDU Specific - Lowest byte of PGN, depending on PDUF this will contain an address (PDU1) or a Group Extension (PDU2) |
+| `PDUF` | 1 byte | PDU Format - PDU Format determines contents of PDUS |
+| `DPP` | 1 byte | Data page and priority - Data Page and message Priority bits |
+| `C` | 1 byte | Control - PGN control ID bits and 3-bit Fast-Packet sequence ID |
+| `TTTT` | 4 bytes | Timestamp - timestamp in milliseconds, little endian |
+| `b0...bn` | Variable | Message data - Message's data payload |
 
 ---
 
