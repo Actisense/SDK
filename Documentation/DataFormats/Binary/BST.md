@@ -8,7 +8,7 @@ Actisense have been making marine instruments since 1997. At that time, devices 
 
 ### Adoption in Navigation and Marine Electronics
 
-A number of manufacturers have copied this format as many marine applcations use it to send and receive NMEA 2000 data. Projects such as CAN Boat have become popular as they provide free and easy to use navigation for boaters, and it integrates well with our BST 93/94 format which is used by our poular NGT PC interface.
+A number of manufacturers have copied this format because many marine applications use it to send and receive NMEA 2000 data. Projects such as "CAN Boat" have become popular as they provide free and easy to use navigation for boaters, and it integrates well with our BST 93/94 format which is used by our poular NGT PC interface.
 
 ### Why BST Encoding Remains Relevant
 

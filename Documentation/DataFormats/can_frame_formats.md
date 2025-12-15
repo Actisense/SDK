@@ -4,9 +4,9 @@ CAN frames are the fundamental data transfer medium of a CAN bus protocol such a
 
 ## Available formats
 
-- [1] [CAN Binary](binary/bst_95_can_frame.md)
-- [2] [CAN Ascii](ascii/can_frame_ascii_A.md)
-- [3] [0183 MXPGN](nmea0183/mxpgn_0183.md)
+- [1] [CAN Binary](Binary/bst_95_can_frame.md)
+- [2] [CAN Ascii](Ascii/can_frame_ascii_A.md)
+- [3] [0183 MXPGN](NMEA0183/mxpgn_0183.md)
 
 ## Description
 

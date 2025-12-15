@@ -1,4 +1,4 @@
-# NMEA 2000 BST 93 Format
+# NMEA 2000 BST 93 Format (Gateway -> PC)
 
 Legacy protocol used to receive NMEA messages used by devices such as NGT or NGX to send NMEA 2000 messages to PC and other devices using compatible software.
 

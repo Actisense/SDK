@@ -1,22 +1,6 @@
-# BST-CAN, BST-N2K & BST-N183 Message Definitions
 
-Technical documentation for CAN, NMEA 2000, and NMEA 0183 message transfers to/from PC.
 
-***
-
-## Overview
-
-This document describes the binary message format used for communication between a gateway device and a PC for three protocols:
-
-* **BST-CAN**: CAN bus messages
-* **BST-N2K**: NMEA 2000 messages
-* **BST-N183**: NMEA 0183 messages
-
-All three formats share the same message structure but use different Command IDs.
-
-***
-
-## Binary Message Frame Structure
+# Binary Message Frame Structure
 
 The complete binary message frame consists of the following components:
 
@@ -24,7 +8,7 @@ The complete binary message frame consists of the following components:
 | ---------------- | ----------------------- | -------------------- |
 | **Binary Start** | DLE (Data Link Escape)  | 1 byte               |
 |                  | STX (Start of Text)     | 1 byte               |
-| **Command ID**   | Protocol identifier     | 1 byte (8-bit)       |
+| **BST ID**       | Protocol identifier     | 1 byte (8-bit)       |
 | **Store Length** | Length of data payload  | 1 byte (8-bit)       |
 | **Store (Data)** | Message payload         | Variable (see below) |
 | **Checksum**     | Message integrity check | 1 byte (8-bit)       |
@@ -47,10 +31,6 @@ The complete binary message frame consists of the following components:
 | **BST-CAN**  | 0x93         | 0x94         |
 | **BST-N2K**  | *(See Note)* | *(See Note)* |
 | **BST-N183** | *(See Note)* | *(See Note)* |
-
-**Note**: Command IDs for BST-N2K and BST-N183 follow the same structure as BST-CAN but use different command ID values. Refer to system-specific documentation for exact values.
-
-***
 
 ## Message Payload Structure (Store)
 
@@ -161,17 +141,17 @@ Complete frame for a message sent from PC to the NMEA 2000 bus:
 
 ## Important Implementation Notes
 
-1.  **Binary Transparency**: DLE (Data Link Escape) characters appearing in the message payload must be escaped (doubled) to maintain frame integrity.
+1. **Binary Transparency**: DLE (Data Link Escape) characters appearing in the message payload must be escaped (doubled) to maintain frame integrity.
 
-2.  **Endianness**: Multi-byte fields (PGN, Timestamp) should be transmitted in little-endian byte order unless otherwise specified by the system.
+2. **Endianness**: Multi-byte fields (PGN, Timestamp) should be transmitted in little-endian byte order unless otherwise specified by the system.
 
-3.  **Priority Management**: The Gateway maintains its own transmission priority state. Applications should generally set the priority byte to 7 to allow the Gateway to manage priority automatically.
+3. **Priority Management**: The Gateway maintains its own transmission priority state. Applications should generally set the priority byte to 7 to allow the Gateway to manage priority automatically.
 
-4.  **Address Claiming**: When sending messages to the NMEA 2000 bus, the Gateway uses its currently claimed address as the source. Applications do not need to manage address claiming.
+4. **Address Claiming**: When sending messages to the NMEA 2000 bus, the Gateway uses its currently claimed address as the source. Applications do not need to manage address claiming.
 
-5.  **PDU Format Types**: Applications must be aware of whether a PGN uses PDU1 (peer-to-peer, PDU Format < 240) or PDU2 (broadcast, PDU Format ≥ 240) format to properly set the Destination Address field.
+5. **PDU Format Types**: Applications must be aware of whether a PGN uses PDU1 (peer-to-peer, PDU Format < 240) or PDU2 (broadcast, PDU Format ≥ 240) format to properly set the Destination Address field.
 
-6.  **Sequence Management**: For multi-packet transfers, the Gateway handles sequence numbering automatically for outgoing messages. Applications receive the original sequence IDs for incoming messages.
+6. **Sequence Management**: For multi-packet transfers, the Gateway handles sequence numbering automatically for outgoing messages. Applications receive the original sequence IDs for incoming messages.
 
 ***
 
@@ -188,10 +168,3 @@ Standard CAN bus messages with 29-bit identifier support.
 *   Address claiming and network management handled by Gateway
 *   Priority management via PGN 126208
 
-### BST-N183 (NMEA 0183)
-
-*   Encapsulation of NMEA 0183 sentence data
-*   Conversion between NMEA 0183 text format and binary message format
-*   Refer to system documentation for sentence mapping details
-
-***
