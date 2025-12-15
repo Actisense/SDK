@@ -56,25 +56,30 @@ The output from the BDTP decoder is a BST message. The first byte identifies the
 The 18-bit PGN (Parameter Group Number) is split across multiple fields. The encoding depends on the PDU type:
 
 **PDU2 (PDUF >= 240):** Global/broadcast messages
-```
+
+```text
 PGN = (DataPage << 16) | (PDUF << 8) | PDUS
 ```
 
 **PDU1 (PDUF < 240):** Destination-specific messages
-```
+
+```text
 PGN = (DataPage << 16) | (PDUF << 8)
 ```
+
 Note: In PDU1 format, PDUS contains the destination address, not part of the PGN.
 
 ### DPPC Byte Encoding
 
 To construct the DPPC byte from individual fields:
-```
+
+```text
 DPPC = (Direction << 7) | (Control << 5) | (Priority << 2) | DataPage
 ```
 
 To decode the DPPC byte:
-```
+
+```text
 DataPage  = DPPC & 0x03         (bits 0-1)
 Priority  = (DPPC >> 2) & 0x07  (bits 2-4)
 Control   = (DPPC >> 5) & 0x03  (bits 5-6)
@@ -89,7 +94,7 @@ Follow these steps to create a BST 95 message from a CAN packet:
 2. **Calculate Length** (Byte 1): `L = 6 + number_of_data_bytes`
 3. **Set Timestamp** (Bytes 2-3): Store as little-endian (T0 = low byte, T1 = high byte)
 4. **Set Source Address** (Byte 4): The CAN source address
-5. **Set PDUS** (Byte 5): 
+5. **Set PDUS** (Byte 5):
    - If PDUF >= 240: lowest byte of PGN
    - If PDUF < 240: destination address
 6. **Set PDUF** (Byte 6): Middle byte of PGN (bits 8-15 of the 18-bit PGN)
@@ -104,7 +109,7 @@ The 16-bit Timestamp has different resolution options, see control bits above
 
 Here PGN 129026 (1F802H) has been encoded as a BST 95 message:
 
-```
+```hex
 95 0E 01 20 30 02 F8 09 FF FC 37 0A 00 10 FF FF
 ```
 
@@ -143,7 +148,7 @@ DPPC = 0x09 = binary `00001001`
 
 Since PDUF (0xF8 = 248) >= 240, this is a PDU2 message:
 
-```
+```text
 PGN = (DataPage << 16) | (PDUF << 8) | PDUS
 PGN = (1 << 16) | (0xF8 << 8) | 0x02
 PGN = 0x10000 | 0xF800 | 0x02

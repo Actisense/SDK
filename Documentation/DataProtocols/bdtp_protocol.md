@@ -48,6 +48,10 @@ Because it is binary encoded, it is the most efficient means of sending messages
 
 This protocol needs a custom decoder to see the message content / receive the data. The decoder is however very simple to write, and Actisense provide many example functions to make integration with this protocol easy.
 
+## Error Checking
+
+BDTP delivers the binary messages over serial links.  The only error checking provided is at the protocol level.  If a DLE/STX pair arrives before a DLE/ETX, the data block is cancelled.  Similarly, any unrecognised DLE escaped data will cause a datagram to be discarded. Onle DLE/STX, DLE/DLE and DLE/ETX are acceptable. Once the DLE/ETX has been received, the binary data block may then have additional error checks performed. See BST Checksum for the most common method used in Actisense devices.  
+
 ## Encoding
 
 Messages sent in this protocol have the following form:  
