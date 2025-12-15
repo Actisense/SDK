@@ -5,7 +5,7 @@ NMEA 2000 format can be used for NMEA 2000, J1939 or ISOBUS transfers.
 ## Available formats
 
 - [1] [NGT Rx](Binary/BST_93_NGT.md) and [NGT Tx](Binary/BST_94_NGT.md)
-- [2] [BSTD0](Binary/BST_D0.md.md)
+- [2] [BSTD0](Binary/BST_D0.md)
 - [3] [N2KAscii](Ascii/nmea2000_type_A.md)
 
 ## Description
