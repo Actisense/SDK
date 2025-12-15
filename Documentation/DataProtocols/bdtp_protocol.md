@@ -28,7 +28,7 @@ Despite the age of the technique, DLE escaped protocols remain valuable for embe
 
 ### Actisense BDTP Evolution
 
-Actisense developed BDTP as a robust implementation of DLE escaped framing. All Actisense binary frmae data is sent using this protocol.  The most common use is to send Actisense [BST](../DataFormats/BST/BST.md) formatted data frames, which are lightweight containers for the relatively short messages typical in marine instrument communications, while maintaining compatibility with standard serial port hardware and software.
+Actisense developed BDTP as a robust implementation of DLE escaped framing. All Actisense binary frame data is sent using this protocol.  The most common use is to send Actisense [BST](../DataFormats/BST/bst.md) formatted datagrams, which are lightweight containers for the relatively short messages typical in marine instrument communications, while maintaining compatibility with standard serial port hardware and software.
 
 ## Description
 
@@ -38,7 +38,7 @@ Actisense BDTP protocol uses DLE as the escape character and STX / ETX for start
 
 ## Uses
 
-This protocol can encode most types of frame based binary messages.
+This protocol can encode all types of binary message blocks.
 
 ## Advantages
 
@@ -57,8 +57,53 @@ Messages sent in this protocol have the following form:
 Where
 
 - `DLE` Datalink escape code, 10 Hex (16 Decimal)
-- `STX` Start of Text. 02 Hex (2 decimal) Indicates start of message frame
+- `STX` Start of Text. 02 Hex (2 decimal) Indicates start of message data
 - `Data Block` The data block is the message data block
-**Note:** If a message data byte has the value 10 hex (DLE) then it must also be escaped, i.e. two DLE bytes will be sent over the link
+  **Note:** If a message data byte has the value 10 hex (DLE) then it must also be escaped, i.e. two DLE bytes will be sent over the link
 - `DLE` Datalink escape code
-- `ETX` End of Text. 03 Hex (3 decimal) Indicates end of message frame
+- `ETX` End of Text. 03 Hex (3 decimal) Indicates end of message data
+
+### Encoding Example
+
+**Original Data Block (16 bytes):**
+
+```hex
+45 10 8A 3F 10 22 B7 01 C4 5E 10 9D 00 FF 12 AB
+```
+
+Note: This data contains three DLE bytes (0x10) at positions 2, 5, and 11.
+
+**Encoded for transmission:**
+
+```hex
+10 02 45 10 10 8A 3F 10 10 22 B7 01 C4 5E 10 10 9D 00 FF 12 AB 10 03
+│  │  └────────────────────── Data Block with escaped DLEs ──────────────────────┘ │  │
+│  │                                                                               │  └── ETX
+│  └── STX                                                                         └── DLE
+└── DLE
+```
+
+**Breakdown:**
+
+| Original Byte | Transmitted As | Notes |
+|---------------|----------------|-------|
+| - | `10 02` | DLE STX - Frame start |
+| `45` | `45` | Data byte (unchanged) |
+| `10` | `10 10` | DLE escaped (doubled) |
+| `8A` | `8A` | Data byte (unchanged) |
+| `3F` | `3F` | Data byte (unchanged) |
+| `10` | `10 10` | DLE escaped (doubled) |
+| `22` | `22` | Data byte (unchanged) |
+| `B7` | `B7` | Data byte (unchanged) |
+| `01` | `01` | Data byte (unchanged) |
+| `C4` | `C4` | Data byte (unchanged) |
+| `5E` | `5E` | Data byte (unchanged) |
+| `10` | `10 10` | DLE escaped (doubled) |
+| `9D` | `9D` | Data byte (unchanged) |
+| `00` | `00` | Data byte (unchanged) |
+| `FF` | `FF` | Data byte (unchanged) |
+| `12` | `12` | Data byte (unchanged) |
+| `AB` | `AB` | Data byte (unchanged) |
+| - | `10 03` | DLE ETX - Frame end |
+
+**Summary:** 16 data bytes become 23 bytes on the wire (16 + 3 escaped DLEs + 4 framing bytes).
