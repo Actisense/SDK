@@ -1,4 +1,4 @@
-# NMEA 2000 BST 94 Format (PC -> Gaetway)
+# NMEA 2000 BST 94 Format (PC -> Gateway)
 
 Legacy protocol used with an NGT and compatible software.
 
