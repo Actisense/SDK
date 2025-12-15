@@ -1,6 +1,6 @@
 # NMEA 2000 ASCII Output format
 
-Tx Format: `N2K Actisense`
+Tx Format: `N2K Ascii`
 
 ## Description
 

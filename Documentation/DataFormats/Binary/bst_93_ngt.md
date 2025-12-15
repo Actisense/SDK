@@ -1,10 +1,10 @@
-# NMEA 2000 BST 93 Format 
+# NMEA 2000 BST 93 Format
 
-Legacy protocol used with an NGT and compatible software.
+Legacy protocol used to receive NMEA messages used by devices such as NGT or NGX to send NMEA 2000 messages to PC and other devices using compatible software.
 
 ## Description
 
-This is an Actisense defined NMEA 2000 binary protocol. It is a legacy protocol used by the NGT to send NMEA 2000 messages from Gateway to PC, and is supported in new products to allow older software applications to continue to work. To send data to an NGT to forward onto the NMEA 2000 bus, use BST 94 protocol.
+This is an Actisense defined NMEA 2000 binary protocol. It is a legacy protocol used by the NGT and available as an option on new Actisense NMEA 2000 products.  This format sends NMEA 2000 messages as BST messages, and is supported in new products to allow older software applications to continue to work. To send data to an NGT to forward onto the NMEA 2000 bus, use BST 94 protocol.
 
 Refer to the NMEA 2000 Appendix B for details of how to decode a PGN's fields.
 
