@@ -28,13 +28,13 @@ Despite the age of the technique, DLE escaped protocols remain valuable for embe
 
 ### Actisense BDTP Evolution
 
-Actisense developed BDTP as a robust implementation of DLE escaped framing. All Actisense binary frmae data is sent using this protocol.  The most common use is to send Actisense [BST](../DataFormats/BST/BST.md) formatted data frames, which add a checksum for error detection. This provides a lightweight integrity check suitable for the relatively short messages typical in marine instrument communications, while maintaining compatibility with standard serial port hardware and software.
+Actisense developed BDTP as a robust implementation of DLE escaped framing. All Actisense binary frmae data is sent using this protocol.  The most common use is to send Actisense [BST](../DataFormats/BST/BST.md) formatted data frames, which are lightweight containers for the relatively short messages typical in marine instrument communications, while maintaining compatibility with standard serial port hardware and software.
 
 ## Description
 
 DLE is a technique used in communication protocols to ensure that special control characters (e.g., start-of-text, end-of-text) are transmitted unambiguously within a data stream. This is particularly useful in asynchronous transmission media where control characters are used for message framing.
 
-Actisense BDTP protocol uses DLE as the escape character and STX / ETX for start and end control codes.  It also adds a checksum character to the message frame to add simple error checking.
+Actisense BDTP protocol uses DLE as the escape character and STX / ETX for start and end control codes.
 
 ## Uses
 
@@ -52,7 +52,7 @@ This protocol needs a custom decoder to see the message content / receive the da
 
 Messages sent in this protocol have the following form:  
   
-**`DLE` `STX` `Data Block` `Checksum` `DLE` `ETX`**
+**`DLE` `STX` `Data Block` `DLE` `ETX`**
 
 Where
 
@@ -60,6 +60,5 @@ Where
 - `STX` Start of Text. 02 Hex (2 decimal) Indicates start of message frame
 - `Data Block` The data block is the message data block
 **Note:** If a message data byte has the value 10 hex (DLE) then it must also be escaped, i.e. two DLE bytes will be sent over the link
-- `Checksum` - An 8-bit checksum for error detection. See the Checksum Calculation section below for details.
 - `DLE` Datalink escape code
 - `ETX` End of Text. 03 Hex (3 decimal) Indicates end of message frame

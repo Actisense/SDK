@@ -1,6 +1,6 @@
-# Binary Serial Transfer (BST) Frames
+# Binary Serial Transfer (BST) datagrams
 
-A BST frame holds Actisense binary frames. A BST frame when sent over a protocol such as BDTP has a checksum for error detection. This provides a lightweight integrity check suitable for the relatively short messages typical in marine instrument communications, while maintaining compatibility with standard serial port hardware and software.
+A BST frame holds Actisense binary datagrams. A BST datagram when sent over a protocol such as BDTP has a checksum for error detection. This provides a lightweight integrity check suitable for the relatively short messages typical in marine instrument communications, while maintaining compatibility with standard serial port hardware and software.
 
 ## History
 
@@ -34,6 +34,24 @@ Actisense devloped BST further to create BEM (BinaryEncoded Message format). Thi
 ## Encoding
 
 Messages sent in this protocol have the following form:  
+
+
+## Encoding
+
+Messages sent in this protocol have the following form:  
+  
+**`DLE` `STX` `Data Block` `Checksum` `DLE` `ETX`**
+
+Where
+
+- `DLE` Datalink escape code, 10 Hex (16 Decimal)
+- `STX` Start of Text. 02 Hex (2 decimal) Indicates start of message
+- `Data Block` The data block is the message data block
+**Note:** If a message data byte has the value 10 hex (DLE) then it must also be escaped, i.e. two DLE bytes will be sent over the link
+- `Checksum` - An 8-bit checksum for error detection. See the Checksum Calculation section below for details.
+- `DLE` Datalink escape code
+- `ETX` End of Text. 03 Hex (3 decimal) Indicates end of message
+
 
 ## BST Checksum Calculation
 
@@ -129,4 +147,4 @@ Encoded as BDTP:
 
 `10 02` 95 1E 01 20 30 02 F8 09 FF FC 37 0A 00 `10 10` FF FF `AF` `10 03`
 
-Note the checksum AF Hex has been added, which gives an 8 bit sum of zero in the non-escaped message data frame.
+Note the checksum AF Hex has been added, which gives an 8 bit sum of zero in the non-escaped message data.

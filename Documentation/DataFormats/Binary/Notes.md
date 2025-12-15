@@ -8,9 +8,9 @@ Technical documentation for CAN, NMEA 2000, and NMEA 0183 message transfers to/f
 
 This document describes the binary message format used for communication between a gateway device and a PC for three protocols:
 
-*   **BST-CAN**: CAN bus messages
-*   **BST-N2K**: NMEA 2000 messages
-*   **BST-N183**: NMEA 0183 messages
+* **BST-CAN**: CAN bus messages
+* **BST-N2K**: NMEA 2000 messages
+* **BST-N183**: NMEA 0183 messages
 
 All three formats share the same message structure but use different Command IDs.
 
