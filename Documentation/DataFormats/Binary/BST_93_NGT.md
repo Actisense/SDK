@@ -34,7 +34,7 @@ The output from the BDTP decoder is a BST message. The first byte identifies the
 | 5 | `DP` | Data page - Data Page 0..3 - Lower 2 bits only |
 | 6 | `D` | Destination Address - 1 byte holding the address where a message was sent |
 | 7 | `S` | Source Address - 1 byte holding the address of the device sending the message |
-| 8-11 | `TTTT` | [Timestamp](binary_timestamp_example.md) - Four bytes for timestamp in milliseconds, little endian |
+| 8-11 | `T₀T₁T₂T₃` | [Timestamp](binary_timestamp_example.md) - Four bytes for timestamp in milliseconds, little endian |
 | 12 | `DL` | Data Length - number of bytes in the data section to follow |
 | 13..(13+DL-1) | `(b0...bn)` | Message data - Message's data variable length payload |
 

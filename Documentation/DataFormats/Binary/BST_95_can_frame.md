@@ -20,7 +20,7 @@ Needs a special software decoder to take the binary encoded format and convert i
 
 ## Protocol
 
-Messages sent in this format are binary encoded using [BDTP encoding](../../Protocols/bdtp.md)
+Messages sent in this format are binary encoded using [BDTP encoding](../../DataProtocols/bdtp_protocol.md)
 
 ## Format
 

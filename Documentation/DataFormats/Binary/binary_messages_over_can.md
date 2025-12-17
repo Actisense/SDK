@@ -12,6 +12,6 @@ Note: no need to add checksum as NMEA 2000 using CAN packets transfer which has 
 
 ## To receive the message over CAN
 
-1. Receive addressed proprietary PGN and chekc if it is Actisense manufacturer code (273)
+1. Receive addressed proprietary PGN and check if it is Actisense manufacturer code (273)
 2. Decode fast packet message
 3. If checksum is correct, decode the message contents

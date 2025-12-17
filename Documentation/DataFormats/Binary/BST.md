@@ -34,3 +34,20 @@ Where
 - `BST ID` The first byte is the BST ID which identifies the data container's content.
 - `Store Length` Length of data block in bytes
 - `Data Block` The data block is the message data block
+
+## Sending BST to a device
+
+Actisense devices have mutliple communications ports.  The most common are serial and CAN (NMEA 2000) ports.
+
+Data sent over serial directly to a device is considered a **local message** and data sent over NMEA 2000 is considered a **remote message**.
+
+### Data length considerations
+
+If a message is sent locally, the theoretical maximum data block length of a BST message is 255 bytes, as that is the maximum 8-bit number that may be inserted into the data length byte.
+
+If a message is sent via addressed fast packet to a remote device over CAN bus, the maximum length is set by the BST over NMEA 2000 protocol limitations. Here, overhead is added to ***embed*** or ***wrap*** the BST message into an nmea 2000 message, so that it can be sent over the bus.  This limits the length of the bst message to 208 bytes.
+
+| Message Type        | Store Length Range |
+| ------------------- | ------------------ |
+| **Local Messages**  | 1 to 255 bytes     |
+| **Remote Messages** | 1 to 208 bytes     |

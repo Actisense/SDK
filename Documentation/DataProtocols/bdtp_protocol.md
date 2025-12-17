@@ -28,7 +28,7 @@ Despite the age of the technique, DLE escaped protocols remain valuable for embe
 
 ### Actisense BDTP Evolution
 
-Actisense developed BDTP as a robust implementation of DLE escaped framing. All Actisense binary frame data is sent using this protocol.  The most common use is to send Actisense [BST](../DataFormats/BST/bst.md) formatted datagrams, which are lightweight containers for the relatively short messages typical in marine instrument communications, while maintaining compatibility with standard serial port hardware and software.
+Actisense developed BDTP as a robust implementation of DLE escaped framing. All Actisense binary frame data is sent using this protocol.  The most common use is to send Actisense [BST](../DataFormats/Binary/BST.md) formatted datagrams, which are lightweight containers for the relatively short messages typical in marine instrument communications, while maintaining compatibility with standard serial port hardware and software.
 
 ## Description
 

@@ -57,8 +57,8 @@ Using the [BST 95 format](bst_95_can_frame.md), we construct the message contain
 |------|-------|-------|-------------|
 | 0 | BSTID | `95` | BST 95 identifier |
 | 1 | L | `0E` | Length: 6 + 8 data bytes = 14 (0x0E) |
-| 2 | T0 | `20` | Timestamp low byte |
-| 3 | T1 | `30` | Timestamp high byte |
+| 2 | T₀ | `20` | Timestamp low byte |
+| 3 | T₁ | `30` | Timestamp high byte |
 | 4 | S | `02` | Source address |
 | 5 | PDUS | `00` | PDU Specific (low byte of PGN) |
 | 6 | PDUF | `F2` | PDU Format |

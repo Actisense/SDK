@@ -37,7 +37,7 @@ The output from the BDTP decoder is a BST message. The first byte identifies the
 | 6 | `PDUF` | 1 byte | PDU Format - PDU Format is the high byte of a PGN number. It also determines the way PDUS is decoded |
 | 7 | `DPP` | 1 byte | Data page and priority - See section below for bit details |
 | 8 | `C` | 1 byte | Control - PGN control ID bits and 3-bit Fast-Packet sequence ID - See section below for bit details |
-| 9-12 | `TTTT` | 4 bytes | [Timestamp](binary_timestamp_example.md) - timestamp in milliseconds, little endian |
+| 9-12 | `T₀T₁T₂T₃` | 4 bytes | [Timestamp](binary_timestamp_example.md) - timestamp in milliseconds, little endian |
 | 13+ | `b0...bn` | Variable | Message data - Message's data payload |
 
 ## Field `DPP`: Data page and priority bits
@@ -69,6 +69,7 @@ The PGN (Parameter Group Number) is calculated from three fields in the BST D0 m
 ### PGN Structure
 
 A NMEA 2000 PGN is an 18-bit number composed of:
+
 - **Data Page** (bits 17-16): 2 bits extracted from `DPP` field
 - **PDU Format** (bits 15-8): 8 bits from `PDUF` field
 - **PDU Specific** (bits 7-0): 8 bits from `PDUS` field (only used when PDUF >= 240)
@@ -76,32 +77,37 @@ A NMEA 2000 PGN is an 18-bit number composed of:
 ### Calculation Method
 
 **For PDU2 Format (PDUF >= 240):**
-```
+
+```pseudocode
 data_page = DPP & 0x03           // Extract bits 0-1 from DPP
 PGN = (data_page << 16) | (PDUF << 8) | PDUS
 ```
 
 **For PDU1 Format (PDUF < 240):**
-```
+
+```pseudocode
 data_page = DPP & 0x03           // Extract bits 0-1 from DPP
 PGN = (data_page << 16) | (PDUF << 8) | 0x00    // PDUS is destination address, not part of PGN
 ```
 
 ### Examples
 
-**Example 1: PGN 129029 (GNSS Position Data) - PDU2 Format**
+#### Example 1: PGN 129029 (GNSS Position Data) - PDU2 Format
+
 - `DPP` = 0x08 → Data Page = 0 (bits 0-1 = 0), Priority = 2 (bits 2-4 = 2)
 - `PDUF` = 0xF8 (248 decimal, >= 240, so PDU2)
 - `PDUS` = 0x05 (5 decimal, Group Extension)
 - PGN = (0 << 16) | (0xF8 << 8) | 0x05 = 0x0F805 = **129029**
 
-**Example 2: PGN 59904 (ISO Request) - PDU1 Format**
+#### Example 2: PGN 59904 (ISO Request) - PDU1 Format
+
 - `DPP` = 0x18 → Data Page = 0 (bits 0-1 = 0), Priority = 6 (bits 2-4 = 6)
 - `PDUF` = 0xEA (234 decimal, < 240, so PDU1)
 - `PDUS` = 0x1F (31 decimal, this is the destination address, NOT part of PGN)
 - PGN = (0 << 16) | (0xEA << 8) | 0x00 = 0x0EA00 = **59904**
 
-**Example 3: PGN 130312 (Temperature) - PDU2 Format with Data Page 1**
+#### Example 3: PGN 130312 (Temperature) - PDU2 Format with Data Page 1
+
 - `DPP` = 0x09 → Data Page = 1 (bits 0-1 = 1), Priority = 2 (bits 2-4 = 2)
 - `PDUF` = 0xFD (253 decimal, >= 240, so PDU2)
 - `PDUS` = 0x08 (8 decimal, Group Extension)
@@ -109,7 +115,7 @@ PGN = (data_page << 16) | (PDUF << 8) | 0x00    // PDUS is destination address, 
 
 ### Pseudo Code
 
-```
+```pseudocode
 function calculate_pgn(dpp, pduf, pdus):
     data_page = dpp & 0x03
     
