@@ -4,7 +4,7 @@ Legacy protocol used with an NGT and compatible software.
 
 ## Description
 
-This is an Actisense defined NMEA 2000 binary protocol, and is a compact format used to send PGNs to an NMEA 2000 bus. 
+This is an Actisense defined NMEA 2000 binary protocol, and is a compact format used to send PGNs to an NMEA 2000 bus.
 
 It is a legacy protocol used with an NGT to send NMEA 2000 messages from PC through the Gateway and onto an NMEA 2000 bus, and is supported in new products to allow older software applications to continue to work. To receive NMEA 2000 data from an NGT use BST 93 protocol.
 
@@ -26,24 +26,18 @@ The output from the BDTP decoder is a BST message. The first byte identifies the
 
 **`ID` `L` `P` `PDUS` `PDUF` `DP` `D` `DL` `b0b1b2b3b4b5b6b7..bn`**
 
-- `ID` BST Message ID, always 94 Hex (148 Decimal)
-
-- `L` Length - single byte length. This is the payload of the BST message excluding the ID and length bytes.
-
-- `P` Message Priority 0..7, Lower 3 bits only.
-
-- `PDUS` PDU Specific - Lowest byte of PGN, depending on PDUF this will contain an address (PDU1) or a Group Extension (PDU2).
-
-- `PDUF` PDU Format - PDU Format determines contents of PDUS.
-
-- `DP` Data page - Data Page 0..3 - Lower 2 bits only.
-
-- `D` Destination Address - 1 byte holding the address where a message was sent.
-
-- `DL` Data Length - number of bytes in the data section to follow.
-
-- `(b0...bn)` Message data - Message's data payload.
+| Byte | Field | Description |
+|------|-------|-------------|
+| 0 | `ID` | BST Message ID, always 94 Hex (148 Decimal) |
+| 1 | `L` | Length - single byte length. This is the payload of the BST message excluding the ID and length bytes. |
+| 2 | `P` | Message Priority 0..7, Lower 3 bits only. |
+| 3 | `PDUS` | PDU Specific - Lowest byte of PGN, depending on PDUF this will contain an address (PDU1) or a Group Extension (PDU2). |
+| 4 | `PDUF` | PDU Format - PDU Format determines contents of PDUS. |
+| 5 | `DP` | Data page - Data Page 0..3 - Lower 2 bits only. |
+| 6 | `D` | Destination Address - 1 byte holding the address where a message was sent. |
+| 7 | `DL` | Data Length - number of bytes in the data section to follow. |
+| 8+ | `(b0...bn)` | Message data - Message's data payload. |
 
 ---
 
-[1] [BDTP Protocol](../../DataProtocols/bdtp_protocol.md)
+[1] [BST](BST.md)

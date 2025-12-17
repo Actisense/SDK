@@ -1,6 +1,10 @@
-# Sending binary messages over asynchronous serial data streams
+# Sending BST binary messages over an asynchronous serial data stream
 
 A asynchronous serial data stream is a method of transferring bytes from a sender to a receiver. It can comprise a TCP/IP link, a serial communications port, or a bluetooth link, among many others.
+
+There is no method of sychronising frames, so Actisense devices use, BDTP protocol to add datagram framing.
+
+In addition, a checksum field is added for data integrity.
 
 ## Sending a message
 
@@ -8,7 +12,7 @@ A asynchronous serial data stream is a method of transferring bytes from a sende
 2. Calculate the checksum
 3. Encode using the BDTP protocol
 
-The complete binary message thus consists of the following components - noting that all data between STX and last DLE will need to be DLE escaped when a DLE charcter is encountered.
+The complete binary message thus consists of the following components - noting that all data between STX and last DLE will need to be DLE escaped when a DLE character is encountered.
 
 | Component        | Description             | Size                 |
 | ---------------- | ----------------------- | -------------------- |
@@ -152,7 +156,7 @@ Apply [BDTP framing](../../DataProtocols/bdtp_protocol.md):
 - Original CAN data: 8 bytes
 - BST 95 message: 16 bytes (header + data)
 - With checksum: 17 bytes
-- BDTP encoded: 23 bytes (17 + 1 escaped DLE + 4 framing + 1 checksum escape not needed)
+- BDTP encoded: 22 bytes (17 + 1 escaped DLE + 4 framing)
 
 ---
 

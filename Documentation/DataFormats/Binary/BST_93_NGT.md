@@ -20,7 +20,7 @@ As a binary format, the N2K Actisense header fields are not easy to read. The bi
 
 Messages sent in this format are binary encoded using [BDTP Protocol](../../DataProtocols/bdtp_protocol.md)
 
-The output from the BDTP decoder is a BST message. The first byte identifies the message type. If it is 93 Hex, it is a "BST 93" message in the following form:
+The output from the BDTP decoder is a BST message. The first byte identifies the message type. If it is 93 Hex, it is a `BST 93` message in the following form:
 
 **`ID` `L` `P` `PDUS` `PDUF` `DP` `D` `S` `TTTT` `DL` `b0b1b2b3b4b5b6b7..bn`**
 
@@ -34,30 +34,9 @@ The output from the BDTP decoder is a BST message. The first byte identifies the
 | 5 | `DP` | Data page - Data Page 0..3 - Lower 2 bits only |
 | 6 | `D` | Destination Address - 1 byte holding the address where a message was sent |
 | 7 | `S` | Source Address - 1 byte holding the address of the device sending the message |
-| 8-11 | `TTTT` | Timestamp - Four bytes for timestamp in milliseconds, little endian |
+| 8-11 | `TTTT` | [Timestamp](binary_timestamp_example.md) - Four bytes for timestamp in milliseconds, little endian |
 | 12 | `DL` | Data Length - number of bytes in the data section to follow |
 | 13..(13+DL-1) | `(b0...bn)` | Message data - Message's data variable length payload |
-
-### Worked Example: Calculating the 32-bit Timestamp
-
-The timestamp is stored as a 32-bit unsigned integer in **little-endian** format across bytes 8-11. In little-endian, the least significant byte comes first.
-
-**Example bytes (hex):** `A0 86 01 00`
-
-| Byte | Position | Hex Value | Decimal | Calculation |
-|------|----------|-----------|---------|-------------|
-| 8 | Byte 0 (LSB) | A0 | 160 | 160 × 256⁰ = 160 |
-| 9 | Byte 1 | 86 | 134 | 134 × 256¹ = 34,304 |
-| 10 | Byte 2 | 01 | 1 | 1 × 256² = 65,536 |
-| 11 | Byte 3 (MSB) | 00 | 0 | 0 × 256³ = 0 |
-
-**Formula:**
-$$\text{Timestamp} = B_8 + (B_9 \times 256) + (B_{10} \times 65536) + (B_{11} \times 16777216)$$
-
-**Calculation:**
-$$160 + 34304 + 65536 + 0 = 100000 \text{ ms}$$
-
-This equals **100,000 milliseconds** or **100 seconds** since the device started.
 
 ---
 
