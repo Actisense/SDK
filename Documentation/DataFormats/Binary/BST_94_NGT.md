@@ -20,9 +20,7 @@ As a binary format, the N2K Actisense header fields are not easy to read. The bi
 
 ## Format of BST 94
 
-Messages sent in this format are binary encoded using [BDTP Protocol](../../DataProtocols/bdtp_protocol.md)
-
-The output from the BDTP decoder is a BST message. The first byte identifies the message type. If it is 94 Hex, it is a "BST 94" message in the following form:
+The first byte identifies the message type. If it is 94 Hex, it is a "BST 94" message in the following form:
 
 **`ID` `L` `P` `PDUS` `PDUF` `DP` `D` `DL` `b0b1b2b3b4b5b6b7..bn`**
 
