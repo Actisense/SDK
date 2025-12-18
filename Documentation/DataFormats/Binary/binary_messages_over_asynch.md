@@ -1,8 +1,8 @@
 # Sending BST binary messages over an asynchronous serial data stream
 
-A asynchronous serial data stream is a method of transferring bytes from a sender to a receiver. It can comprise a TCP/IP link, a serial communications port, or a bluetooth link, among many others.
+An asynchronous serial data stream is a method of transferring bytes from a sender to a receiver. It can comprise a TCP/IP link, a serial communications port, or a Bluetooth link, among many others.
 
-There is no method of sychronising frames, so Actisense devices use, BDTP protocol to add datagram framing.
+There is no method of synchronising frames, so Actisense devices use BDTP protocol to add datagram framing.
 
 In addition, a checksum field is added for data integrity.
 
