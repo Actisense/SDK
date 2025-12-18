@@ -1,4 +1,4 @@
-# CAN Frame BST 95
+# BST 95 CAN Frame
 
 ## Description
 
