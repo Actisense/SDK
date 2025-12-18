@@ -1,6 +1,6 @@
 # Binary Encoded Message (BEM)
 
-Actisense devloped BST further to create BEM (BinaryEncoded Message format).
+Actisense developed BST further to create BEM (Binary Encoded Message format).
 
 Adding a second message id (BEM Id) to the message allowed a richer command set without consuming excessive BST ID codes.
 
@@ -21,3 +21,4 @@ Where
 - `Store Length` Length of data block in bytes
 - `BEM ID` Command Id extension
 - `Data Block` The data block is the message data block
+
