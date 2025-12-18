@@ -6,10 +6,10 @@ Using a BST 93 message as an example, the timestamp is stored as a 32-bit unsign
 
 | Byte | Position | Hex Value | Decimal | Calculation |
 |------|----------|-----------|---------|-------------|
-| 8    | Byte 0 (LSB) | A0 | 160 | 160 × 256⁰ = 160 |
-| 9    | Byte 1 | 86 | 134 | 134 × 256¹ = 34,304 |
-| 10   | Byte 2 | 01 | 1 | 1 × 256² = 65,536 |
-| 11   | Byte 3 (MSB) | 00 | 0 | 0 × 256³ = 0 |
+| 8    | T₀ (LSB) | A0 | 160 | 160 × 256⁰ = 160 |
+| 9    | T₁       | 86 | 134 | 134 × 256¹ = 34,304 |
+| 10   | T₂       | 01 | 1 | 1 × 256² = 65,536 |
+| 11   | T₃ (MSB) | 00 | 0 | 0 × 256³ = 0 |
 
 **Formula:**
 $$\text{Timestamp} = B_8 + (B_9 \times 256) + (B_{10} \times 65536) + (B_{11} \times 16777216)$$
