@@ -16,11 +16,11 @@ Use where CAN frames need to be sent without modification, and where a simple te
 
 ## Advantages of Can Frame ASCII
 
-Because this output format is ASCII, it's easy to view in a terminal logger without any special decoder software. It's therefore easy to decode using string manipulation in Javascript or typescript code.
+Because this output format is ASCII, it's easy to view in a terminal logger without any special decoder software. It's therefore easy to decode using string manipulation in JavaScript or TypeScript code.
 
 ## Disadvantages of Can Frame ASCII
 
-ASCII format encode each binary value as two HEX digits, so use roughly twice the bandwidth that an equivalent binay format would use to send the same amount of data. This may be relevant on applications that transfer to the cloud. If bandwidth is of ultimate importance, always use a binary format to send data.
+ASCII format encodes each binary value as two HEX digits, so use roughly twice the bandwidth that an equivalent binary format would use to send the same amount of data. This may be relevant on applications that transfer to the cloud. If bandwidth is of ultimate importance, always use a binary format to send data.
 
 (Note: Much of this disadvantage will be overcome if the cloud connection employs compression, as ASCII data is highly compressible)
 
@@ -36,7 +36,7 @@ Example:
 
 where:  
 
-`hhmmss.ddd` = Time of message transmission or reception, ddd are milliseconds. The .ddd is optional - settings on Actisense deivces can be applied to just send seconds only to save on bandwidth if low-resolution time stamping is all that is required  
+`hhmmss.ddd` = Time of message transmission or reception, ddd are milliseconds. The .ddd is optional - settings on Actisense devices can be applied to just send seconds only to save on bandwidth if low-resolution time stamping is all that is required  
   
 `D` = direction of the message  
    `R` = from NMEA 2000 to application  
