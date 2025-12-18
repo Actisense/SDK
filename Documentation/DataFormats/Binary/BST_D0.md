@@ -1,4 +1,4 @@
-# NMEA 2000 BST D0 Format
+# BST D0 NMEA 2000 Format
 
 The latest binary format used in newer Actisense devices such as WGX and PRO-NDC-1-E2K
 
