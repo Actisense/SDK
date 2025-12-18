@@ -4,11 +4,11 @@ A BST frame holds Actisense binary datagrams. A BST datagram when sent over a pr
 
 ## History
 
-Actisense have been making marine instruments since 1997. At that time, devices were simple and memory contrained, and a lightweight, efficient way of encoding and decoding data was required to control devices over serial connections. This resulted in BST format, which has evolved over the intervening period and is still used as the most efficient way of send marine data between PCs, the cloud, and devices.
+Actisense have been making marine instruments since 1997. At that time, devices were simple and memory constrained, and a lightweight, efficient way of encoding and decoding data was required to control devices over serial connections. This resulted in BST format, which has evolved over time and is still the most efficient way of sending marine data between PCs, the cloud, and devices.
 
 ### Adoption in Navigation and Marine Electronics
 
-A number of manufacturers have copied this format because many marine applications use it to send and receive NMEA 2000 data. Projects such as "CAN Boat" have become popular as they provide free and easy to use navigation for boaters, and it integrates well with our BST 93/94 format which is used by our poular NGT PC interface.
+A number of manufacturers have copied this format because many marine applications use it to send and receive NMEA 2000 data. Projects such as "CAN Boat" have become popular as they provide free and easy to use navigation for boaters, and it integrates well with our BST 93/94 format which is used by our popular NGT PC interface.
 
 ### Why BST Encoding Remains Relevant
 
@@ -37,7 +37,7 @@ Where
 
 ## Sending BST to a device
 
-Actisense devices have mutliple communications ports.  The most common are serial and CAN (NMEA 2000) ports.
+Actisense devices have multiple communications ports.  The most common are serial and CAN (NMEA 2000) ports.
 
 Data sent over serial directly to a device is considered a **local message** and data sent over NMEA 2000 is considered a **remote message**.
 
@@ -45,7 +45,7 @@ Data sent over serial directly to a device is considered a **local message** and
 
 If a message is sent locally, the theoretical maximum data block length of a BST message is 255 bytes, as that is the maximum 8-bit number that may be inserted into the data length byte.
 
-If a message is sent via addressed fast packet to a remote device over CAN bus, the maximum length is set by the BST over NMEA 2000 protocol limitations. Here, overhead is added to ***embed*** or ***wrap*** the BST message into an nmea 2000 message, so that it can be sent over the bus.  This limits the length of the bst message to 208 bytes.
+If a message is sent via addressed fast packet to a remote device over CAN bus, the maximum length is set by the BST over NMEA 2000 protocol limitations. Here, overhead is added to ***embed*** or ***wrap*** the BST message into an NMEA 2000 message, so that it can be sent over the bus.  This limits the length of the BST message to 208 bytes.
 
 | Message Type        | Store Length Range |
 | ------------------- | ------------------ |
