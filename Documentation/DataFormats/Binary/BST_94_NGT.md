@@ -25,7 +25,7 @@ The first byte identifies the message type. If it is 94 Hex, it is a "BST 94" me
 **`ID` `L` `P` `PDUS` `PDUF` `DP` `D` `DL` `b0b1b2b3b4b5b6b7..bn`**
 
 | Byte | Field | Description |
-|------|-------|-------------|
+| ------ | ------- | ------------- |
 | 0 | `ID` | BST Message ID, always 94 Hex (148 Decimal) |
 | 1 | `L` | Length - single byte length. This is the payload of the BST message excluding the ID and length bytes. |
 | 2 | `P` | Message Priority 0..7, Lower 3 bits only. |

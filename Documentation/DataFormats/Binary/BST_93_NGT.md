@@ -20,7 +20,7 @@ As a binary format, the N2K Actisense header fields are not easy to read. The bi
 
 The first byte identifies the message type. If it is 93 Hex, it is a `BST 93` message in the following form:
 
-**`ID` `L` `P` `PDUS` `PDUF` `DP` `D` `S` `TTTT` `DL` `b0b1b2b3b4b5b6b7..bn`**
+**`ID` `L` `P` `PDUS` `PDUF` `DP` `D` `S` `T₀T₁T₂T₃` `DL` `b0b1b2b3b4b5b6b7..bn`**
 
 | Byte | Field | Description |
 |------|-------|-------------|
