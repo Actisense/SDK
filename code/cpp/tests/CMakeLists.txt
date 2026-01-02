@@ -23,10 +23,9 @@ function(add_sdk_test test_name test_file)
 endfunction()
 
 # ============================================================================
-# Test Definitions (placeholder - add as tests are written)
+# Test Subdirectories
 # ============================================================================
-# add_sdk_test(test_error_category unit/test_error_category.cpp)
-# add_sdk_test(test_protocol_registry unit/test_protocol_registry.cpp)
-# add_sdk_test(test_loopback_session integration/test_loopback_session.cpp)
+add_subdirectory(unit)
+add_subdirectory(integration)
 
-message(STATUS "Tests configured (add test files in tests/ subdirectories)")
+message(STATUS "Tests configured (add test files in tests/unit/ and tests/integration/)")
