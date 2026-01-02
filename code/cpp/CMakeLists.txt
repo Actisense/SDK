@@ -1,15 +1,32 @@
 cmake_minimum_required(VERSION 3.20)
 
+# ============================================================================
+# Auto-detect vcpkg if available
+# ============================================================================
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    # Check common vcpkg locations
+    if(DEFINED ENV{VCPKG_ROOT})
+        set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
+        message(STATUS "Auto-detected vcpkg from VCPKG_ROOT: $ENV{VCPKG_ROOT}")
+    elseif(EXISTS "C:/vcpkg/scripts/buildsystems/vcpkg.cmake")
+        set(CMAKE_TOOLCHAIN_FILE "C:/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
+        message(STATUS "Auto-detected vcpkg at C:/vcpkg")
+    elseif(EXISTS "$ENV{USERPROFILE}/vcpkg/scripts/buildsystems/vcpkg.cmake")
+        set(CMAKE_TOOLCHAIN_FILE "$ENV{USERPROFILE}/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
+        message(STATUS "Auto-detected vcpkg at $ENV{USERPROFILE}/vcpkg")
+    endif()
+endif()
+
 project(ActisenseSDK
     VERSION 0.1.0
-    DESCRIPTION "Modern C++17 SDK for Actisense device communication"
+    DESCRIPTION "Modern C++20 SDK for Actisense device communication"
     LANGUAGES CXX
 )
 
 # ============================================================================
 # C++ Standard & Compiler Configuration
 # ============================================================================
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 

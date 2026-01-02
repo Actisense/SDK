@@ -16,7 +16,7 @@ function(add_sdk_example example_name example_file)
             ${CMAKE_CURRENT_SOURCE_DIR}/../src/public
     )
     
-    target_compile_features(${example_name} PRIVATE cxx_std_17)
+    target_compile_features(${example_name} PRIVATE cxx_std_20)
 endfunction()
 
 # ============================================================================

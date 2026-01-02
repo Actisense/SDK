@@ -1,5 +1,9 @@
 # tests/CMakeLists.txt - Unit and integration tests
 
+# Store the source directories before we descend into subdirectories
+set(SDK_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
+set(SDK_PUBLIC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src/public")
+
 # ============================================================================
 # Test Helper Function
 # ============================================================================
@@ -14,10 +18,11 @@ function(add_sdk_test test_name test_file)
     
     target_include_directories(${test_name}
         PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/../src
+            ${SDK_SRC_DIR}
+            ${SDK_PUBLIC_DIR}
     )
     
-    target_compile_features(${test_name} PRIVATE cxx_std_17)
+    target_compile_features(${test_name} PRIVATE cxx_std_20)
     
     add_test(NAME ${test_name} COMMAND ${test_name})
 endfunction()

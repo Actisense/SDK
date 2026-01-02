@@ -12,6 +12,7 @@ target_include_directories(actisense_sdk
         $<INSTALL_INTERFACE:include>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
 # ============================================================================
@@ -27,24 +28,18 @@ set(PUBLIC_HEADERS
 )
 
 # ============================================================================
-# Source Files (add as modules develop)
+# Source Files
 # ============================================================================
-# Placeholder source to satisfy STATIC library requirement
-# Will be replaced with actual sources in Phase 1+
 set(SDK_SOURCES
-    # core/version.cpp
-    # core/error_category.cpp
-    # transport/loopback_transport.cpp
-    # protocols/protocol_registry.cpp
-)
+    # Core
+    core/error_category.cpp
 
-# For now, create a minimal source to allow library creation
-# This will be replaced when Phase 1 implementation begins
-if(NOT SDK_SOURCES)
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/placeholder.cpp" 
-         "// Placeholder - will be replaced with actual sources\n")
-    list(APPEND SDK_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/placeholder.cpp")
-endif()
+    # Transport layer (internal)
+    transport/loopback/loopback_transport.cpp
+
+    # Protocols
+    protocols/bdtp/bdtp_protocol.cpp
+)
 
 target_sources(actisense_sdk PRIVATE ${SDK_SOURCES})
 
@@ -63,4 +58,4 @@ endif()
 # ============================================================================
 # Compiler Features
 # ============================================================================
-target_compile_features(actisense_sdk PUBLIC cxx_std_17)
+target_compile_features(actisense_sdk PUBLIC cxx_std_20)

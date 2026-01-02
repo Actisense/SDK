@@ -69,6 +69,17 @@ namespace Sdk
 	*******************************************************************************/
 	using ErrorCallback = std::function<void(ErrorCode code, std::string_view message)>;
 
+	/**************************************************************************//**
+	\brief      ADL-compatible make_error_code for ErrorCode
+	\details    Required for std::is_error_code_enum integration
+	\param[in]  code  The SDK error code
+	\return     std::error_code 
+	*******************************************************************************/
+	[[nodiscard]] inline std::error_code make_error_code(ErrorCode code) noexcept
+	{
+		return makeErrorCode(code);
+	}
+
 }; /* namespace Sdk */
 }; /* namespace Actisense */
 

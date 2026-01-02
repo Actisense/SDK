@@ -1,4 +1,7 @@
 # Integration Tests
+
+# BDTP over loopback transport
+add_sdk_test(test_bdtp_loopback test_bdtp_loopback.cpp)
 # Add integration test files here as they are developed
 
 # Example (uncomment when implementing Phase 6+):
