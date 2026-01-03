@@ -24,7 +24,7 @@ set(PUBLIC_HEADERS
     public/config.hpp
     public/events.hpp
     public/session.hpp
-    public/sdk.hpp
+    public/api.hpp
 )
 
 # ============================================================================

@@ -1,8 +1,8 @@
-#ifndef __ACTISENSE_SDK_SDK_HPP
-#define __ACTISENSE_SDK_SDK_HPP
+#ifndef __ACTISENSE_SDK_API_HPP
+#define __ACTISENSE_SDK_API_HPP
 
 /**************************************************************************//**
-\file       sdk.hpp
+\file       api.hpp
 \brief      Main facade for Actisense SDK
 \details    High-level entry points for device discovery, session creation,
             and SDK management.
@@ -16,6 +16,7 @@
 #include "config.hpp"
 #include "events.hpp"
 #include "session.hpp"
+#include "serial_device_info.hpp"
 
 #include <memory>
 #include <vector>
@@ -27,11 +28,6 @@ namespace Actisense
 namespace Sdk
 {
 	/* Definitions ---------------------------------------------------------- */
-
-	/**************************************************************************//**
-	\brief      Serial port enumeration callback
-	*******************************************************************************/
-	using PortEnumerationCallback = std::function<void(const std::vector<std::string>& ports)>;
 
 	/**************************************************************************//**
 	\brief      Host resolution callback
@@ -47,7 +43,7 @@ namespace Sdk
 	\brief      Main SDK facade class
 	\details    Provides static methods for SDK operations. Thread-safe.
 	*******************************************************************************/
-	class Sdk
+	class Api
 	{
 	public:
 		/**************************************************************************//**
@@ -61,7 +57,7 @@ namespace Sdk
 		\param[in]  callback  Called with list of port names
 		\details    Asynchronously discovers serial ports on the system
 		*******************************************************************************/
-		static void enumerateSerialPorts(PortEnumerationCallback callback);
+		static std::vector<SerialDeviceInfo> enumerateSerialDevices();
 
 		/**************************************************************************//**
 		\brief      Resolve hostname to endpoints
@@ -85,10 +81,10 @@ namespace Sdk
 			SessionOpenedCallback onOpened);
 
 	private:
-		Sdk() = delete;
-		~Sdk() = delete;
-		Sdk(const Sdk&) = delete;
-		Sdk& operator=(const Sdk&) = delete;
+		Api() = delete;
+		~Api() = delete;
+		Api(const Api&) = delete;
+		Api& operator=(const Api&) = delete;
 	};
 
 }; /* namespace Sdk */
