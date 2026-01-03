@@ -19,12 +19,12 @@ target_include_directories(actisense_sdk
 # Public Header Files
 # ============================================================================
 set(PUBLIC_HEADERS
-    public/actisense/version.hpp
-    public/actisense/error.hpp
-    public/actisense/config.hpp
-    public/actisense/events.hpp
-    public/actisense/session.hpp
-    public/actisense/sdk.hpp
+    public/version.hpp
+    public/error.hpp
+    public/config.hpp
+    public/events.hpp
+    public/session.hpp
+    public/sdk.hpp
 )
 
 # ============================================================================

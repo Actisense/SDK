@@ -14,8 +14,11 @@ if(MSVC)
     # Note: Use safe alternatives (_s) on Windows when possible
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
     
-    # Runtime library: dynamic
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+    # Runtime library: use appropriate runtime for build type
+    # MultiThreaded$<$<CONFIG:Debug>:Debug>DLL expands to:
+    #   - MultiThreadedDebugDLL for Debug builds
+    #   - MultiThreadedDLL for Release builds
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 endif()
 
 # ============================================================================

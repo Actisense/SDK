@@ -10,8 +10,8 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include <actisense/error.hpp>
-#include <actisense/events.hpp>
+#include <error.hpp>
+#include <events.hpp>
 
 #include <cstdint>
 #include <string>

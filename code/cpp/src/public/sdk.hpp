@@ -11,11 +11,11 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include <actisense/version.hpp>
-#include <actisense/error.hpp>
-#include <actisense/config.hpp>
-#include <actisense/events.hpp>
-#include <actisense/session.hpp>
+#include "version.hpp"
+#include "error.hpp"
+#include "config.hpp"
+#include "events.hpp"
+#include "session.hpp"
 
 #include <memory>
 #include <vector>

@@ -7,7 +7,7 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include <actisense/error.hpp>
+#include <error.hpp>
 
 #include <gtest/gtest.h>
 

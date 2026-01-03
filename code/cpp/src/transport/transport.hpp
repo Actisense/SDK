@@ -11,8 +11,8 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include <actisense/error.hpp>
-#include <actisense/config.hpp>
+#include <error.hpp>
+#include <config.hpp>
 
 #include <cstdint>
 #include <functional>
