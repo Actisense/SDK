@@ -113,7 +113,7 @@ Result: checksum = 0xBF
 
 ### Step 3: Encode using the BDTP protocol
 
-Apply [BDTP framing](../../DataProtocols/bdtp_protocol.md):
+Apply [BDTP framing](../../DataProtocols/bdtp-protocol.md):
 
 1. Add `DLE STX` (10 02) header
 2. Escape any DLE (0x10) bytes in the data by doubling them

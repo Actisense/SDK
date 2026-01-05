@@ -6,7 +6,7 @@ Tx Format: `RAW Ascii`
 
 A simple-to-read ASCII formatted CAN frame output.
 
-See [1] [CAN frame formats](../can_frame_formats.md)
+See [1] [CAN frame formats](../can-frame-formats.md)
 
 In RAW CAN ASCII mode, these CAN frames are converted to the ASCII text format described below.
 

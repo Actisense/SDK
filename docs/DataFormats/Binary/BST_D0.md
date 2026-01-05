@@ -20,7 +20,7 @@ As a binary format, the BST D0 protocol header fields are not easy to read. The 
 
 ## Format of BST D0
 
-Messages sent in this format are binary encoded using [BDTP Protocol](../../DataProtocols/bdtp_protocol.md)
+Messages sent in this format are binary encoded using [BDTP Protocol](../../DataProtocols/bdtp-protocol.md)
 
 The output from the BDTP decoder is a BST message. The first byte identifies the message type. If it is D0 Hex, it is a BST D0 message in the following form:
 
@@ -136,4 +136,4 @@ function calculate_pgn(dpp, pduf, pdus):
 
 ---
 
-[1] [BDTP Protocol](../../DataProtocols/bdtp_protocol.md)
+[1] [BDTP Protocol](../../DataProtocols/bdtp-protocol.md)
