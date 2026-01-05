@@ -1,0 +1,340 @@
+/**************************************************************************//**
+\file       bem_protocol.cpp
+\brief      BEM (Binary Encoded Message) protocol implementation
+\details    Command encoding, response decoding, and request/response correlation
+
+\copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
+*******************************************************************************/
+
+/* Dependent includes ------------------------------------------------------- */
+#include "bem_protocol.hpp"
+
+namespace Actisense
+{
+namespace Sdk
+{
+	/* Public Function Definitions ------------------------------------------ */
+
+	BemProtocol::BemProtocol() = default;
+
+	BemProtocol::~BemProtocol()
+	{
+		clearPendingRequests();
+	}
+
+	bool BemProtocol::encodeCommand(
+		const BemCommand& command,
+		std::vector<uint8_t>& outFrame,
+		std::string& outError)
+	{
+		if (!isBemCommand(command.bstId))
+		{
+			outError = "Invalid BST ID for BEM command";
+			return false;
+		}
+
+		if (command.data.size() > 252) /* 255 - 3 for header */
+		{
+			outError = "BEM command data too large";
+			return false;
+		}
+
+		/* Build BST payload: BEM ID + data */
+		const uint8_t storeLen = static_cast<uint8_t>(1 + command.data.size());
+
+		std::vector<uint8_t> bstPayload;
+		bstPayload.reserve(2 + storeLen + 1); /* ID + Len + payload + checksum */
+
+		bstPayload.push_back(static_cast<uint8_t>(command.bstId));
+		bstPayload.push_back(storeLen);
+		bstPayload.push_back(static_cast<uint8_t>(command.bemId));
+		bstPayload.insert(bstPayload.end(), command.data.begin(), command.data.end());
+
+		/* Calculate and append checksum */
+		const uint8_t checksum = BdtpProtocol::calculateChecksum(bstPayload);
+		bstPayload.push_back(checksum);
+
+		/* Apply BDTP framing */
+		BdtpProtocol::encodeFrame(bstPayload, outFrame);
+
+		++commands_sent_;
+		return true;
+	}
+
+	bool BemProtocol::encodeSimpleCommand(
+		BemCommandId bemId,
+		BstId bstId,
+		std::vector<uint8_t>& outFrame,
+		std::string& outError)
+	{
+		BemCommand cmd;
+		cmd.bstId = bstId;
+		cmd.bemId = bemId;
+		/* No data payload for simple commands */
+
+		return encodeCommand(cmd, outFrame, outError);
+	}
+
+	bool BemProtocol::buildGetOperatingMode(
+		std::vector<uint8_t>& outFrame,
+		std::string& outError)
+	{
+		return encodeSimpleCommand(
+			BemCommandId::GetOperatingMode,
+			BstId::Bem_PG_A1,
+			outFrame,
+			outError);
+	}
+
+	bool BemProtocol::buildSetOperatingMode(
+		uint16_t mode,
+		std::vector<uint8_t>& outFrame,
+		std::string& outError)
+	{
+		BemCommand cmd;
+		cmd.bstId = BstId::Bem_PG_A1;
+		cmd.bemId = BemCommandId::SetOperatingMode;
+		
+		/* Mode is 2 bytes, little-endian */
+		cmd.data.resize(2);
+		writeU16LE(cmd.data.data(), mode);
+
+		return encodeCommand(cmd, outFrame, outError);
+	}
+
+	bool BemProtocol::isBemResponse(const BstDatagram& datagram) const
+	{
+		return Actisense::Sdk::isBemResponse(static_cast<BstId>(datagram.bstId));
+	}
+
+	std::optional<BemResponse> BemProtocol::decodeResponse(
+		const BstDatagram& datagram,
+		std::string& outError)
+	{
+		if (!isBemResponse(datagram))
+		{
+			outError = "Not a BEM response BST ID";
+			return std::nullopt;
+		}
+
+		/* Minimum response: header (12 bytes) */
+		if (datagram.data.size() < kBemGP_OffData)
+		{
+			outError = "BEM response too short";
+			return std::nullopt;
+		}
+
+		BemResponse response;
+		response.header.bstId = static_cast<BstId>(datagram.bstId);
+		response.header.storeLength = datagram.storeLength;
+		response.checksumValid = true; /* Assumed validated by BDTP layer */
+
+		const auto& data = datagram.data;
+		response.header.bemId        = data[kBemGP_OffBemId];
+		response.header.sequenceId   = data[kBemGP_OffSeqId];
+		response.header.modelId      = readU16LE(&data[kBemGP_OffModelId]);
+		response.header.serialNumber = readU32LE(&data[kBemGP_OffSerial]);
+		response.header.errorCode    = readU32LE(&data[kBemGP_OffError]);
+
+		/* Extract data payload if present */
+		if (data.size() > kBemGP_OffData)
+		{
+			response.data.assign(
+				data.begin() + kBemGP_OffData,
+				data.end());
+		}
+
+		++responses_received_;
+		return response;
+	}
+
+	std::optional<BemResponse> BemProtocol::decodeResponseFromBytes(
+		ConstByteSpan data,
+		std::string& outError)
+	{
+		/* Minimum: ID(1) + Len(1) + header(12) = 14 bytes */
+		if (data.size() < 2 + kBemGP_OffData)
+		{
+			outError = "BEM response bytes too short";
+			return std::nullopt;
+		}
+
+		const auto bstId = static_cast<BstId>(data[0]);
+		if (!Actisense::Sdk::isBemResponse(bstId))
+		{
+			outError = "Not a BEM response BST ID";
+			return std::nullopt;
+		}
+
+		BstDatagram datagram;
+		datagram.bstId = data[0];
+		datagram.storeLength = data[1];
+		
+		if (data.size() < static_cast<std::size_t>(2 + datagram.storeLength))
+		{
+			outError = "BEM response payload truncated";
+			return std::nullopt;
+		}
+
+		datagram.data.assign(
+			data.begin() + 2,
+			data.begin() + 2 + datagram.storeLength);
+
+		return decodeResponse(datagram, outError);
+	}
+
+	uint8_t BemProtocol::registerRequest(
+		BemCommandId commandId,
+		std::chrono::milliseconds timeout,
+		BemResponseCallback callback)
+	{
+		std::lock_guard<std::mutex> lock(mutex_);
+
+		const uint8_t seqId = nextSequenceId();
+
+		PendingRequest req;
+		req.commandId = commandId;
+		req.sentAt = std::chrono::steady_clock::now();
+		req.timeout = timeout;
+		req.callback = std::move(callback);
+
+		pending_requests_[seqId] = std::move(req);
+
+		return seqId;
+	}
+
+	bool BemProtocol::correlateResponse(const BemResponse& response)
+	{
+		std::lock_guard<std::mutex> lock(mutex_);
+
+		auto it = pending_requests_.find(response.header.sequenceId);
+		if (it == pending_requests_.end())
+		{
+			/* No pending request with this sequence ID */
+			return false;
+		}
+
+		/* Found matching request */
+		auto callback = std::move(it->second.callback);
+		pending_requests_.erase(it);
+
+		++responses_correlated_;
+
+		/* Invoke callback outside lock? For now, keep it simple */
+		if (callback)
+		{
+			ErrorCode ec = ErrorCode::Ok;
+			std::string errorMsg;
+
+			if (response.header.errorCode != 0)
+			{
+				ec = ErrorCode::UnsupportedOperation; /* Map ARL errors later */
+				errorMsg = "Device returned error: " + 
+				           std::to_string(response.header.errorCode);
+			}
+
+			callback(response, ec, errorMsg);
+		}
+
+		return true;
+	}
+
+	std::size_t BemProtocol::processTimeouts()
+	{
+		std::vector<std::pair<uint8_t, BemResponseCallback>> timedOut;
+		const auto now = std::chrono::steady_clock::now();
+
+		{
+			std::lock_guard<std::mutex> lock(mutex_);
+
+			for (auto it = pending_requests_.begin(); it != pending_requests_.end();)
+			{
+				const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+					now - it->second.sentAt);
+
+				if (elapsed >= it->second.timeout)
+				{
+					timedOut.emplace_back(it->first, std::move(it->second.callback));
+					it = pending_requests_.erase(it);
+				}
+				else
+				{
+					++it;
+				}
+			}
+
+			timeout_count_ += timedOut.size();
+		}
+
+		/* Invoke callbacks outside lock */
+		for (auto& [seqId, callback] : timedOut)
+		{
+			if (callback)
+			{
+				callback(std::nullopt, ErrorCode::Timeout, "Request timed out");
+			}
+		}
+
+		return timedOut.size();
+	}
+
+	std::size_t BemProtocol::pendingRequestCount() const
+	{
+		std::lock_guard<std::mutex> lock(mutex_);
+		return pending_requests_.size();
+	}
+
+	void BemProtocol::clearPendingRequests()
+	{
+		std::vector<BemResponseCallback> callbacks;
+
+		{
+			std::lock_guard<std::mutex> lock(mutex_);
+
+			for (auto& [seqId, req] : pending_requests_)
+			{
+				if (req.callback)
+				{
+					callbacks.push_back(std::move(req.callback));
+				}
+			}
+			pending_requests_.clear();
+		}
+
+		/* Invoke callbacks outside lock */
+		for (auto& callback : callbacks)
+		{
+			callback(std::nullopt, ErrorCode::Canceled, "Request canceled");
+		}
+	}
+
+	uint8_t BemProtocol::nextSequenceId()
+	{
+		/* Note: mutex_ must be held by caller */
+		return sequence_counter_++;
+	}
+
+	uint16_t BemProtocol::readU16LE(const uint8_t* p) noexcept
+	{
+		return static_cast<uint16_t>(p[0]) |
+		       (static_cast<uint16_t>(p[1]) << 8);
+	}
+
+	uint32_t BemProtocol::readU32LE(const uint8_t* p) noexcept
+	{
+		return static_cast<uint32_t>(p[0]) |
+		       (static_cast<uint32_t>(p[1]) << 8) |
+		       (static_cast<uint32_t>(p[2]) << 16) |
+		       (static_cast<uint32_t>(p[3]) << 24);
+	}
+
+	void BemProtocol::writeU16LE(uint8_t* p, uint16_t value) noexcept
+	{
+		p[0] = static_cast<uint8_t>(value & 0xFF);
+		p[1] = static_cast<uint8_t>((value >> 8) & 0xFF);
+	}
+
+}; /* namespace Sdk */
+}; /* namespace Actisense */
+
+/**************** (C) COPYRIGHT Active Research Limited  ** END OF FILE **/

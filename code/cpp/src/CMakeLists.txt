@@ -33,12 +33,23 @@ set(PUBLIC_HEADERS
 set(SDK_SOURCES
     # Core
     core/error_category.cpp
+    core/session_impl.cpp
 
     # Transport layer (internal)
     transport/loopback/loopback_transport.cpp
+    transport/serial/serial_transport.cpp
 
     # Protocols
     protocols/bdtp/bdtp_protocol.cpp
+    protocols/bst/bst_decoder.cpp
+    protocols/bem/bem_protocol.cpp
+
+    # Public API implementation
+    public/api.cpp
+
+    # Platform-specific
+    $<$<PLATFORM_ID:Windows>:platform/windows/EnumerateSerialDevices_windows.cpp>
+    $<$<PLATFORM_ID:Linux>:platform/linux/EnumerateSerialDevices_linux.cpp>
 )
 
 target_sources(actisense_sdk PRIVATE ${SDK_SOURCES})
