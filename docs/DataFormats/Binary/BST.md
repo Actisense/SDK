@@ -8,7 +8,7 @@ Actisense have been making marine instruments since 1997. At that time, devices 
 
 ### Adoption in Navigation and Marine Electronics
 
-A number of manufacturers have copied this format because many marine applications use it to send and receive NMEA 2000 data. Projects such as "CAN Boat" have become popular as they provide free and easy to use navigation for boaters, and it integrates well with our BST 93/94 format which is used by our popular NGT PC interface.
+A number of manufacturers have copied this format because many marine applications use it to send and receive NMEA 2000 data. Projects such as "CAN Boat" have become popular as they provide free and easy to use navigation for boaters, and it integrates well with our BST 93 /94 format which is used by our popular NGT PC interface.
 
 ### Why BST Encoding Remains Relevant
 
@@ -51,3 +51,17 @@ If a message is sent via addressed fast packet to a remote device over CAN bus, 
 | ------------------- | ------------------ |
 | **Local Messages**  | 1 to 255 bytes     |
 | **Remote Messages** | 1 to 208 bytes     |
+
+## BST "Type 2"
+
+To overcome the data length considerations, BST type 2 - messages with BST ID of D0 Hex to DF Hex use BST type 2. These can only be sent over a local link due to message length limiations of fast packets. See [BST-D0](BST-D0.md) for an example using BST Type 2.
+
+| Byte | Field | Size | Description |
+| ------ | ------- | ------ | ------------- |
+| 0 | `ID` | 1 byte | BST Message ID, D0-DF Hex |
+| 1 | `L0` | 1 byte | Payload Length - lower byte of 16 bit little endian number |
+| 2 | `L1` | 1 byte | Payload Length - upper byte of 16 bit little endian number |
+
+## BST-BEM
+
+There are only 255 possible valid BST ID codes as the BST Id is an 8-bit number. To extend this, BST-BEM format was created to make a 16-bit command space. See [BST-BEM](BEM.md) for details.

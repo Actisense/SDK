@@ -27,7 +27,7 @@ The output from the BDTP decoder is a BST message. The first byte identifies the
 **`ID` `L0 L1` `D` `S` `PDUS` `PDUF` `DPP` `C` `TTTT` `b0b1b2b3b4b5b6b7..bn`**
 
 | Byte | Field | Size | Description |
-|------|-------|------|-------------|
+| ------ | ------- | ------ | ------------- |
 | 0 | `ID` | 1 byte | BST Message ID, always D0 Hex (208 Decimal) |
 | 1 | `L0` | 1 byte | Payload Length - lower byte of 16 bit little endian number |
 | 2 | `L1` | 1 byte | Payload Length - upper byte of 16 bit little endian number - the maximum length of an N2K message is 1785 |
