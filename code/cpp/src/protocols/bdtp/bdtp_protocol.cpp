@@ -216,8 +216,9 @@ namespace Sdk
 		bstPayload.push_back(static_cast<uint8_t>(datagram.data.size()));
 		bstPayload.insert(bstPayload.end(), datagram.data.begin(), datagram.data.end());
 
-		/* Calculate and append checksum */
-		const uint8_t checksum = calculateChecksum(bstPayload);
+		/* Calculate checksum such that sum of all bytes (including checksum) equals zero */
+		const uint8_t sum = calculateChecksum(bstPayload);
+		const uint8_t checksum = static_cast<uint8_t>(-sum);
 		bstPayload.push_back(checksum);
 
 		/* Encode with BDTP framing */
@@ -323,16 +324,14 @@ namespace Sdk
 			return false;
 		}
 
-		/* Verify checksum (covers ID + Length + Data) */
-		const auto checksumData = frameData.subspan(0, 2 + storeLength);
-		const uint8_t expectedChecksum = calculateChecksum(checksumData);
-		const uint8_t actualChecksum = frameData[2 + storeLength];
+		/* Verify checksum (sum of all bytes including checksum should be zero) */
+		const auto checksumData = frameData.subspan(0, 2 + storeLength + 1);
+		const uint8_t checksumResult = calculateChecksum(checksumData);
 
-		if (actualChecksum != expectedChecksum)
+		if (checksumResult != 0)
 		{
-			outError = "BST checksum mismatch - expected 0x" + 
-			           std::to_string(expectedChecksum) + ", got 0x" + 
-			           std::to_string(actualChecksum);
+			outError = "BST checksum mismatch - sum is 0x" + 
+			           std::to_string(checksumResult) + " (expected 0)";
 			return false;
 		}
 

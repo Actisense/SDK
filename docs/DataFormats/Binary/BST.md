@@ -23,17 +23,21 @@ Despite the age of the technique, BST format remains valuable for embedded and m
 
 Messages sent in this protocol have the following form:  
 
-| Byte  | Id           | Description             | Size                 |
-| ------| ------------ | ----------------------- | -------------------- |
-| 0     | BST ID       | Protocol identifier     | 1 byte (8-bit)       |
-| 1     | Store Length | Length of data payload  | 1 byte (8-bit)       |
-| 2     | Data Block   | Message payload         | Variable (see below) |
+| Byte   | Id           | Description             | Size                 |
+| -------| ------------ | ----------------------- | -------------------- |
+| 0      | BST ID       | Protocol identifier     | 1 byte (8-bit)       |
+| 1      | Store Length | Length of data payload  | 1 byte (8-bit)       |
+| 2      | Data Block   | Message payload         | Variable (see below) |
+| Length | Checksum     | Zero sum checksum       | 1 byte (8-bit)       |
 
 Where
 
 - `BST ID` The first byte is the BST ID which identifies the data container's content.
 - `Store Length` Length of data block in bytes
 - `Data Block` The data block is the message data block
+- `Checksum` Zero-sum checksum byte calculated as follows:
+  - **To encode**: Sum bytes 0 through N-1 (BST ID + Store Length + Data), then negate the result: `checksum = -(sum) mod 256`
+  - **To verify**: Sum all bytes 0 through N (including the checksum byte). The 8-bit result must equal zero.
 
 ## Sending BST to a device
 
