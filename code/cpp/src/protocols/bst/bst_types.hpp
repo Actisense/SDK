@@ -176,8 +176,8 @@ namespace Sdk
 	{
 		switch (id)
 		{
-		case BstId::Nmea2000_GatewayToPC:  return "BST-93 (N2K Gateway→PC)";
-		case BstId::Nmea2000_PCToGateway:  return "BST-94 (N2K PC→Gateway)";
+		case BstId::Nmea2000_GatewayToPC:  return "BST-93 (N2K Gateway-PC)";
+		case BstId::Nmea2000_PCToGateway:  return "BST-94 (N2K PC-Gateway)";
 		case BstId::CanFrame:              return "BST-95 (CAN Frame)";
 		case BstId::Nmea0183:              return "BST-9D (NMEA 0183)";
 		case BstId::Nmea2000_D0:           return "BST-D0 (N2K Latest)";

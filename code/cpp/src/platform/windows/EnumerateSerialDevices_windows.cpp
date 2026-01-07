@@ -81,6 +81,12 @@ namespace Sdk
 						DWORD fr_type = 0;
 						if (SetupDiGetDeviceRegistryProperty(devInfoHandle, &devInfo, SPDRP_FRIENDLYNAME, &fr_type, reinterpret_cast<PBYTE>(fr_name), static_cast<DWORD>(fr_size), reinterpret_cast<LPDWORD>(&fr_size)) && (REG_SZ == fr_type)) {
 							device_info.friendly_name = fr_name;
+							/* Remove any trailing null characters or control characters */
+							device_info.friendly_name.erase(
+								std::find_if(device_info.friendly_name.rbegin(), device_info.friendly_name.rend(),
+									[](unsigned char ch) { return ch > 31; }).base(),
+								device_info.friendly_name.end()
+							);
 						}
 						
 						enumeration.push_back(device_info);
