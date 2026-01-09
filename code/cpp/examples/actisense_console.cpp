@@ -53,6 +53,7 @@ using namespace Actisense::Sdk;
 
 /* Global State ------------------------------------------------------------- */
 static std::atomic<bool> g_running{true};
+static std::atomic<bool> g_consoleOutputEnabled{true};
 static std::ofstream g_logFile;
 
 /* Forward Declarations ----------------------------------------------------- */
@@ -223,12 +224,19 @@ void onEvent(const EventVariant& event)
 				}
 			}
 
-			std::cout << ss.str() << std::endl;
-			logFrame(ss.str());
+			const std::string message = ss.str();
+			logFrame(message);
+			if (g_consoleOutputEnabled)
+			{
+				std::cout << message << std::endl;
+			}
 		}
 		else if constexpr (std::is_same_v<T, DeviceStatusEvent>)
 		{
-			std::cout << "[STATUS] " << e.key << " = " << e.value << std::endl;
+			if (g_consoleOutputEnabled)
+			{
+				std::cout << "[STATUS] " << e.key << " = " << e.value << std::endl;
+			}
 		}
 	}, event);
 }
@@ -315,7 +323,7 @@ int main(int argc, char* argv[])
 	}
 	std::cout << "----------------------------------------" << std::endl;
 	std::cout << "Press Ctrl+C to exit" << std::endl;
-	std::cout << "Commands: 'g' = Get Mode, 's' = Set Mode, 'q' = Quit" << std::endl;
+	std::cout << "Commands: 'g' = Get Mode, 's' = Set Mode, 'c' = Console output toggle, 'q' = Quit" << std::endl;
 	std::cout << "----------------------------------------" << std::endl;
 
 	/* Create serial configuration */
@@ -531,6 +539,12 @@ void processUserInput(std::unique_ptr<SessionImpl>& session)
 		case 's':
 		case 'S':
 			std::cout << "[USER] Set Operating Mode not yet implemented" << std::endl;
+			break;
+
+		case 'c':
+		case 'C':
+			g_consoleOutputEnabled = !g_consoleOutputEnabled;
+			std::cout << "[USER] Console output " << (g_consoleOutputEnabled ? "enabled" : "disabled") << std::endl;
 			break;
 
 		case 'q':
