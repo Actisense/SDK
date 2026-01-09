@@ -168,7 +168,17 @@ namespace Sdk
 			return false;
 		}
 
-		encodeFrame(payload, outFrame);
+		/* Build payload with zero-sum checksum */
+		std::vector<uint8_t> payloadWithChecksum;
+		payloadWithChecksum.reserve(payload.size() + 1);
+		payloadWithChecksum.insert(payloadWithChecksum.end(), payload.begin(), payload.end());
+
+		/* Calculate checksum such that sum of all bytes (including checksum) equals zero */
+		const uint8_t sum = calculateChecksum(payloadWithChecksum);
+		const uint8_t checksum = static_cast<uint8_t>(-sum);
+		payloadWithChecksum.push_back(checksum);
+
+		encodeFrame(payloadWithChecksum, outFrame);
 		return true;
 	}
 

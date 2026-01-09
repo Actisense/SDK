@@ -43,6 +43,7 @@ set(SDK_SOURCES
     protocols/bdtp/bdtp_protocol.cpp
     protocols/bst/bst_decoder.cpp
     protocols/bem/bem_protocol.cpp
+    protocols/bem/bem_commands/operating_mode.cpp
 
     # Public API implementation
     public/api.cpp

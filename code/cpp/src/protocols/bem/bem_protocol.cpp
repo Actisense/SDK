@@ -51,7 +51,7 @@ namespace Sdk
 		bstPayload.insert(bstPayload.end(), command.data.begin(), command.data.end());
 
 		/* Calculate and append checksum */
-		const uint8_t checksum = BdtpProtocol::calculateChecksum(bstPayload);
+		const uint8_t checksum = static_cast<uint8_t>(-BdtpProtocol::calculateChecksum(bstPayload));
 		bstPayload.push_back(checksum);
 
 		/* Apply BDTP framing */
@@ -80,7 +80,7 @@ namespace Sdk
 		std::string& outError)
 	{
 		return encodeSimpleCommand(
-			BemCommandId::GetOperatingMode,
+			BemCommandId::GetSetOperatingMode,
 			BstId::Bem_PG_A1,
 			outFrame,
 			outError);
@@ -93,7 +93,7 @@ namespace Sdk
 	{
 		BemCommand cmd;
 		cmd.bstId = BstId::Bem_PG_A1;
-		cmd.bemId = BemCommandId::SetOperatingMode;
+		cmd.bemId = BemCommandId::GetSetOperatingMode;
 		
 		/* Mode is 2 bytes, little-endian */
 		cmd.data.resize(2);

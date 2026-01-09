@@ -27,6 +27,8 @@ Examples:
 #include "protocols/bst/bst_types.hpp"
 #include "protocols/bst/bst_decoder.hpp"
 #include "protocols/bem/bem_types.hpp"
+#include "protocols/bem/bem_commands/operating_mode.hpp"
+#include "protocols/bem/bem_commands/system_status.hpp"
 
 #include <iostream>
 #include <iomanip>
@@ -65,6 +67,98 @@ void onEvent(const EventVariant& event)
 			std::ostringstream ss;
 			ss << "[" << formatTimestamp() << "] ";
 			ss << "[RX] " << e.protocol << ": " << e.messageType;
+
+			/* Check for BEM unsolicited messages first */
+			if (e.protocol == "bem")
+			{
+				try
+				{
+					const auto& response = std::any_cast<const BemResponse&>(e.payload);
+					const auto bemId = static_cast<BemCommandId>(response.header.bemId);
+					
+					if (bemId == BemCommandId::SystemStatus)
+					{
+						/* Decode System Status (F2H) */
+						ss << "\n[STATUS] System Status from "
+						   << modelIdToString(response.header.modelId)
+						   << " (Serial: " << response.header.serialNumber << ")";
+						
+						if (!response.data.empty())
+						{
+							std::string error;
+							auto status = decodeSystemStatus(
+								response.data.data(), 
+								response.data.size(), 
+								error);
+							
+							if (status)
+							{
+								ss << "\n         Individual Buffers: " << status->individual_buffers_.size();
+								for (std::size_t i = 0; i < status->individual_buffers_.size(); ++i)
+								{
+									const auto& buf = status->individual_buffers_[i];
+									ss << "\n           [" << i << "] Rx: " 
+									   << static_cast<int>(buf.rx_bandwidth_) << "% BW, "
+									   << static_cast<int>(buf.rx_loading_) << "% Load, "
+									   << static_cast<int>(buf.rx_filtered_) << "% Filt, "
+									   << static_cast<int>(buf.rx_dropped_) << "% Drop"
+									   << " | Tx: "
+									   << static_cast<int>(buf.tx_bandwidth_) << "% BW, "
+									   << static_cast<int>(buf.tx_loading_) << "% Load";
+								}
+								
+								ss << "\n         Unified Buffers: " << status->unified_buffers_.size();
+								for (std::size_t j = 0; j < status->unified_buffers_.size(); ++j)
+								{
+									const auto& buf = status->unified_buffers_[j];
+									ss << "\n           [" << j << "] "
+									   << static_cast<int>(buf.bandwidth_) << "% BW, "
+									   << static_cast<int>(buf.loading_) << "% Load, "
+									   << static_cast<int>(buf.deleted_) << "% Del, "
+									   << static_cast<int>(buf.pointer_loading_) << "% Ptr";
+								}
+								
+								if (status->can_status_)
+								{
+									ss << "\n         CAN: RxErr=" 
+									   << static_cast<int>(status->can_status_->rx_error_count_)
+									   << " TxErr=" << static_cast<int>(status->can_status_->tx_error_count_)
+									   << " Status=0x" << std::hex 
+									   << static_cast<int>(status->can_status_->can_status_) << std::dec;
+								}
+								
+								if (status->operating_mode_)
+								{
+									const uint16_t mode = *status->operating_mode_;
+									const char* modeName = OperatingModeName(static_cast<OperatingMode>(mode));
+									ss << "\n         Operating Mode: 0x" << std::hex << mode << std::dec
+									   << " (" << modeName << ")";
+								}
+							}
+							else
+							{
+								ss << "\n         Decode error: " << error;
+							}
+						}
+					}
+					else
+					{
+						/* Other unsolicited BEM messages */
+						ss << " | BEM ID=0x" << std::hex 
+						   << static_cast<int>(response.header.bemId) << std::dec
+						   << " from " << modelIdToString(response.header.modelId)
+						   << " | " << formatHexBytes(response.data);
+					}
+				}
+				catch (const std::bad_any_cast&)
+				{
+					/* Not a BEM response */
+				}
+				
+				std::cout << ss.str() << std::endl;
+				logFrame(ss.str());
+				return;
+			}
 
 			/* Try to extract frame-specific details - try each type directly */
 			try
@@ -277,7 +371,9 @@ int main(int argc, char* argv[])
 							{
 								mode = response->data[0];
 							}
-							std::cout << "      Operating Mode: 0x" << std::hex << mode << std::dec << std::endl;
+							const char* modeName = OperatingModeName(static_cast<OperatingMode>(mode));
+							std::cout << "      Operating Mode: 0x" << std::hex << mode << std::dec 
+							          << " (" << modeName << ")" << std::endl;
 						}
 					}
 					else if (code == ErrorCode::Timeout)

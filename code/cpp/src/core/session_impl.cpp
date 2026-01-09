@@ -9,7 +9,7 @@
 /* Dependent includes ------------------------------------------------------- */
 #include "session_impl.hpp"
 #include "transport/serial/serial_transport.hpp"
-
+#include <format>
 #include <cstring>
 
 namespace Actisense
@@ -147,7 +147,7 @@ namespace Sdk
 	{
 		BemCommand cmd;
 		cmd.bstId = BstId::Bem_PG_A1;
-		cmd.bemId = BemCommandId::GetOperatingMode;
+		cmd.bemId = BemCommandId::GetSetOperatingMode;
 
 		sendBemCommand(cmd, timeout, std::move(callback));
 	}
@@ -159,7 +159,7 @@ namespace Sdk
 	{
 		BemCommand cmd;
 		cmd.bstId = BstId::Bem_PG_A1;
-		cmd.bemId = BemCommandId::SetOperatingMode;
+		cmd.bemId = BemCommandId::GetSetOperatingMode;
 		cmd.data.resize(2);
 		cmd.data[0] = static_cast<uint8_t>(mode & 0xFF);
 		cmd.data[1] = static_cast<uint8_t>((mode >> 8) & 0xFF);
@@ -305,7 +305,7 @@ namespace Sdk
 		{
 			ParsedMessageEvent event;
 			event.protocol = "bem";
-			event.messageType = "BEM_Response_" + std::to_string(response.header.bemId);
+			event.messageType = "BEM_Response_" + std::format("{:X}", response.header.bemId);
 			event.payload = response;
 
 			eventCallback_(EventVariant{event});
