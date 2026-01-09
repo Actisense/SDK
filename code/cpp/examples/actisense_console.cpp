@@ -40,6 +40,14 @@ Examples:
 #include <fstream>
 #include <sstream>
 
+#ifdef _WIN32
+#include <conio.h>  // for _kbhit() and _getch()
+#else
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
+#endif
+
 /* Namespace ---------------------------------------------------------------- */
 using namespace Actisense::Sdk;
 
@@ -54,6 +62,9 @@ void signalHandler(int signal);
 std::string formatHexBytes(const std::vector<uint8_t>& data, std::size_t maxBytes = 16);
 std::string formatTimestamp();
 void logFrame(const std::string& message);
+bool hasKeyPressed();
+char getKey();
+void processUserInput(std::unique_ptr<SessionImpl>& session);
 
 /* Event Handlers ----------------------------------------------------------- */
 
@@ -331,61 +342,11 @@ int main(int argc, char* argv[])
 	/* Main loop - process input and display frames */
 	while (g_running && session->isConnected())
 	{
-		/* Non-blocking check for user input (simplified) */
-		/* In a real application, you'd use proper async input handling */
+		/* Check for user keyboard input */
+		processUserInput(session);
 		
 		/* Let the session process data */
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-		/* Check for simple commands (would need proper input handling) */
-		/* For now, demonstrate sending a Get Operating Mode command once */
-		static bool sentInitialCommand = false;
-		if (!sentInitialCommand)
-		{
-			sentInitialCommand = true;
-
-			/* Wait a moment for device to be ready */
-			std::this_thread::sleep_for(std::chrono::seconds(1));
-
-			std::cout << "[CMD] Sending Get Operating Mode..." << std::endl;
-
-			session->getOperatingMode(
-				std::chrono::seconds(5),
-				[](const std::optional<BemResponse>& response, ErrorCode code, std::string_view errorMsg) {
-					if (code == ErrorCode::Ok && response)
-					{
-						std::cout << "[RSP] Operating Mode Response:" << std::endl;
-						std::cout << "      Model: " << modelIdToString(response->header.modelId) 
-						          << " (0x" << std::hex << response->header.modelId << ")" << std::endl;
-						std::cout << "      Serial: " << std::dec << response->header.serialNumber << std::endl;
-						std::cout << "      Error Code: " << response->header.errorCode << std::endl;
-
-						if (!response->data.empty())
-						{
-							uint16_t mode = 0;
-							if (response->data.size() >= 2)
-							{
-								mode = response->data[0] | (response->data[1] << 8);
-							}
-							else if (response->data.size() == 1)
-							{
-								mode = response->data[0];
-							}
-							const char* modeName = OperatingModeName(static_cast<OperatingMode>(mode));
-							std::cout << "      Operating Mode: 0x" << std::hex << mode << std::dec 
-							          << " (" << modeName << ")" << std::endl;
-						}
-					}
-					else if (code == ErrorCode::Timeout)
-					{
-						std::cout << "[RSP] Timeout waiting for Operating Mode response" << std::endl;
-					}
-					else
-					{
-						std::cout << "[RSP] Error: " << errorMsg << std::endl;
-					}
-				});
-		}
 	}
 
 	/* Clean shutdown */
@@ -491,6 +452,96 @@ void logFrame(const std::string& message)
 	if (g_logFile.is_open())
 	{
 		g_logFile << message << std::endl;
+	}
+}
+
+bool hasKeyPressed()
+{
+#ifdef _WIN32
+	return _kbhit() != 0;
+#else
+	int ch = getchar();
+	if (ch != EOF) {
+		ungetc(ch, stdin);
+		return true;
+	}
+	return false;
+#endif
+}
+
+char getKey()
+{
+#ifdef _WIN32
+	return static_cast<char>(_getch());
+#else
+	return getchar();
+#endif
+}
+
+void processUserInput(std::unique_ptr<SessionImpl>& session)
+{
+	if (!hasKeyPressed())
+		return;
+
+	char key = getKey();
+	
+	switch (key)
+	{
+		case 'g':
+		case 'G':
+			std::cout << "[USER] Requesting Operating Mode..." << std::endl;
+			session->getOperatingMode(
+				std::chrono::seconds(5),
+				[](const std::optional<BemResponse>& response, ErrorCode code, std::string_view errorMsg) {
+					if (code == ErrorCode::Ok && response)
+					{
+						std::cout << "[RSP] Operating Mode Response:" << std::endl;
+						std::cout << "      Model: " << modelIdToString(response->header.modelId) 
+						          << " (0x" << std::hex << response->header.modelId << ")" << std::endl;
+						std::cout << "      Serial: " << std::dec << response->header.serialNumber << std::endl;
+						std::cout << "      Error Code: " << response->header.errorCode << std::endl;
+
+						if (!response->data.empty())
+						{
+							uint16_t mode = 0;
+							if (response->data.size() >= 2)
+							{
+								mode = response->data[0] | (response->data[1] << 8);
+							}
+							else if (response->data.size() == 1)
+							{
+								mode = response->data[0];
+							}
+							const char* modeName = OperatingModeName(static_cast<OperatingMode>(mode));
+							std::cout << "      Operating Mode: 0x" << std::hex << mode << std::dec 
+							          << " (" << modeName << ")" << std::endl;
+						}
+					}
+					else if (code == ErrorCode::Timeout)
+					{
+						std::cout << "[RSP] Timeout waiting for Operating Mode response" << std::endl;
+					}
+					else
+					{
+						std::cout << "[RSP] Error: " << errorMsg << std::endl;
+					}
+				});
+			break;
+
+		case 's':
+		case 'S':
+			std::cout << "[USER] Set Operating Mode not yet implemented" << std::endl;
+			break;
+
+		case 'q':
+		case 'Q':
+			std::cout << "[USER] Quit requested" << std::endl;
+			g_running = false;
+			break;
+
+		default:
+			// Ignore other keys
+			break;
 	}
 }
 
