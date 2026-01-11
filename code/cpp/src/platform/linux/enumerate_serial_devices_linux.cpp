@@ -1,7 +1,7 @@
 #if defined (__linux__)
 
 /**************************************************************************//**
-\file		EnumerateSerialDevices_linux.cpp
+\file		enumerate_serial_devices_linux.cpp
 \author		(Created by) Phil Whitehurst
 \date		(Created on) 03/01/2026
 \brief		Implementation of the serial device enumeration function.
@@ -21,7 +21,7 @@
 #include <sstream>
 #include <unistd.h>
 #include <linux/limits.h>
-#include "EnumerateSerialDevices_linux.hpp"
+#include "enumerate_serial_devices_linux.hpp"
 
 namespace Actisense
 {

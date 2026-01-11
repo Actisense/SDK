@@ -49,8 +49,8 @@ set(SDK_SOURCES
     public/api.cpp
 
     # Platform-specific
-    $<$<PLATFORM_ID:Windows>:platform/windows/EnumerateSerialDevices_windows.cpp>
-    $<$<PLATFORM_ID:Linux>:platform/linux/EnumerateSerialDevices_linux.cpp>
+    $<$<PLATFORM_ID:Windows>:platform/windows/enumerate_serial_devices_windows.cpp>
+    $<$<PLATFORM_ID:Linux>:platform/linux/enumerate_serial_devices_linux.cpp>
 )
 
 target_sources(actisense_sdk PRIVATE ${SDK_SOURCES})

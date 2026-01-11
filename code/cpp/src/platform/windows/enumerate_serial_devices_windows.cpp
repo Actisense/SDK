@@ -1,7 +1,7 @@
 #if defined (_WIN32)
 
 /**************************************************************************//**
-\file		EnumerateSerialDevices_windows.cpp
+\file		enumerate_serial_devices_windows.cpp
 \author		(Created by) Phil Whitehurst
 \date		(Created on) 04/04/2012
 \brief		Implementation of the serial device enumeration function.
@@ -21,7 +21,7 @@
 #include <unordered_set>
 #include <algorithm>
 #include "Setupapi.h"
-#include "EnumerateSerialDevices_windows.hpp"
+#include "enumerate_serial_devices_windows.hpp"
 
 /* Definitions -------------------------------------------------------------- */
 #ifndef GUID_DEVINTERFACE_COMPORT

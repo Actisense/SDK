@@ -9,8 +9,8 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include "api.hpp"
-#include "../platform/windows/EnumerateSerialDevices_windows.hpp"
-#include "../platform/linux/EnumerateSerialDevices_linux.hpp"
+#include "../platform/windows/enumerate_serial_devices_windows.hpp"
+#include "../platform/linux/enumerate_serial_devices_linux.hpp"
 
 #include <cstdio>
 
