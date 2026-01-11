@@ -185,6 +185,7 @@ namespace Sdk
 
 	uint8_t BemProtocol::registerRequest(
 		BemCommandId commandId,
+		BstId bstId,
 		std::chrono::milliseconds timeout,
 		BemResponseCallback callback)
 	{
@@ -192,13 +193,29 @@ namespace Sdk
 
 		const uint8_t seqId = nextSequenceId();
 
+		/* Map command BST ID to corresponding response BST ID */
+		BstId responseBstId;
+		switch (bstId) {
+			case BstId::Bem_PG_A1: responseBstId = BstId::Bem_GP_A0; break;
+			case BstId::Bem_PG_A4: responseBstId = BstId::Bem_GP_A2; break;
+			case BstId::Bem_PG_A6: responseBstId = BstId::Bem_GP_A3; break;
+			case BstId::Bem_PG_A8: responseBstId = BstId::Bem_GP_A5; break;
+			default:
+				/* Default to A1->A0 mapping for unknown BST IDs */
+				responseBstId = BstId::Bem_GP_A0;
+				break;
+		}
+
+		/* Build correlation key from response BST ID and BEM command ID */
+		const uint64_t key = buildResponseKey(responseBstId, commandId);
+
 		PendingRequest req;
 		req.commandId = commandId;
 		req.sentAt = std::chrono::steady_clock::now();
 		req.timeout = timeout;
 		req.callback = std::move(callback);
 
-		pending_requests_[seqId] = std::move(req);
+		pending_requests_[key] = std::move(req);
 
 		return seqId;
 	}
@@ -206,11 +223,16 @@ namespace Sdk
 	bool BemProtocol::correlateResponse(const BemResponse& response)
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
+		
+		/* Build correlation key from response BST ID and BEM command ID */
+		const uint64_t key = buildResponseKey(
+			response.header.bstId,
+			static_cast<BemCommandId>(response.header.bemId));
 
-		auto it = pending_requests_.find(response.header.sequenceId);
+		auto it = pending_requests_.find(key);
 		if (it == pending_requests_.end())
 		{
-			/* No pending request with this sequence ID */
+			/* No pending request with this correlation key */
 			return false;
 		}
 
@@ -241,7 +263,7 @@ namespace Sdk
 
 	std::size_t BemProtocol::processTimeouts()
 	{
-		std::vector<std::pair<uint8_t, BemResponseCallback>> timedOut;
+		std::vector<std::pair<uint64_t, BemResponseCallback>> timedOut;
 		const auto now = std::chrono::steady_clock::now();
 
 		{
@@ -267,7 +289,7 @@ namespace Sdk
 		}
 
 		/* Invoke callbacks outside lock */
-		for (auto& [seqId, callback] : timedOut)
+		for (auto& [key, callback] : timedOut)
 		{
 			if (callback)
 			{
@@ -291,7 +313,7 @@ namespace Sdk
 		{
 			std::lock_guard<std::mutex> lock(mutex_);
 
-			for (auto& [seqId, req] : pending_requests_)
+			for (auto& [key, req] : pending_requests_)
 			{
 				if (req.callback)
 				{
@@ -306,6 +328,24 @@ namespace Sdk
 		{
 			callback(std::nullopt, ErrorCode::Canceled, "Request canceled");
 		}
+	}
+
+	uint64_t BemProtocol::buildResponseKey(BstId bstId, BemCommandId bemId) noexcept
+	{
+		/* Build 64-bit correlation key for request/response matching:
+		 * 
+		 * Bits 63-32: Reserved for future use (e.g., device serial, channel ID, etc.)
+		 * Bits 31-16: BST ID (response BST ID, e.g., A0, A2, A3, A5)
+		 * Bits 15-0:  BEM command ID (e.g., 0x11 for GetSetOperatingMode)
+		 * 
+		 * This allows correlation without relying on sequence IDs, which may not
+		 * be unique across different devices or channels.
+		 * 
+		 * Example key for GetSetOperatingMode response (A0/0x11):
+		 *   Key = 0x00000000_00A0_0011
+		 */
+		return (static_cast<uint64_t>(static_cast<uint16_t>(bstId)) << 16) |
+		       static_cast<uint64_t>(static_cast<uint16_t>(bemId));
 	}
 
 	uint8_t BemProtocol::nextSequenceId()

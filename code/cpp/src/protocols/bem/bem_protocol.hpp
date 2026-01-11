@@ -127,12 +127,14 @@ namespace Sdk
 		/**************************************************************************//**
 		\brief      Register a pending request for correlation
 		\param[in]  commandId  Command being sent
+		\param[in]  bstId      Command BST ID (to map to corresponding response BST ID)
 		\param[in]  timeout    Timeout for response
 		\param[in]  callback   Callback to invoke on response or timeout
 		\return     Sequence ID assigned to this request
 		*******************************************************************************/
 		uint8_t registerRequest(
 			BemCommandId commandId,
+			BstId bstId,
 			std::chrono::milliseconds timeout,
 			BemResponseCallback callback);
 
@@ -194,6 +196,14 @@ namespace Sdk
 		};
 
 		/**************************************************************************//**
+		\brief      Build correlation key from BST ID and BEM ID
+		\param[in]  bstId    BST command/response ID
+		\param[in]  bemId    BEM command ID
+		\return     64-bit key for request/response correlation
+		*******************************************************************************/
+		[[nodiscard]] static uint64_t buildResponseKey(BstId bstId, BemCommandId bemId) noexcept;
+
+		/**************************************************************************//**
 		\brief      Get next sequence ID (thread-safe)
 		*******************************************************************************/
 		uint8_t nextSequenceId();
@@ -215,7 +225,8 @@ namespace Sdk
 
 		mutable std::mutex          mutex_;
 		uint8_t                     sequence_counter_ = 0;
-		std::map<uint8_t, PendingRequest> pending_requests_;
+		/* map of requests pending by key composed of request details */
+		std::map<uint64_t, PendingRequest> pending_requests_;
 
 		/* Statistics */
 		std::size_t commands_sent_ = 0;

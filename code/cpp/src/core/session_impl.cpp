@@ -129,7 +129,7 @@ namespace Sdk
 		}
 
 		/* Register for response correlation */
-		const uint8_t seqId = bem_.registerRequest(command.bemId, timeout, std::move(callback));
+		const uint8_t seqId = bem_.registerRequest(command.bemId, command.bstId, timeout, std::move(callback));
 		(void)seqId; /* Sequence ID is embedded in the frame by BEM encoder in future */
 
 		/* Send frame */

@@ -167,7 +167,9 @@ void onEvent(const EventVariant& event)
 					/* Not a BEM response */
 				}
 				
-				std::cout << ss.str() << std::endl;
+				if (g_consoleOutputEnabled) {
+					std::cout << ss.str() << std::endl;
+				}
 				logFrame(ss.str());
 				return;
 			}
