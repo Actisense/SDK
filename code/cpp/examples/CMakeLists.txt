@@ -13,7 +13,6 @@ function(add_sdk_example example_name example_file)
     
     target_include_directories(${example_name}
         PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/../src/public
             ${CMAKE_CURRENT_SOURCE_DIR}/../src
     )
     
@@ -24,6 +23,7 @@ endfunction()
 # Example Definitions
 # ============================================================================
 add_sdk_example(actisense_console actisense_console.cpp)
+add_sdk_example(test_single_include test_single_include.cpp)
 
 # Future examples (uncomment when files are created)
 # add_sdk_example(serial_nmea_receiver serial_nmea_receiver.cpp)

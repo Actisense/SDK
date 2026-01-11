@@ -10,8 +10,8 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include <error.hpp>
-#include <events.hpp>
+#include "public/error.hpp"
+#include "public/events.hpp"
 
 #include <cstdint>
 #include <string>

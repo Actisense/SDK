@@ -13,7 +13,7 @@
 
 /* Dependent includes ------------------------------------------------------- */
 
-#include "../../public/serial_device_info.hpp"
+#include "public/serial_device_info.hpp"
 
 /* Type Definitions --------------------------------------------------------- */
 namespace Actisense

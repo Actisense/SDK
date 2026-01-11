@@ -5,14 +5,13 @@
 # ============================================================================
 add_library(actisense_sdk STATIC)
 
-# Public headers (relative to src/public/)
+# Public headers (relative to src/)
 target_include_directories(actisense_sdk
     PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/public>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<INSTALL_INTERFACE:include>
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/..
+        # No additional private directories needed
 )
 
 # ============================================================================

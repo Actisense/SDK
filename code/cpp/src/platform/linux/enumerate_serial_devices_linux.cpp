@@ -21,7 +21,7 @@
 #include <sstream>
 #include <unistd.h>
 #include <linux/limits.h>
-#include "enumerate_serial_devices_linux.hpp"
+#include "platform/linux/enumerate_serial_devices_linux.hpp"
 
 namespace Actisense
 {

@@ -11,12 +11,12 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "version.hpp"
-#include "error.hpp"
-#include "config.hpp"
-#include "events.hpp"
-#include "session.hpp"
-#include "serial_device_info.hpp"
+#include "public/version.hpp"
+#include "public/error.hpp"
+#include "public/config.hpp"
+#include "public/events.hpp"
+#include "public/session.hpp"
+#include "public/serial_device_info.hpp"
 
 #include <memory>
 #include <vector>

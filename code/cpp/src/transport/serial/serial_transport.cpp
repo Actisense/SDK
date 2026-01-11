@@ -7,7 +7,7 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "serial_transport.hpp"
+#include "transport/serial/serial_transport.hpp"
 
 #include <cstring>
 #include <algorithm>

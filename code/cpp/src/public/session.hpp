@@ -10,7 +10,7 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "error.hpp"
+#include "public/error.hpp"
 
 #include <cstdint>
 #include <span>

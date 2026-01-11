@@ -10,7 +10,7 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "bst_types.hpp"
+#include "protocols/bst/bst_types.hpp"
 
 #include <cstdint>
 #include <memory>

@@ -21,7 +21,7 @@
 #include <unordered_set>
 #include <algorithm>
 #include "Setupapi.h"
-#include "enumerate_serial_devices_windows.hpp"
+#include "platform/windows/enumerate_serial_devices_windows.hpp"
 
 /* Definitions -------------------------------------------------------------- */
 #ifndef GUID_DEVINTERFACE_COMPORT

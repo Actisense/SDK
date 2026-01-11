@@ -7,7 +7,7 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "loopback_transport.hpp"
+#include "transport/loopback/loopback_transport.hpp"
 
 #include <algorithm>
 

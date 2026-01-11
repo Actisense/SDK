@@ -10,8 +10,8 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "operating_mode.hpp"
-#include "system_status.hpp"
+#include "protocols/bem/bem_commands/operating_mode.hpp"
+#include "protocols/bem/bem_commands/system_status.hpp"
 
 namespace Actisense
 {

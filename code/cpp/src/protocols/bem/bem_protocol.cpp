@@ -7,7 +7,7 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "bem_protocol.hpp"
+#include "protocols/bem/bem_protocol.hpp"
 
 namespace Actisense
 {

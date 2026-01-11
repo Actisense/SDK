@@ -10,9 +10,9 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "../bst/bst_types.hpp"
-#include "bem_commands/operating_mode.hpp"
-#include "bem_commands/bem_commands.hpp"
+#include "protocols/bst/bst_types.hpp"
+#include "protocols/bem/bem_commands/operating_mode.hpp"
+#include "protocols/bem/bem_commands/bem_commands.hpp"
 #include "public/error.hpp"
 
 #include <cstdint>

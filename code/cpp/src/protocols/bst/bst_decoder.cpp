@@ -7,7 +7,7 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "bst_decoder.hpp"
+#include "protocols/bst/bst_decoder.hpp"
 
 #include <cstring>
 

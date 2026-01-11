@@ -202,6 +202,58 @@ cpp/
 └── CMakeLists.txt    # Main build configuration
 ```
 
+## Include Design
+
+The SDK follows a standardized include design where all headers derive from the `src/` root directory:
+
+### For External Users
+
+Simply include the main API header to access all SDK functionality:
+
+```cpp
+#include "public/api.hpp"  // Single include gives access to entire SDK
+
+int main() {
+    using namespace Actisense::Sdk;
+    
+    // Get SDK version
+    auto version = getVersion();
+    
+    // Enumerate devices
+    auto devices = enumerateSerialDevices();
+    
+    // Create session
+    auto session = createSession(/* config */);
+    
+    return 0;
+}
+```
+
+### Include Path Rules
+
+All includes throughout the SDK use paths relative to `src/`:
+
+```cpp
+// ✅ Correct - relative to src/
+#include "public/error.hpp"
+#include "protocols/bem/bem_protocol.hpp"  
+#include "transport/serial/serial_transport.hpp"
+#include "util/ring_buffer.hpp"
+
+// ❌ Incorrect - relative paths
+#include "error.hpp"
+#include "../bem/bem_protocol.hpp"
+#include "../../util/ring_buffer.hpp"
+```
+
+### Benefits
+
+- **Single include path**: All headers derive from `src/` root
+- **No path ambiguity**: Clear, absolute paths relative to project root  
+- **Easy integration**: Users only need to add `src/` to include directories
+- **Maintainable**: Consistent include style throughout codebase
+- **IDE friendly**: Better autocomplete and navigation
+
 ## Troubleshooting
 
 ### CMake Cannot Find Compiler

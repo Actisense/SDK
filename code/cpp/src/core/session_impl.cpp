@@ -7,7 +7,7 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "session_impl.hpp"
+#include "core/session_impl.hpp"
 #include "transport/serial/serial_transport.hpp"
 #include <format>
 #include <cstring>

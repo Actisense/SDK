@@ -9,7 +9,7 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "operating_mode.hpp"
+#include "protocols/bem/bem_commands/operating_mode.hpp"
 
 namespace Actisense
 {

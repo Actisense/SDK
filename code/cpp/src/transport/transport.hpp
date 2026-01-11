@@ -11,8 +11,8 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include <error.hpp>
-#include <config.hpp>
+#include "public/error.hpp"
+#include "public/config.hpp"
 
 #include <cstdint>
 #include <functional>

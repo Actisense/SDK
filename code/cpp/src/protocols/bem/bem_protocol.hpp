@@ -10,7 +10,7 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "bem_types.hpp"
+#include "protocols/bem/bem_types.hpp"
 #include "protocols/bdtp/bdtp_protocol.hpp"
 
 #include <map>

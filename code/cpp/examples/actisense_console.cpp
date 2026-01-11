@@ -17,17 +17,7 @@ Examples:
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "api.hpp"
-#include "config.hpp"
-#include "error.hpp"
-#include "events.hpp"
-#include "serial_device_info.hpp"
-
-#include "core/session_impl.hpp"
-#include "protocols/bst/bst_types.hpp"
-#include "protocols/bst/bst_decoder.hpp"
-#include "protocols/bem/bem_types.hpp"
-#include "protocols/bem/bem_commands/operating_mode.hpp"
+#include "public/api.hpp"
 #include "protocols/bem/bem_commands/system_status.hpp"
 
 #include <iostream>

@@ -7,7 +7,7 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "bdtp_protocol.hpp"
+#include "protocols/bdtp/bdtp_protocol.hpp"
 
 #include <numeric>
 
