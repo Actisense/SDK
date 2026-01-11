@@ -18,6 +18,14 @@ Examples:
 
 /* Dependent includes ------------------------------------------------------- */
 #include "public/api.hpp"
+
+/* Internal includes for advanced console functionality */
+#include "core/session_impl.hpp"
+#include "protocols/bst/bst_types.hpp"
+#include "protocols/bst/bst_decoder.hpp"
+#include "protocols/bem/bem_types.hpp"
+#include "protocols/bem/bem_commands/operating_mode.hpp"
+#include "protocols/bem/bem_commands/system_status.hpp"
 #include "protocols/bem/bem_commands/system_status.hpp"
 
 #include <iostream>

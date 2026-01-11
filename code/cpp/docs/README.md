@@ -217,7 +217,30 @@ int main() {
     using namespace Actisense::Sdk;
     
     // Get SDK version
-    auto version = getVersion();
+    auto version = Api::version();
+    
+    // Enumerate devices
+    auto devices = Api::enumerateSerialDevices();
+    
+    // Create session
+    // Api::open(config, eventCallback, errorCallback, openedCallback);
+    
+    return 0;
+}
+```
+
+### For Advanced Examples
+
+Advanced examples that need to decode protocol details or access implementation types may require additional includes:
+
+```cpp
+#include "public/api.hpp"                               // Main SDK API
+#include "protocols/bem/bem_types.hpp"                  // BEM protocol types
+#include "protocols/bem/bem_commands/operating_mode.hpp" // BEM command details
+#include "core/session_impl.hpp"                        // Session implementation
+```
+
+The `actisense_console` example demonstrates this advanced usage for protocol decoding and detailed message display.
     
     // Enumerate devices
     auto devices = enumerateSerialDevices();
