@@ -65,7 +65,7 @@ namespace Sdk
 	RequestHandle SessionImpl::asyncRequestResponse(
 		const std::string& protocol,
 		std::span<const uint8_t> payload,
-		std::chrono::milliseconds timeout,
+		[[maybe_unused]] std::chrono::milliseconds timeout,
 		RequestCompletion completion)
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
