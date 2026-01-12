@@ -160,7 +160,8 @@ namespace Actisense
 			OVERLAPPED writeOverlapped_{};
 #else
 			int fd_ = -1;
-			struct termios originalTermios_{};
+			struct termios originalTermios_
+			{};
 			bool termiosRestoreNeeded_ = false;
 #endif
 
