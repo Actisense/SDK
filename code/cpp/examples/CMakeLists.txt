@@ -23,7 +23,6 @@ endfunction()
 # Example Definitions
 # ============================================================================
 add_sdk_example(actisense_console actisense_console.cpp)
-add_sdk_example(test_single_include test_single_include.cpp)
 
 # Future examples (uncomment when files are created)
 # add_sdk_example(serial_nmea_receiver serial_nmea_receiver.cpp)
