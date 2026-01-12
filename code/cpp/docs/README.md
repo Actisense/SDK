@@ -91,7 +91,7 @@ The `actisense_console` example demonstrates connecting to an Actisense device:
 
 **Windows**:
 ```powershell
-.\build\examples\Release\actisense_console.exe --port COM7
+.\build\examples\Release\actisense_console.exe --port COM9
 ```
 
 **Linux** (using `build_linux` directory):
