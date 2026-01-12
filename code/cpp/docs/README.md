@@ -51,8 +51,19 @@ A modern C++20 SDK for Actisense device communication, supporting serial and UDP
    cd Public/SDK/code/cpp
    ```
 
-2. **Configure and build**:
+2. **Configure and build** (use separate `build_linux` directory to avoid conflicts with Windows builds):
    ```bash
+   cmake -B build_linux -S . -DCMAKE_BUILD_TYPE=Release
+   cmake --build build_linux -j$(nproc)
+   ```
+
+   **Note:** Use a platform-specific build directory name (e.g., `build_linux`, `build_macos`) when building on multiple platforms from the same source tree. This prevents CMake cache conflicts between Windows and Unix-like systems.
+
+   **Alternative - Using `build` directory:**
+   
+   If you only build on one platform, you can use the standard `build` directory. However, if switching between Windows and Linux/macOS, always delete and recreate the build directory:
+   ```bash
+   rm -rf build
    cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
    cmake --build build -j$(nproc)
    ```
@@ -83,9 +94,9 @@ The `actisense_console` example demonstrates connecting to an Actisense device:
 .\build\examples\Release\actisense_console.exe --port COM7
 ```
 
-**Linux**:
+**Linux** (using `build_linux` directory):
 ```bash
-./build/examples/actisense_console --port /dev/ttyUSB0 --baud 115200
+./build_linux/examples/actisense_console --port /dev/ttyUSB0 --baud 115200
 ```
 
 **List available serial ports**:
@@ -111,7 +122,7 @@ ctest -C Release --output-on-failure
 
 **Linux/macOS**:
 ```bash
-cd build
+cd build_linux
 ctest --output-on-failure
 ```
 
@@ -125,11 +136,11 @@ ctest --output-on-failure
 .\build\tests\unit\Release\test_loopback_transport.exe
 .\build\tests\unit\Release\test_ring_buffer.exe
 
-# Linux/macOS
-./build/tests/unit/test_bdtp_protocol
-./build/tests/unit/test_error_category
-./build/tests/unit/test_loopback_transport
-./build/tests/unit/test_ring_buffer
+# Linux/macOS (using build_linux directory)
+./build_linux/tests/unit/test_bdtp_protocol
+./build_linux/tests/unit/test_error_category
+./build_linux/tests/unit/test_loopback_transport
+./build_linux/tests/unit/test_ring_buffer
 ```
 
 **Integration tests**:
@@ -137,8 +148,8 @@ ctest --output-on-failure
 # Windows
 .\build\tests\integration\Release\test_bdtp_loopback.exe
 
-# Linux/macOS
-./build/tests/integration/test_bdtp_loopback
+# Linux/macOS (using build_linux directory)
+./build_linux/tests/integration/test_bdtp_loopback
 ```
 
 ### Run Tests with Verbose Output

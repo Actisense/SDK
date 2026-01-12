@@ -2,6 +2,7 @@
 # Build Artifacts & Temporary Files
 # ============================================================================
 build/
+build_linux/
 _build/
 cmake-build-*/
 out/
