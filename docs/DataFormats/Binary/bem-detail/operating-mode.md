@@ -17,8 +17,7 @@ The data block contains the 16-bit, little-endian encoded representation of the 
 
 | Offset  | Description              | Size           |
 | ------- | ------------------------ | ---------------|
-| 0       | Operating Mode Low Byte  | 1 byte (8-bit) |
-| 1       | Operating Mode High Byte | 1 byte (8-bit) |
+| 0-1     | Operating Mode           | 2 bytes (16-bit LE) |
 
 ### Example - Get Operating Mode
 
@@ -31,10 +30,13 @@ The data block contains the 16-bit, little-endian encoded representation of the 
 
 ### Example - Set Operating Mode
 
+Here, we're setting the operating mode (OM) to 2 "NGTransferRxAllMode"
+
 | Offset | Field | Value | Description |
 |--------|-------|-------|-------------|
 | 0 | BST ID | A1H | Operating Mode BEM command |
 | 1 | BST Length | 3 | BEM ID + 2-byte mode value |
 | 2 | BEM Id | 11H | Operating Mode identifier |
-| 3 | Operating Mode Low Byte | OM & FFH | Low byte of 16-bit mode (little-endian) |
-| 4 | Operating Mode High Byte | OM >> 8 | High byte of 16-bit mode (little-endian) |
+| 3 | Operating Mode Low Byte | 02H | OM & 0xFF = 2 & 0xFF = 0x02 |
+| 4 | Operating Mode High Byte | 00H | OM >> 8 = 2 >> 8 = 0x00 |
+

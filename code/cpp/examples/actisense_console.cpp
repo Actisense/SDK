@@ -537,7 +537,37 @@ void processUserInput(std::unique_ptr<SessionImpl>& session)
 
 		case 's':
 		case 'S':
-			std::cout << "[USER] Set Operating Mode not yet implemented" << std::endl;
+			std::cout << "[USER] Setting Operating Mode to 2 (OM_NGTransferRxAllMode)..." << std::endl;
+			session->setOperatingMode(
+				2,  // OM_NGTransferRxAllMode
+				std::chrono::seconds(5),
+				[](const std::optional<BemResponse>& response, ErrorCode code, std::string_view errorMsg) {
+					if (code == ErrorCode::Ok && response)
+					{
+						std::cout << "[RSP] Set Operating Mode Response:" << std::endl;
+						std::cout << "      Model: " << modelIdToString(response->header.modelId) 
+						          << " (0x" << std::hex << response->header.modelId << ")" << std::endl;
+						std::cout << "      Serial: " << std::dec << response->header.serialNumber << std::endl;
+						std::cout << "      Error Code: " << response->header.errorCode << std::endl;
+
+						if (response->header.errorCode == 0)
+						{
+							std::cout << "      Operating Mode successfully set to 2 (OM_NGTransferRxAllMode)" << std::endl;
+						}
+						else
+						{
+							std::cout << "      Device returned error code: " << response->header.errorCode << std::endl;
+						}
+					}
+					else if (code == ErrorCode::Timeout)
+					{
+						std::cout << "[RSP] Timeout waiting for Set Operating Mode response" << std::endl;
+					}
+					else
+					{
+						std::cout << "[RSP] Error: " << errorMsg << std::endl;
+					}
+				});
 			break;
 
 		case 'c':
