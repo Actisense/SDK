@@ -10,6 +10,9 @@
 #include "protocols/bdtp/bdtp_protocol.hpp"
 
 #include <numeric>
+#include <sstream>
+
+#include "util/debug_log.hpp"
 
 namespace Actisense
 {
@@ -36,6 +39,8 @@ namespace Actisense
 										ErrorEmitter emitError) {
 			std::size_t bytesConsumed = 0;
 
+			ACTISENSE_LOG_HEX(LogLevel::Trace, "BDTP", "Parse input", data.data(), data.size());
+
 			for (const uint8_t byte : data) {
 				++bytesConsumed;
 
@@ -43,6 +48,7 @@ namespace Actisense
 					case State::Idle:
 						if (byte == BdtpChars::DLE) {
 							state_ = State::GotDLE;
+							ACTISENSE_LOG_TRACE("BDTP", "State: Idle -> GotDLE");
 						}
 						/* Ignore any other bytes while idle */
 						break;
@@ -52,12 +58,20 @@ namespace Actisense
 							/* Frame start detected */
 							state_ = State::InFrame;
 							frame_buffer_.clear();
+							ACTISENSE_LOG_DEBUG("BDTP", "Frame start (DLE STX)");
 						} else if (byte == BdtpChars::DLE) {
 							/* Double DLE outside frame - stay in GotDLE */
 							/* This shouldn't happen in valid streams but handle gracefully */
+							ACTISENSE_LOG_WARN("BDTP", "Double DLE outside frame");
 						} else {
 							/* Invalid sequence - back to idle */
 							state_ = State::Idle;
+							{
+								std::ostringstream ss;
+								ss << "Invalid byte after DLE outside frame: 0x" 
+								   << std::hex << static_cast<int>(byte);
+								ACTISENSE_LOG_WARN("BDTP", ss.str());
+							}
 						}
 						break;
 
@@ -70,6 +84,7 @@ namespace Actisense
 								frame_buffer_.push_back(byte);
 							} else {
 								/* Frame too large - abort and signal error */
+								ACTISENSE_LOG_ERROR("BDTP", "Frame exceeds maximum size");
 								if (emitError) {
 									emitError(ErrorCode::MalformedFrame,
 											  "BDTP frame exceeds maximum size");
@@ -84,6 +99,11 @@ namespace Actisense
 					case State::InFrameGotDLE:
 						if (byte == BdtpChars::ETX) {
 							/* Frame complete */
+							{
+								std::ostringstream ss;
+								ss << "Frame complete, " << frame_buffer_.size() << " bytes";
+								ACTISENSE_LOG_DEBUG("BDTP", ss.str());
+							}
 							processCompletedFrame(emitMessage, emitError);
 							state_ = State::Idle;
 						} else if (byte == BdtpChars::DLE) {
@@ -94,6 +114,14 @@ namespace Actisense
 							state_ = State::InFrame;
 						} else if (byte == BdtpChars::STX) {
 							/* New frame start - abort current frame */
+							{
+								std::ostringstream ss;
+								ss << "Frame aborted by new DLE STX! Buffer had " 
+								   << frame_buffer_.size() << " bytes";
+								ACTISENSE_LOG_ERROR("BDTP", ss.str());
+								ACTISENSE_LOG_HEX(LogLevel::Debug, "BDTP", "Aborted frame data",
+												  frame_buffer_.data(), frame_buffer_.size());
+							}
 							if (emitError) {
 								emitError(ErrorCode::MalformedFrame,
 										  "BDTP frame aborted - new frame started");
@@ -103,6 +131,12 @@ namespace Actisense
 							state_ = State::InFrame;
 						} else {
 							/* Invalid escape sequence */
+							{
+								std::ostringstream ss;
+								ss << "Invalid escape sequence: DLE 0x" 
+								   << std::hex << static_cast<int>(byte);
+								ACTISENSE_LOG_ERROR("BDTP", ss.str());
+							}
 							if (emitError) {
 								emitError(ErrorCode::MalformedFrame,
 										  "Invalid BDTP escape sequence");

@@ -11,6 +11,9 @@
 
 #include <algorithm>
 #include <cstring>
+#include <sstream>
+
+#include "util/debug_log.hpp"
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -517,15 +520,32 @@ namespace Actisense
 		void SerialTransport::readThreadFunc() {
 			std::vector<uint8_t> tempBuffer(512);
 
+			ACTISENSE_LOG_INFO("Serial", "Read thread started");
+
 			while (!stopRequested_ && isOpen()) {
 				/* Read from port */
 				const auto bytesRead = readSync(tempBuffer.data(), tempBuffer.size(), 100);
 
 				if (bytesRead > 0) {
+					{
+						std::ostringstream ss;
+						ss << "Read " << bytesRead << " bytes from port";
+						ACTISENSE_LOG_TRACE("Serial", ss.str());
+					}
+
 					/* Add to ring buffer */
+					std::size_t written = 0;
 					{
 						std::lock_guard<std::mutex> lock(readMutex_);
-						readBuffer_.write(std::span<const uint8_t>(tempBuffer.data(), bytesRead));
+						const auto availableBefore = readBuffer_.available();
+						written = readBuffer_.write(std::span<const uint8_t>(tempBuffer.data(), bytesRead));
+						if (written < bytesRead) {
+							std::ostringstream ss;
+							ss << "Ring buffer overflow! Only wrote " << written 
+							   << " of " << bytesRead << " bytes (available was " 
+							   << availableBefore << ")";
+							ACTISENSE_LOG_ERROR("Serial", ss.str());
+						}
 					}
 
 					/* Notify waiting readers and process async operations */
@@ -533,10 +553,19 @@ namespace Actisense
 					processAsyncOperations();
 				}
 			}
+
+			ACTISENSE_LOG_INFO("Serial", "Read thread exiting");
 		}
 
 		void SerialTransport::processAsyncOperations() {
 			std::lock_guard<std::mutex> asyncLock(asyncMutex_);
+
+			const auto pendingCount = pendingRecvs_.size();
+			if (pendingCount > 1) {
+				std::ostringstream ss;
+				ss << "WARNING: " << pendingCount << " pending recv operations queued!";
+				ACTISENSE_LOG_WARN("Serial", ss.str());
+			}
 
 			while (!pendingRecvs_.empty()) {
 				std::lock_guard<std::mutex> readLock(readMutex_);
@@ -549,6 +578,12 @@ namespace Actisense
 				auto& op = pendingRecvs_.front();
 				const auto toRead = (std::min)(op.buffer.size(), available);
 				readBuffer_.read(std::span<uint8_t>(op.buffer.data(), toRead));
+
+				{
+					std::ostringstream ss;
+					ss << "Completing async recv: " << toRead << " bytes";
+					ACTISENSE_LOG_TRACE("Serial", ss.str());
+				}
 
 				if (op.completion) {
 					op.completion(ErrorCode::Ok, toRead);

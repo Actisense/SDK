@@ -26,6 +26,7 @@ Examples:
 #include "protocols/bem/bem_types.hpp"
 #include "protocols/bem/bem_commands/operating_mode.hpp"
 #include "protocols/bem/bem_commands/system_status.hpp"
+#include "util/debug_log.hpp"
 
 #include <iostream>
 #include <iomanip>
@@ -252,6 +253,9 @@ int main(int argc, char* argv[])
 	std::string port;
 	unsigned baud = 115200;
 	std::string logPath;
+	std::string debugLogPath;
+	LogLevel consoleDebugLevel = LogLevel::None;
+	LogLevel fileDebugLevel = LogLevel::None;
 
 	/* Parse command line arguments */
 	for (int i = 1; i < argc; ++i)
@@ -280,6 +284,38 @@ int main(int argc, char* argv[])
 		{
 			logPath = argv[++i];
 		}
+		else if ((arg == "--debug-log") && i + 1 < argc)
+		{
+			debugLogPath = argv[++i];
+		}
+		else if ((arg == "--debug" || arg == "-d") && i + 1 < argc)
+		{
+			int level = std::stoi(argv[++i]);
+			if (level >= 0 && level <= 5)
+			{
+				consoleDebugLevel = static_cast<LogLevel>(level);
+			}
+		}
+		else if ((arg == "--file-debug") && i + 1 < argc)
+		{
+			int level = std::stoi(argv[++i]);
+			if (level >= 0 && level <= 5)
+			{
+				fileDebugLevel = static_cast<LogLevel>(level);
+			}
+		}
+		else if (arg == "-v")
+		{
+			consoleDebugLevel = LogLevel::Info;
+		}
+		else if (arg == "-vv")
+		{
+			consoleDebugLevel = LogLevel::Debug;
+		}
+		else if (arg == "-vvv")
+		{
+			consoleDebugLevel = LogLevel::Trace;
+		}
 		else
 		{
 			std::cerr << "Unknown argument: " << arg << std::endl;
@@ -295,7 +331,21 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	/* Open log file if specified */
+	/* Set debug log levels */
+	DebugLog::instance().setConsoleLevel(consoleDebugLevel);
+	
+	/* If debug log file specified, set file level (default to Trace if not specified) */
+	if (!debugLogPath.empty())
+	{
+		DebugLog::instance().setLogFile(debugLogPath);
+		if (fileDebugLevel == LogLevel::None)
+		{
+			fileDebugLevel = LogLevel::Trace;  /* Default to full verbosity in file */
+		}
+	}
+	DebugLog::instance().setFileLevel(fileDebugLevel);
+
+	/* Open frame log file if specified */
 	if (!logPath.empty())
 	{
 		g_logFile.open(logPath, std::ios::out | std::ios::app);
@@ -316,9 +366,17 @@ int main(int argc, char* argv[])
 	std::cout << "========================================" << std::endl;
 	std::cout << "Port: " << port << std::endl;
 	std::cout << "Baud: " << baud << std::endl;
+	if (consoleDebugLevel != LogLevel::None)
+	{
+		std::cout << "Console Debug: " << static_cast<int>(consoleDebugLevel) << std::endl;
+	}
+	if (!debugLogPath.empty())
+	{
+		std::cout << "Debug Log: " << debugLogPath << " (level " << static_cast<int>(fileDebugLevel) << ")" << std::endl;
+	}
 	if (!logPath.empty())
 	{
-		std::cout << "Log:  " << logPath << std::endl;
+		std::cout << "Frame Log: " << logPath << std::endl;
 	}
 	std::cout << "----------------------------------------" << std::endl;
 	std::cout << "Press Ctrl+C to exit" << std::endl;
@@ -377,7 +435,7 @@ int main(int argc, char* argv[])
 
 void printUsage(const char* programName)
 {
-	std::cout << "Usage: " << programName << " --port <port> [--baud <rate>] [--log <file>]" << std::endl;
+	std::cout << "Usage: " << programName << " --port <port> [options]" << std::endl;
 	std::cout << "       " << programName << " --list" << std::endl;
 	std::cout << std::endl;
 	std::cout << "Options:" << std::endl;
@@ -386,6 +444,19 @@ void printUsage(const char* programName)
 	std::cout << "  --log <file>        Log frames to file" << std::endl;
 	std::cout << "  -l, --list          List available serial ports" << std::endl;
 	std::cout << "  -h, --help          Show this help message" << std::endl;
+	std::cout << std::endl;
+	std::cout << "Debug options (console):" << std::endl;
+	std::cout << "  -v                  Verbose (info level to console)" << std::endl;
+	std::cout << "  -vv                 Very verbose (debug level to console)" << std::endl;
+	std::cout << "  -vvv                Trace level to console (very detailed)" << std::endl;
+	std::cout << "  -d, --debug <0-5>   Set console debug level (0=off, 5=trace)" << std::endl;
+	std::cout << std::endl;
+	std::cout << "Debug options (file):" << std::endl;
+	std::cout << "  --debug-log <file>  Write debug output to file (defaults to trace level)" << std::endl;
+	std::cout << "  --file-debug <0-5>  Set file debug level (0=off, 5=trace)" << std::endl;
+	std::cout << std::endl;
+	std::cout << "Example: Log errors to console, full trace to file:" << std::endl;
+	std::cout << "  " << programName << " --port COM7 -d 1 --debug-log debug.log" << std::endl;
 }
 
 void listSerialPorts()

@@ -11,8 +11,10 @@
 
 #include <cstring>
 #include <format>
+#include <sstream>
 
 #include "transport/serial/serial_transport.hpp"
+#include "util/debug_log.hpp"
 
 namespace Actisense
 {
@@ -155,6 +157,8 @@ namespace Actisense
 		void SessionImpl::receiveThreadFunc() {
 			std::vector<uint8_t> buffer(512);
 
+			ACTISENSE_LOG_INFO("Session", "Receive thread started");
+
 			while (running_ && isConnected()) {
 				/* Use synchronous flag to track completion */
 				std::atomic<bool> completed{false};
@@ -163,6 +167,13 @@ namespace Actisense
 				transport_->asyncRecv(
 					buffer, [this, &buffer, &completed](ErrorCode code, std::size_t bytesRead) {
 						if (code == ErrorCode::Ok && bytesRead > 0) {
+							{
+								std::ostringstream ss;
+								ss << "Received " << bytesRead << " bytes from transport";
+								ACTISENSE_LOG_DEBUG("Session", ss.str());
+							}
+							ACTISENSE_LOG_HEX(LogLevel::Trace, "Session", "Raw data",
+											  buffer.data(), bytesRead);
 							processReceivedData(std::span<const uint8_t>(buffer.data(), bytesRead));
 						}
 						completed.store(true, std::memory_order_release);
@@ -181,6 +192,8 @@ namespace Actisense
 				/* Additional timeout processing after completion */
 				processTimeouts();
 			}
+
+			ACTISENSE_LOG_INFO("Session", "Receive thread exiting");
 		}
 
 		void SessionImpl::processReceivedData(std::span<const uint8_t> data) {
@@ -197,6 +210,7 @@ namespace Actisense
 					}
 				},
 				[this](ErrorCode code, std::string_view message) {
+					ACTISENSE_LOG_ERROR("Session", std::string("BDTP error: ") + std::string(message));
 					if (errorCallback_) {
 						errorCallback_(code, std::string(message));
 					}
