@@ -156,19 +156,30 @@ namespace Actisense
 			std::vector<uint8_t> buffer(512);
 
 			while (running_ && isConnected()) {
+				/* Use synchronous flag to track completion */
+				std::atomic<bool> completed{false};
+
 				/* Request data from transport */
 				transport_->asyncRecv(
-					buffer, [this, &buffer](ErrorCode code, std::size_t bytesRead) {
+					buffer, [this, &buffer, &completed](ErrorCode code, std::size_t bytesRead) {
 						if (code == ErrorCode::Ok && bytesRead > 0) {
 							processReceivedData(std::span<const uint8_t>(buffer.data(), bytesRead));
 						}
+						completed.store(true, std::memory_order_release);
 					});
 
-				/* Process any timeouts */
-				processTimeouts();
+				/* Wait for the async operation to complete before continuing */
+				/* This prevents queuing multiple operations with the same buffer */
+				while (!completed.load(std::memory_order_acquire) && running_ && isConnected()) {
+					/* Process any timeouts while waiting */
+					processTimeouts();
 
-				/* Small sleep to prevent busy-waiting */
-				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+					/* Small sleep to prevent busy-waiting */
+					std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				}
+
+				/* Additional timeout processing after completion */
+				processTimeouts();
 			}
 		}
 
