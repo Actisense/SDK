@@ -36,6 +36,13 @@ The first byte identifies the message type. If it is 94 Hex, it is a "BST 94" me
 | 7 | `DL` | Data Length - number of bytes in the data section to follow. |
 | 8+ | `(b0...bn)` | Message data - Message's data payload. |
 
+### Note on length fields
+
+- `L` encodes the whole BST message length, which will be the BST 94 header plus the dtaa length `DL` field.
+- `DL` encodes just the data length
+
+So for a data length of 8 bytes, `L` = 14 and `DL` = 8, thus the whole BST frame in this case will use 16 bytes of space (14 bytes + the 2 byte BST header)
+
 ---
 
 [1] [BST](BST.md)
