@@ -2,6 +2,7 @@
 """Verify DLE expansion and checksums in n2ksender.log"""
 
 import sys
+import argparse
 
 def verify_line(line):
     """Verify a single line from the log"""
@@ -70,18 +71,24 @@ def verify_line(line):
     }
 
 # Parse command line arguments
-verbose = '-v' in sys.argv or '--verbose' in sys.argv
+parser = argparse.ArgumentParser(description='Verify DLE expansion and checksums in log files')
+parser.add_argument('file', nargs='?', default='n2ksender.log', help='Log file to verify (default: n2ksender.log)')
+parser.add_argument('-v', '--verbose', action='store_true', help='Show details for valid messages')
+args = parser.parse_args()
+
+verbose = args.verbose
+log_file = args.file
 
 # Read and verify log file
 if verbose:
-    print("Verifying n2ksender.log...\n")
+    print(f"Verifying {log_file}...\n")
     print("="*80)
 
 total_messages = 0
 valid_messages = 0
 error_messages = 0
 
-with open('n2ksender.log', 'r') as f:
+with open(log_file, 'r') as f:
     for line_num, line in enumerate(f, 1):
         result = verify_line(line)
         if result is None:
