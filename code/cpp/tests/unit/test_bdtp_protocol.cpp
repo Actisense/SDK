@@ -57,7 +57,7 @@ protected:
 	{
 		BstDatagram datagram;
 		datagram.bstId = bstId;
-		datagram.storeLength = static_cast<uint8_t>(data.size());
+		datagram.storeLength = static_cast<uint16_t>(data.size());
 		datagram.data.assign(data.begin(), data.end());
 
 		std::vector<uint8_t> frame;

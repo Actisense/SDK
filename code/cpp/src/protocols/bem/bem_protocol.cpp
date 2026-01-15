@@ -106,7 +106,7 @@ namespace Actisense
 
 			BemResponse response;
 			response.header.bstId = static_cast<BstId>(datagram.bstId);
-			response.header.storeLength = datagram.storeLength;
+			response.header.storeLength = static_cast<uint8_t>(datagram.storeLength);
 			response.checksumValid = true; /* Assumed validated by BDTP layer */
 
 			const auto& data = datagram.data;

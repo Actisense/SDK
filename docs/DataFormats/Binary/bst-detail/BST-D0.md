@@ -31,7 +31,7 @@ The output from the BDTP decoder is a BST message. The first byte identifies the
 | Byte | Field | Size | Description |
 | ------ | ------- | ------ | ------------- |
 | 0 | `ID` | 1 byte | BST Message ID, always D0 Hex (208 Decimal) |
-| 1-2 | `L` | 2 bytes | Payload Length - 16-bit little-endian value containing the data length (excludes ID, length bytes, and checksum). Equals 10 + message_data_length |
+| 1-2 | `L` | 2 bytes | Total Length - 16-bit little-endian value containing the total message length exclud&ing checksum. Equals 13 + message_data_length (includes ID, L0, L1, and all header bytes) |
 | 3 | `D` | 1 byte | Destination Address - address of the device receiving the message |
 | 4 | `S` | 1 byte | Source Address - address of the device sending the message |
 | 5 | `PDUS` | 1 byte | PDU Specific - If (PDUF<240) this will contain a PDU1 destination address. If (PDUF>=240) this will contain a PDU2 Group Extension and forms the lower 8 bits of the PGN number |
@@ -44,9 +44,17 @@ The output from the BDTP decoder is a BST message. The first byte identifies the
 
 ### Field `L`: BST D0 Length
 
-The 16-bit length field contains the total payload length in bytes (little-endian). Unlkie BST Type 1, this includes all header bytes (ID, L, D, S, PDUS, PDUF, DPP, C, T₀T₁T₂T₃), but does not include the checksum byte. 
+The 16-bit length field contains the total message length in bytes (little-endian), excluding the checksum byte. Unlike BST Type 1, this includes all header bytes (ID, L, D, S, PDUS, PDUF, DPP, C, T₀T₁T₂T₃).
 
-Total message length = 13 + message_data_length + 1 (checksum). 
+**Length = 13 + message_data_length**
+
+Where:
+- 1 byte: ID (0xD0)
+- 2 bytes: Length field (L0, L1)
+- 10 bytes: Header fields (D, S, PDUS, PDUF, DPP, C, T₀T₁T₂T₃)
+- Variable: Message data
+
+Total message size including checksum = Length + 1 (checksum byte)
 
 ### Field `DPP`: Data page and priority bits
 

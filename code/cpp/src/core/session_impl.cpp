@@ -235,9 +235,23 @@ namespace Actisense
 			/* Try to decode as regular BST frame */
 			/* Build raw BST bytes for decoder */
 			std::vector<uint8_t> rawBst;
-			rawBst.reserve(2 + datagram.data.size());
-			rawBst.push_back(datagram.bstId);
-			rawBst.push_back(datagram.storeLength);
+
+			/* BST Type 2 frames (IDs 0xD0-0xDF) use 16-bit length field */
+			const bool isType2 = (datagram.bstId >= 0xD0 && datagram.bstId <= 0xDF);
+
+			if (isType2) {
+				/* Type 2: ID + 16-bit length (total length including ID and length bytes) */
+				const uint16_t totalLen = static_cast<uint16_t>(3 + datagram.data.size());
+				rawBst.reserve(3 + datagram.data.size());
+				rawBst.push_back(datagram.bstId);
+				rawBst.push_back(static_cast<uint8_t>(totalLen & 0xFF));
+				rawBst.push_back(static_cast<uint8_t>((totalLen >> 8) & 0xFF));
+			} else {
+				/* Type 1: ID + 8-bit length (payload length only) */
+				rawBst.reserve(2 + datagram.data.size());
+				rawBst.push_back(datagram.bstId);
+				rawBst.push_back(static_cast<uint8_t>(datagram.storeLength));
+			}
 			rawBst.insert(rawBst.end(), datagram.data.begin(), datagram.data.end());
 
 			auto result = bstDecoder_.decode(rawBst);

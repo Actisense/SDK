@@ -298,10 +298,31 @@ namespace Actisense
 			}
 
 			const uint8_t bstId = frameData[0];
-			const uint8_t storeLength = frameData[1];
 
-			/* Expected total: ID + Length + Data + Checksum */
-			const std::size_t expectedSize = static_cast<std::size_t>(2) + storeLength + 1;
+			/* BST Type 2 frames (IDs 0xD0-0xDF) use 16-bit length in bytes 1-2,
+			 * where length is the total message length excluding checksum */
+			const bool isType2 = (bstId >= 0xD0 && bstId <= 0xDF);
+
+			std::size_t headerSize = 0;
+			std::size_t totalLen = 0;
+
+			if (isType2) {
+				/* Type 2: 16-bit length field, length includes ID and length bytes */
+				if (frameData.size() < 4) {
+					outError = "BST Type 2 frame too short (minimum 4 bytes)";
+					return false;
+				}
+				totalLen = static_cast<std::size_t>(frameData[1]) |
+						   (static_cast<std::size_t>(frameData[2]) << 8);
+				headerSize = 3; /* ID + L0 + L1 */
+			} else {
+				/* Type 1: 8-bit length field, length is payload only */
+				totalLen = static_cast<std::size_t>(frameData[1]) + 2; /* Add ID + length byte */
+				headerSize = 2; /* ID + L */
+			}
+
+			/* Expected total frame size: totalLen + 1 (checksum) */
+			const std::size_t expectedSize = totalLen + 1;
 
 			if (frameData.size() < expectedSize) {
 				outError = "BST frame incomplete - expected " + std::to_string(expectedSize) +
@@ -310,24 +331,25 @@ namespace Actisense
 			}
 
 			/* Verify checksum (sum of all bytes including checksum should be zero) */
-			const auto checksumData = frameData.subspan(0, 2 + storeLength + 1);
+			const auto checksumData = frameData.subspan(0, expectedSize);
 			const uint8_t checksumResult = calculateChecksum(checksumData);
 
 			if (checksumResult != 0) {
-			std::ostringstream ss;
-			ss << "BST checksum mismatch - sum is 0x" << std::hex 
-			   << static_cast<int>(checksumResult) << " (expected 0)";
-			outError = ss.str();
-			return false;
+				std::ostringstream ss;
+				ss << "BST checksum mismatch - sum is 0x" << std::hex
+				   << static_cast<int>(checksumResult) << " (expected 0)";
+				outError = ss.str();
+				return false;
+			}
+
+			/* Extract datagram */
+			outDatagram.bstId = bstId;
+			outDatagram.storeLength = static_cast<uint16_t>(totalLen - headerSize);
+			outDatagram.data.assign(frameData.begin() + headerSize,
+									frameData.begin() + totalLen);
+
+			return true;
 		}
-
-		/* Extract datagram */
-		outDatagram.bstId = bstId;
-		outDatagram.storeLength = storeLength;
-		outDatagram.data.assign(frameData.begin() + 2, frameData.begin() + 2 + storeLength);
-
-		return true;
-	}
 	ProtocolPtr createBdtpProtocol() {
 		return std::make_unique<BdtpProtocol>();
 	}

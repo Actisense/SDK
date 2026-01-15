@@ -276,21 +276,27 @@ namespace Actisense
 
 		std::optional<BstD0Frame> BstDecoder::decodeD0(ConstByteSpan data,
 													   std::string& outError) const {
-			/* BST-D0 uses 16-bit length: ID(1) + L0(1) + L1(1) = 3 byte header */
+			/* BST-D0 uses 16-bit length: ID(1) + L0(1) + L1(1) = 3 byte header
+			 * The length field contains the TOTAL message length excluding checksum,
+			 * i.e., it includes ID byte and the 2 length bytes themselves.
+			 * Length = 13 + message_data_length (ID + L0 + L1 + 10 header bytes + data) */
 			if (data.size() < 3) {
 				outError = "BST-D0 frame too short";
 				return std::nullopt;
 			}
 
-			const uint16_t storeLen = readU16LE(&data[1]);
+			const uint16_t totalLen = readU16LE(&data[1]);
 			const auto payload = data.subspan(3);
 
-			if (payload.size() < storeLen) {
+			/* totalLen includes ID(1) + L0(1) + L1(1) = 3 bytes, so payload length = totalLen - 3 */
+			const uint16_t payloadLen = (totalLen >= 3) ? (totalLen - 3) : 0;
+
+			if (payload.size() < payloadLen) {
 				outError = "BST-D0 payload truncated";
 				return std::nullopt;
 			}
 
-			if (storeLen < kBstD0MinLength) {
+			if (payloadLen < kBstD0MinLength) {
 				outError = "BST-D0 store length too small";
 				return std::nullopt;
 			}
@@ -322,8 +328,9 @@ namespace Actisense
 
 			frame.timestamp = readU32LE(&payload[kBstD0OffTime]);
 
-			/* Data follows header */
-			const std::size_t dataLen = storeLen - kBstD0OffData;
+			/* Data follows header - payloadLen is the length of payload after ID and L bytes,
+			 * so dataLen = payloadLen - header_size (10 bytes) */
+			const std::size_t dataLen = payloadLen - kBstD0OffData;
 			frame.data.assign(payload.begin() + kBstD0OffData,
 							  payload.begin() + kBstD0OffData + dataLen);
 
@@ -412,15 +419,18 @@ namespace Actisense
 				pdus = frame.destination;
 			}
 
-			const uint16_t storeLen = static_cast<uint16_t>(kBstD0OffData + frame.data.size());
+			/* BST-D0 length field includes ID(1) + L0(1) + L1(1) + 10 header bytes + data
+			 * Total length = 13 + data_size (excludes checksum) */
+			const uint16_t totalLen = static_cast<uint16_t>(13 + frame.data.size());
+			const std::size_t payloadLen = kBstD0OffData + frame.data.size();
 
 			outData.clear();
-			outData.reserve(3 + storeLen);
+			outData.reserve(3 + payloadLen);
 
 			/* BST-D0 header (16-bit length) */
 			outData.push_back(static_cast<uint8_t>(BstId::Nmea2000_D0));
-			outData.push_back(static_cast<uint8_t>(storeLen & 0xFF));
-			outData.push_back(static_cast<uint8_t>((storeLen >> 8) & 0xFF));
+			outData.push_back(static_cast<uint8_t>(totalLen & 0xFF));
+			outData.push_back(static_cast<uint8_t>((totalLen >> 8) & 0xFF));
 
 			/* Payload */
 			outData.push_back(frame.destination);
