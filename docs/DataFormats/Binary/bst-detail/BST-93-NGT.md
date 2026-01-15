@@ -36,6 +36,11 @@ The first byte identifies the message type. If it is 93 Hex, it is a `BST 93` me
 | 12 | `DL` | Data Length - number of bytes in the data section to follow |
 | 13..(13+DL-1) | `(b0...bn)` | Message data - Message's data variable length payload |
 
+### Note on length fields
+
+- `L` Encodes the whole BST message length, which will be the BST 93 header plus the data length `DL` field.
+- `DL` Encodes just the data length. As the header is a fixed 11 bytes in size, `L` = `DL`+ 11.
+
 ---
 
 [1] [BST](BST.md)

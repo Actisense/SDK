@@ -22,25 +22,33 @@ As a binary format, the BST D0 protocol header fields are not easy to read. The 
 
 Messages sent in this format are binary encoded using [BDTP Protocol](../../DataProtocols/bdtp-protocol.md)
 
-The output from the BDTP decoder is a BST message. The first byte identifies the message type. If it is D0 Hex, it is a BST D0 message in the following form:
+The output from the BDTP decoder is a BST message. The first byte identifies the message type. If it is D0 Hex, it is a BST D0 message. The message has a fixed length header of 13 bytes (including BST Id and length) and a variable length payload.
+
+### Message fields
 
 **`ID` `L0 L1` `D` `S` `PDUS` `PDUF` `DPP` `C` `TTTT` `b0b1b2b3b4b5b6b7..bn`**
 
 | Byte | Field | Size | Description |
 | ------ | ------- | ------ | ------------- |
 | 0 | `ID` | 1 byte | BST Message ID, always D0 Hex (208 Decimal) |
-| 1 | `L0` | 1 byte | Payload Length - lower byte of 16 bit little endian number |
-| 2 | `L1` | 1 byte | Payload Length - upper byte of 16 bit little endian number - the maximum length of an N2K message is 1785 |
+| 1-2 | `L` | 2 bytes | Payload Length - 16-bit little-endian value containing the data length (excludes ID, length bytes, and checksum). Equals 10 + message_data_length |
 | 3 | `D` | 1 byte | Destination Address - address of the device receiving the message |
 | 4 | `S` | 1 byte | Source Address - address of the device sending the message |
 | 5 | `PDUS` | 1 byte | PDU Specific - If (PDUF<240) this will contain a PDU1 destination address. If (PDUF>=240) this will contain a PDU2 Group Extension and forms the lower 8 bits of the PGN number |
 | 6 | `PDUF` | 1 byte | PDU Format - PDU Format is the high byte of a PGN number. It also determines the way PDUS is decoded |
 | 7 | `DPP` | 1 byte | Data page and priority - See section below for bit details |
 | 8 | `C` | 1 byte | Control - PGN control ID bits and 3-bit Fast-Packet sequence ID - See section below for bit details |
-| 9-12 | `T₀T₁T₂T₃` | 4 bytes | [Timestamp](binary-timestamp-example.md) - timestamp in milliseconds, little endian |
+| 9-12 | `T₀T₁T₂T₃` | 4 bytes | [Timestamp](binary-timestamp-example.md) - 32-bit timestamp in milliseconds, little endian |
 | 13+ | `b0...bn` | Variable | Message data - Message's data payload |
+| Last | Checksum | 1 byte | Zero-sum checksum (not included in length field) |
 
-## Field `DPP`: Data page and priority bits
+### Field `L`: BST D0 Length
+
+The 16-bit length field contains the total payload length in bytes (little-endian). Unlkie BST Type 1, this includes all header bytes (ID, L, D, S, PDUS, PDUF, DPP, C, T₀T₁T₂T₃), but does not include the checksum byte. 
+
+Total message length = 13 + message_data_length + 1 (checksum). 
+
+### Field `DPP`: Data page and priority bits
 
 The Data Page and Priority byte (field "DPP") contains PGN-related information:
 
@@ -50,7 +58,7 @@ The Data Page and Priority byte (field "DPP") contains PGN-related information:
 | 2..4 | Priority | Priority bits, value 0..7 |
 | 5..7 | Spare | Spare 3 bits |
 
-## Field `C`: PGN control bits
+### Field `C`: PGN control bits
 
 The Control byte (field "C") contains various flags and identifiers packed into a single byte:
 

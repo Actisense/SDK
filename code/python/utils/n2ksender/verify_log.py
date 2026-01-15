@@ -31,6 +31,29 @@ def verify_line(line):
             decoded.append(int(inner[i], 16))
             i += 1
     
+    # Check BST length byte
+    # BST Type 1 (ID < 0xD0): [BST_ID][LENGTH][DATA...][CHECKSUM] - length = len(decoded) - 3
+    # BST Type 2 (ID >= 0xD0): [BST_ID][L0][L1][DATA...][CHECKSUM] - length includes full 13-byte header
+    length_valid = True
+    expected_length = None
+    actual_length = None
+    
+    if len(decoded) < 3:
+        length_valid = False
+    elif decoded[0] >= 0xD0:  # Type 2 (16-bit length, includes ID + L0 + L1 + data)
+        if len(decoded) < 4:
+            length_valid = False
+        else:
+            actual_length = decoded[1] | (decoded[2] << 8)
+            expected_length = len(decoded) - 1  # Total length minus checksum only
+            if actual_length != expected_length:
+                length_valid = False
+    else:  # Type 1 (8-bit length)
+        actual_length = decoded[1]
+        expected_length = len(decoded) - 3  # Minus ID, length, checksum
+        if actual_length != expected_length:
+            length_valid = False
+    
     # Check checksum
     checksum = sum(decoded) & 0xFF
     
@@ -38,6 +61,10 @@ def verify_line(line):
         'encoded': ' '.join(bytes_hex),
         'decoded': ' '.join(f'{b:02X}' for b in decoded),
         'dle_expansions': dle_expansions,
+        'length_valid': length_valid,
+        'expected_length': expected_length,
+        'actual_length': actual_length,
+        'bst_type': 2 if (len(decoded) > 0 and decoded[0] >= 0xD0) else 1,
         'checksum_valid': checksum == 0,
         'checksum': checksum
     }
@@ -65,6 +92,13 @@ with open('n2ksender.log', 'r') as f:
         if 'error' in result:
             error_messages += 1
             print(f"Line {line_num}: ERROR - {result['error']}")
+            print()
+        elif not result['length_valid']:
+            error_messages += 1
+            print(f"Line {line_num}: LENGTH ERROR")
+            print(f"  Encoded: {result['encoded']}")
+            print(f"  Decoded: {result['decoded']}")
+            print(f"  Length byte: {result['actual_length']} (expected {result['expected_length']})")
             print()
         elif not result['checksum_valid']:
             error_messages += 1

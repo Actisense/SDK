@@ -124,11 +124,11 @@ class MessageGenerator:
         data = bytes([random.randint(0, 255) for _ in range(data_length)])
         
         # Build BST 94 message (without checksum first to calculate length)
-        payload_length = 5 + data_length # 5 header bytes + data + (checksum byte is not part of length)
+        payload_length = 6 + data_length  # 6 header bytes (priority, pdus, pduf, dp, destination, data_length) + data
         
         message = bytearray([
             MSG_TYPE_BST94,
-            payload_length,  # Length (excludes ID and length bytes, (checksum byte is not part of length))
+            payload_length,  # Length (excludes ID and length bytes, checksum byte is not part of length)
             priority & 0x07,
             pdus,
             pduf,
@@ -160,9 +160,9 @@ class MessageGenerator:
         # Generate random data
         data = bytes([random.randint(0, 255) for _ in range(data_length)])
         
-        # Payload length = all fields after length field + checksum
-        # Fields: D, S, PDUS, PDUF, DPP, C, Timestamp (4 bytes), Data, Checksum
-        payload_length = 10 + len(data)  # 10 header bytes + data (checksum byte is not part of length)
+        # BST Type 2 (D0) length includes the full 13-byte header (ID + L0 + L1 + 10 data header bytes)
+        # Length = 13 header bytes + message data (checksum is not included)
+        payload_length = 13 + len(data)
         
         # DPP field: Data Page and Priority
         dpp = (dp & 0x03) | ((priority & 0x07) << 2)
@@ -173,7 +173,7 @@ class MessageGenerator:
         # Build BST D0 message
         message = bytearray([
             MSG_TYPE_BSTD0,
-            payload_length & 0xFF,  # Length low byte (checksum byte is not part of length)
+            payload_length & 0xFF,  # Length low byte
             (payload_length >> 8) & 0xFF,  # Length high byte
             destination,
             source,

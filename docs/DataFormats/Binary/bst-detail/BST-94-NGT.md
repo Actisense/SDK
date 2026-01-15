@@ -38,8 +38,8 @@ The first byte identifies the message type. If it is 94 Hex, it is a "BST 94" me
 
 ### Note on length fields
 
-- `L` encodes the whole BST message length, which will be the BST 94 header plus the dtaa length `DL` field.
-- `DL` encodes just the data length
+- `L` Encodes the whole BST message length, which will be the BST 94 header plus the data length `DL` field.
+- `DL` Encodes just the data length. As the header is a fixed 6 bytes in size, `L` = `DL`+ 6.
 
 So for a data length of 8 bytes, `L` = 14 and `DL` = 8, thus the whole BST frame in this case will use 16 bytes of space (14 bytes + the 2 byte BST header)
 

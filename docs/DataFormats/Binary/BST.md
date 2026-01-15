@@ -28,7 +28,7 @@ Messages sent in this protocol have the following form:
 | 0      | BST ID       | Protocol identifier     | 1 byte (8-bit)       |
 | 1      | Store Length | Length of data payload  | 1 byte (8-bit)       |
 | 2      | Data Block   | Message payload         | Variable (see below) |
-| Length | Checksum     | Zero sum checksum       | 1 byte (8-bit)       |
+| 2 + Data Block Length | Checksum     | Zero sum checksum       | 1 byte (8-bit)       |
 
 Where
 
@@ -65,6 +65,8 @@ To overcome the data length considerations, BST type 2 - messages with BST ID of
 | 0 | `ID` | 1 byte | BST Message ID, D0-DF Hex |
 | 1 | `L0` | 1 byte | Payload Length - lower byte of 16 bit little endian number |
 | 2 | `L1` | 1 byte | Payload Length - upper byte of 16 bit little endian number |
+
+Note also that for BST type 2, the length is the total message length, **including** the BST ID and length bytes.
 
 ## BST-BEM
 
