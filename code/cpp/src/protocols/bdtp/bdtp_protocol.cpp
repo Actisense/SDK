@@ -314,24 +314,25 @@ namespace Actisense
 			const uint8_t checksumResult = calculateChecksum(checksumData);
 
 			if (checksumResult != 0) {
-				outError = "BST checksum mismatch - sum is 0x" + std::to_string(checksumResult) +
-						   " (expected 0)";
-				return false;
-			}
-
-			/* Extract datagram */
-			outDatagram.bstId = bstId;
-			outDatagram.storeLength = storeLength;
-			outDatagram.data.assign(frameData.begin() + 2, frameData.begin() + 2 + storeLength);
-
-			return true;
+			std::ostringstream ss;
+			ss << "BST checksum mismatch - sum is 0x" << std::hex 
+			   << static_cast<int>(checksumResult) << " (expected 0)";
+			outError = ss.str();
+			return false;
 		}
 
-		ProtocolPtr createBdtpProtocol() {
-			return std::make_unique<BdtpProtocol>();
-		}
+		/* Extract datagram */
+		outDatagram.bstId = bstId;
+		outDatagram.storeLength = storeLength;
+		outDatagram.data.assign(frameData.begin() + 2, frameData.begin() + 2 + storeLength);
 
-	}; /* namespace Sdk */
+		return true;
+	}
+	ProtocolPtr createBdtpProtocol() {
+		return std::make_unique<BdtpProtocol>();
+	}
+
+}; /* namespace Sdk */
 }; /* namespace Actisense */
 
 /**************** (C) COPYRIGHT Active Research Limited  ** END OF FILE **/
