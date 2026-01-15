@@ -12,6 +12,8 @@ import threading
 import time
 import random
 import logging
+import configparser
+import os
 from datetime import datetime
 from typing import List, Optional
 from dataclasses import dataclass
@@ -203,6 +205,9 @@ class N2KSenderGUI:
         self.root.title("N2K Sender Utility v1.0")
         self.root.geometry("700x600")
         
+        # Settings file
+        self.settings_file = "n2ksender.ini"
+        
         # State variables
         self.serial_port: Optional[serial.Serial] = None
         self.is_sending = False
@@ -215,8 +220,12 @@ class N2KSenderGUI:
         self.setup_logging()
         
         self.create_widgets()
+        self.load_settings()
         self.update_serial_ports()
         self.update_calculations()
+        
+        # Handle window close to save settings
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
     
     def setup_logging(self):
         """Set up file logging for sent messages"""
@@ -236,6 +245,98 @@ class N2KSenderGUI:
         # Add handler to logger
         if not self.logger.handlers:
             self.logger.addHandler(file_handler)
+    
+    def load_settings(self):
+        """Load settings from .ini file if it exists"""
+        if not os.path.exists(self.settings_file):
+            return
+        
+        try:
+            config = configparser.ConfigParser()
+            config.read(self.settings_file)
+            
+            # Load Serial Connection settings
+            if config.has_section('SerialConnection'):
+                if config.has_option('SerialConnection', 'port'):
+                    self.port_var.set(config.get('SerialConnection', 'port'))
+                if config.has_option('SerialConnection', 'baud_rate'):
+                    self.baud_var.set(config.getint('SerialConnection', 'baud_rate'))
+            
+            # Load Bandwidth Control settings
+            if config.has_section('BandwidthControl'):
+                if config.has_option('BandwidthControl', 'bandwidth_percent'):
+                    self.bandwidth_var.set(config.getint('BandwidthControl', 'bandwidth_percent'))
+            
+            # Load Message Configuration settings
+            if config.has_section('MessageConfig'):
+                if config.has_option('MessageConfig', 'message_type'):
+                    self.msg_type_var.set(config.get('MessageConfig', 'message_type'))
+                if config.has_option('MessageConfig', 'variable_length'):
+                    self.variable_length_var.set(config.getboolean('MessageConfig', 'variable_length'))
+                if config.has_option('MessageConfig', 'fixed_length'):
+                    self.fixed_length_var.set(config.getint('MessageConfig', 'fixed_length'))
+            
+            # Load PGN list
+            if config.has_section('PGNList'):
+                if config.has_option('PGNList', 'pgns'):
+                    pgn_text = config.get('PGNList', 'pgns')
+                    self.pgn_text.delete('1.0', tk.END)
+                    self.pgn_text.insert('1.0', pgn_text)
+            
+            self.log_status(f"Settings loaded from {self.settings_file}")
+        except Exception as e:
+            self.log_status(f"Error loading settings: {e}")
+    
+    def on_setting_changed(self):
+        """Called whenever any setting changes - triggers auto-save"""
+        # Use after_cancel to debounce multiple rapid changes
+        if hasattr(self, '_save_timer'):
+            self.root.after_cancel(self._save_timer)
+        self._save_timer = self.root.after(500, self.save_settings)
+    
+    def on_closing(self):
+        """Handle window close event - save settings and exit"""
+        if self.is_sending:
+            self.stop_sending()
+            # Give a brief moment for the send thread to stop
+            self.root.after(100, self.on_closing)
+            return
+        
+        self.save_settings()
+        self.root.destroy()
+    
+    def save_settings(self):
+        """Save current UI settings to .ini file"""
+        try:
+            config = configparser.ConfigParser()
+            
+            # Save Serial Connection settings
+            config.add_section('SerialConnection')
+            config.set('SerialConnection', 'port', self.port_var.get())
+            config.set('SerialConnection', 'baud_rate', str(self.baud_var.get()))
+            
+            # Save Bandwidth Control settings
+            config.add_section('BandwidthControl')
+            config.set('BandwidthControl', 'bandwidth_percent', str(self.bandwidth_var.get()))
+            
+            # Save Message Configuration settings
+            config.add_section('MessageConfig')
+            config.set('MessageConfig', 'message_type', self.msg_type_var.get())
+            config.set('MessageConfig', 'variable_length', str(self.variable_length_var.get()))
+            config.set('MessageConfig', 'fixed_length', str(self.fixed_length_var.get()))
+            
+            # Save PGN list
+            config.add_section('PGNList')
+            pgn_text = self.pgn_text.get('1.0', tk.END).strip()
+            config.set('PGNList', 'pgns', pgn_text)
+            
+            # Write to file
+            with open(self.settings_file, 'w') as f:
+                config.write(f)
+            
+            self.log_status(f"Settings saved to {self.settings_file}")
+        except Exception as e:
+            self.log_status(f"Error saving settings: {e}")
         
     def create_widgets(self):
         """Create all GUI widgets"""
@@ -256,6 +357,7 @@ class N2KSenderGUI:
         
         ttk.Label(conn_frame, text="Baud Rate:").grid(row=0, column=3, sticky=tk.W, padx=5)
         self.baud_var = tk.IntVar(value=115200)
+        self.baud_var.trace_add('write', lambda *args: self.on_setting_changed())
         baud_combo = ttk.Combobox(conn_frame, textvariable=self.baud_var, values=self.baud_rates, 
                                    width=10, state='readonly')
         baud_combo.grid(row=0, column=4, padx=5)
@@ -267,6 +369,7 @@ class N2KSenderGUI:
         
         ttk.Label(bw_frame, text="Bandwidth %:").grid(row=0, column=0, sticky=tk.W, padx=5)
         self.bandwidth_var = tk.IntVar(value=50)
+        self.bandwidth_var.trace_add('write', lambda *args: self.on_setting_changed())
         bandwidth_spin = ttk.Spinbox(bw_frame, from_=0, to=100, textvariable=self.bandwidth_var, 
                                       width=10, command=self.update_calculations)
         bandwidth_spin.grid(row=0, column=1, padx=5)
@@ -286,6 +389,7 @@ class N2KSenderGUI:
         
         ttk.Label(msg_frame, text="Message Type:").grid(row=0, column=0, sticky=tk.W, padx=5)
         self.msg_type_var = tk.StringVar(value="BST 93")
+        self.msg_type_var.trace_add('write', lambda *args: self.on_setting_changed())
         msg_type_combo = ttk.Combobox(msg_frame, textvariable=self.msg_type_var, 
                                        values=["BST 93", "BST 94", "BST D0"], 
                                        width=15, state='readonly')
@@ -294,12 +398,14 @@ class N2KSenderGUI:
         # Message Length Configuration
         ttk.Label(msg_frame, text="Variable Length:").grid(row=1, column=0, sticky=tk.W, padx=5)
         self.variable_length_var = tk.BooleanVar(value=True)
+        self.variable_length_var.trace_add('write', lambda *args: self.on_setting_changed())
         var_check = ttk.Checkbutton(msg_frame, variable=self.variable_length_var, 
                                      command=self.toggle_length_control)
         var_check.grid(row=1, column=1, sticky=tk.W, padx=5)
         
         ttk.Label(msg_frame, text="Fixed Length:").grid(row=1, column=2, sticky=tk.W, padx=5)
         self.fixed_length_var = tk.IntVar(value=8)
+        self.fixed_length_var.trace_add('write', lambda *args: self.on_setting_changed())
         self.fixed_length_spin = ttk.Spinbox(msg_frame, from_=5, to=100, 
                                               textvariable=self.fixed_length_var, 
                                               width=10, state='disabled',
@@ -315,6 +421,7 @@ class N2KSenderGUI:
         self.pgn_text = scrolledtext.ScrolledText(pgn_frame, width=60, height=8)
         self.pgn_text.grid(row=0, column=0, padx=5, pady=5)
         self.pgn_text.insert('1.0', "60928, 129025, 129029, 130312, 130316, 128267")
+        self.pgn_text.bind('<KeyRelease>', lambda e: self.on_setting_changed())
         
         # Control Buttons
         btn_frame = ttk.Frame(main_frame)
@@ -325,6 +432,9 @@ class N2KSenderGUI:
         
         self.stop_btn = ttk.Button(btn_frame, text="Stop", command=self.stop_sending, state='disabled')
         self.stop_btn.grid(row=0, column=1, padx=5)
+        
+        self.save_btn = ttk.Button(btn_frame, text="Save Settings", command=self.save_settings)
+        self.save_btn.grid(row=0, column=2, padx=5)
         
         # Status Display
         status_frame = ttk.LabelFrame(main_frame, text="Status", padding="5")
@@ -353,8 +463,14 @@ class N2KSenderGUI:
         ports = serial.tools.list_ports.comports()
         port_list = [port.device for port in ports]
         self.port_combo['values'] = port_list
-        if port_list:
+        
+        # Preserve current selection if it still exists, otherwise select first
+        current_port = self.port_var.get()
+        if current_port in port_list:
+            self.port_combo.set(current_port)
+        elif port_list:
             self.port_combo.current(0)
+        
         self.log_status(f"Found {len(port_list)} serial port(s)")
         
     def update_calculations(self):
