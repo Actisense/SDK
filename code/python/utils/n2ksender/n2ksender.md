@@ -40,7 +40,21 @@ N2K Sender is a Python-based testing utility designed to generate and transmit N
   - Real-time display of estimated message frames per second (varies with message length)
 - Text input field for PGN list entry with clear formatting instructions
 - Send/Stop buttons for message transmission control
+- **Save Settings button** to manually persist all current UI settings
 - Status display for transmission feedback and error messages
+
+### Settings Persistence
+- **Automatic Settings Saving**: All UI settings are automatically saved to `n2ksender.ini` whenever you change any control (with debouncing to avoid excessive writes)
+- **Auto-Load on Startup**: Settings are automatically restored when the application starts if the settings file exists
+- **Manual Save Option**: Click the "Save Settings" button to explicitly save your current configuration
+- **Window Close Save**: Settings are automatically saved when you close the application
+- **Saved Settings Include**:
+  - Serial port selection
+  - Baud rate
+  - Bandwidth percentage
+  - Message type selection
+  - Variable/fixed length setting
+  - All PGN numbers
 
 ## Use Cases
 
@@ -75,9 +89,34 @@ N2K Sender is a Python-based testing utility designed to generate and transmit N
 2. Configure the appropriate baud rate for your device
 3. Choose the message type (BST 93, BST 94, or D0) from the selector
 4. Enter a list of PGN numbers to generate (e.g., "60928, 129025, 130312")
-5. Click "Send Messages" to begin transmission
-6. Monitor the status display for transmission progress and any errors
-7. Use "Stop" button to halt transmission at any time
+5. (Optional) Click "Save Settings" to manually persist your configuration
+6. Click "Send Messages" to begin transmission
+7. Monitor the status display for transmission progress and any errors
+8. Use "Stop" button to halt transmission at any time
+9. Your settings are automatically saved when the application closes
+
+## Settings File Format
+
+The application uses a standard INI format file (`n2ksender.ini`) to persist settings. The file is organized into sections:
+
+```ini
+[SerialConnection]
+port = COM6
+baud_rate = 115200
+
+[BandwidthControl]
+bandwidth_percent = 50
+
+[MessageConfig]
+message_type = BST 93
+variable_length = True
+fixed_length = 8
+
+[PGNList]
+pgns = 60928, 129025, 129029, 130312, 130316, 128267
+```
+
+You can manually edit this file or use the application's "Save Settings" button. Settings are automatically loaded on application startup if the file exists in the same directory as the script.
 
 ## Example PGN Values
 
