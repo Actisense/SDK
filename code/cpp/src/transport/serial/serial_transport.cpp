@@ -72,8 +72,8 @@ namespace Actisense
 
 			stopRequested_ = true;
 
-			/* Wake up read thread if waiting */
-			readCv_.notify_all();
+			/* Wake up any waiting threads */
+			messageBuffer_.notifyAll();
 
 			/* Wait for read thread to finish */
 			if (readThread_.joinable()) {
@@ -220,7 +220,7 @@ namespace Actisense
 			}
 
 			/* Configure message buffer */
-			messageBuffer_ = MessageRingBuffer<std::vector<uint8_t>>(config.maxPendingMessages);
+			messageBuffer_.reset(config.maxPendingMessages);
 			tempBufferSize_ = config.readBufferSize;
 			messagesReceived_ = 0;
 

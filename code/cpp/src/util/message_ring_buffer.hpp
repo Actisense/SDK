@@ -212,6 +212,17 @@ namespace Actisense
 			}
 
 			/**************************************************************************/ /**
+			 \brief      Reset buffer with new capacity
+			 \param[in]  maxMessages  New maximum message capacity
+			 \details    Clears all existing messages and sets new capacity
+			 *******************************************************************************/
+			void reset(std::size_t maxMessages) noexcept {
+				std::lock_guard<std::mutex> lock(mutex_);
+				messages_.clear();
+				maxMessages_ = maxMessages;
+			}
+
+			/**************************************************************************/ /**
 			 \brief      Notify all waiting threads
 			 \details    Used during shutdown to unblock waiting dequeue operations
 			 *******************************************************************************/

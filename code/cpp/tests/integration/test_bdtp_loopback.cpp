@@ -198,7 +198,7 @@ TEST_F(BdtpLoopbackIntegrationTest, DataInjectionSimulatesDevice)
 
 TEST_F(BdtpLoopbackIntegrationTest, ChunkedReceive)
 {
-	/* Send complete frame but receive in chunks */
+	/* Send complete frame and receive as complete message, then parse progressively */
 	BstDatagram datagram;
 	datagram.bstId = 0x96;
 	datagram.storeLength = 10;
@@ -213,23 +213,27 @@ TEST_F(BdtpLoopbackIntegrationTest, ChunkedReceive)
 		EXPECT_EQ(ec, ErrorCode::Ok);
 	});
 
-	/* Receive in small chunks and parse progressively */
-	while (m_transport.bytesAvailable() > 0)
+	/* Receive complete message (message-oriented buffer returns full message) */
+	std::vector<uint8_t> recvBuffer(frame.size());
+	std::size_t totalBytesRead = 0;
+	
+	m_transport.asyncRecv(recvBuffer, [&](ErrorCode ec, std::size_t bytes)
 	{
-		std::array<uint8_t, 3> chunk = {};  /* Small chunks */
-		std::size_t bytesRead = 0;
-		
-		m_transport.asyncRecv(chunk, [&](ErrorCode ec, std::size_t bytes)
-		{
-			EXPECT_EQ(ec, ErrorCode::Ok);
-			bytesRead = bytes;
-		});
+		EXPECT_EQ(ec, ErrorCode::Ok);
+		totalBytesRead = bytes;
+	});
 
-		if (bytesRead > 0)
-		{
-			m_protocol.parse(ConstByteSpan(chunk.data(), bytesRead),
-			                 messageEmitter(), errorEmitter());
-		}
+	EXPECT_EQ(totalBytesRead, frame.size());
+
+	/* Parse progressively in small chunks to test BDTP parser's chunked parsing */
+	std::size_t offset = 0;
+	constexpr std::size_t chunkSize = 3;
+	while (offset < totalBytesRead)
+	{
+		std::size_t bytesToParse = std::min(chunkSize, totalBytesRead - offset);
+		m_protocol.parse(ConstByteSpan(recvBuffer.data() + offset, bytesToParse),
+		                 messageEmitter(), errorEmitter());
+		offset += bytesToParse;
 	}
 
 	/* Should still receive complete message */
