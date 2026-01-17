@@ -15,7 +15,7 @@
 #include <queue>
 
 #include "transport/transport.hpp"
-#include "util/ring_buffer.hpp"
+#include "util/message_ring_buffer.hpp"
 
 namespace Actisense
 {
@@ -88,6 +88,12 @@ namespace Actisense
 			[[nodiscard]] std::size_t bytesSent() const noexcept;
 
 			/**************************************************************************/ /**
+			 \brief      Get number of messages available
+			 \return     Number of complete messages in buffer
+			 *******************************************************************************/
+			[[nodiscard]] std::size_t messagesAvailable() const noexcept;
+
+			/**************************************************************************/ /**
 			 \brief      Clear all buffers
 			 *******************************************************************************/
 			void clearBuffers();
@@ -106,13 +112,14 @@ namespace Actisense
 			[[nodiscard]] bool isLoopbackEnabled() const noexcept;
 
 		private:
-			static constexpr std::size_t kBufferSize = 8192;
+			static constexpr std::size_t kMaxPendingMessages = 64;
 
 			mutable std::mutex mutex_;
-			RingBuffer<kBufferSize> buffer_;
+			MessageRingBuffer<std::vector<uint8_t>> messageBuffer_;
 			bool is_open_;
 			bool loopback_enabled_;
 			std::size_t total_bytes_sent_;
+			std::size_t total_messages_sent_;
 
 			/* Pending receive requests */
 			struct PendingRecv

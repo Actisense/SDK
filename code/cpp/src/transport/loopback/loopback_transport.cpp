@@ -18,8 +18,8 @@ namespace Actisense
 		/* Public Function Definitions ------------------------------------------ */
 
 		LoopbackTransport::LoopbackTransport()
-			: mutex_(), buffer_(), is_open_(false), loopback_enabled_(true), total_bytes_sent_(0),
-			  pending_recvs_() {}
+			: mutex_(), messageBuffer_(kMaxPendingMessages), is_open_(false), loopback_enabled_(true),
+			  total_bytes_sent_(0), total_messages_sent_(0), pending_recvs_() {}
 
 		LoopbackTransport::~LoopbackTransport() {
 			close();
@@ -41,7 +41,8 @@ namespace Actisense
 
 			is_open_ = true;
 			total_bytes_sent_ = 0;
-			buffer_.clear();
+			total_messages_sent_ = 0;
+			messageBuffer_.clear();
 
 			if (completion) {
 				completion(ErrorCode::Ok);
@@ -67,7 +68,7 @@ namespace Actisense
 				}
 			}
 
-			buffer_.clear();
+			messageBuffer_.clear();
 		}
 
 		bool LoopbackTransport::isOpen() const noexcept {
@@ -85,25 +86,22 @@ namespace Actisense
 				return;
 			}
 
-			std::size_t bytesWritten = 0;
+			std::size_t bytesWritten = data.size();
 
 			if (loopback_enabled_) {
-				/* Write to ring buffer (loopback to receive side) */
-				bytesWritten = buffer_.write(data);
-
-				if (bytesWritten < data.size()) {
+				/* Enqueue message as complete block (loopback to receive side) */
+				if (!messageBuffer_.enqueue(data)) {
 					/* Buffer full - rate limited */
 					if (completion) {
-						completion(ErrorCode::RateLimited, bytesWritten);
+						completion(ErrorCode::RateLimited, 0);
 					}
 					return;
 				}
 
+				++total_messages_sent_;
+
 				/* Try to complete any pending receives */
 				tryCompletePendingRecvs();
-			} else {
-				/* Not looping back, just count the bytes */
-				bytesWritten = data.size();
 			}
 
 			total_bytes_sent_ += bytesWritten;
@@ -123,16 +121,18 @@ namespace Actisense
 				return;
 			}
 
-			/* Try to read immediately if data available */
-			if (!buffer_.empty()) {
-				const auto bytesRead = buffer_.read(buffer);
-				if (completion) {
-					completion(ErrorCode::Ok, bytesRead);
+			/* Try to read immediately if message available */
+			if (!messageBuffer_.empty()) {
+				std::size_t bytesRead = 0;
+				if (messageBuffer_.readPartial(buffer, bytesRead)) {
+					if (completion) {
+						completion(ErrorCode::Ok, bytesRead);
+					}
+					return;
 				}
-				return;
 			}
 
-			/* No data available - queue the receive request */
+			/* No message available - queue the receive request */
 			pending_recvs_.push(PendingRecv{buffer, std::move(completion)});
 		}
 
@@ -147,17 +147,19 @@ namespace Actisense
 				return 0;
 			}
 
-			const auto bytesWritten = buffer_.write(data);
+			if (!messageBuffer_.enqueue(data)) {
+				return 0; /* Buffer full */
+			}
 
 			/* Try to complete pending receives with injected data */
 			tryCompletePendingRecvs();
 
-			return bytesWritten;
+			return data.size();
 		}
 
 		std::size_t LoopbackTransport::bytesAvailable() const noexcept {
 			std::lock_guard<std::mutex> lock(mutex_);
-			return buffer_.size();
+			return messageBuffer_.totalBytes();
 		}
 
 		std::size_t LoopbackTransport::bytesSent() const noexcept {
@@ -165,9 +167,14 @@ namespace Actisense
 			return total_bytes_sent_;
 		}
 
+		std::size_t LoopbackTransport::messagesAvailable() const noexcept {
+			std::lock_guard<std::mutex> lock(mutex_);
+			return messageBuffer_.size();
+		}
+
 		void LoopbackTransport::clearBuffers() {
 			std::lock_guard<std::mutex> lock(mutex_);
-			buffer_.clear();
+			messageBuffer_.clear();
 		}
 
 		void LoopbackTransport::setLoopbackEnabled(bool enabled) noexcept {
@@ -182,11 +189,12 @@ namespace Actisense
 
 		void LoopbackTransport::tryCompletePendingRecvs() {
 			/* Called with lock held */
-			while (!pending_recvs_.empty() && !buffer_.empty()) {
+			while (!pending_recvs_.empty() && !messageBuffer_.empty()) {
 				auto pending = std::move(pending_recvs_.front());
 				pending_recvs_.pop();
 
-				const auto bytesRead = buffer_.read(pending.buffer);
+				std::size_t bytesRead = 0;
+				messageBuffer_.readPartial(pending.buffer, bytesRead);
 
 				if (pending.completion) {
 					pending.completion(ErrorCode::Ok, bytesRead);

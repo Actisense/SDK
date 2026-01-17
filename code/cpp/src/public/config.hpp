@@ -38,12 +38,14 @@ namespace Actisense
 		 *******************************************************************************/
 		struct SerialConfig
 		{
-			std::string port;				///< Port name (e.g., "COM7", "/dev/ttyUSB0")
-			unsigned baud = 115200;			///< Baud rate
-			unsigned dataBits = 8;			///< Data bits (5-8)
-			char parity = 'N';				///< Parity: 'N'=None, 'E'=Even, 'O'=Odd
-			unsigned stopBits = 1;			///< Stop bits (1 or 2)
-			unsigned readBufferSize = 4096; ///< Read buffer size in bytes
+			std::string port;					  ///< Port name (e.g., "COM7", "/dev/ttyUSB0")
+			unsigned baud = 115200;				  ///< Baud rate
+			unsigned dataBits = 8;				  ///< Data bits (5-8)
+			char parity = 'N';					  ///< Parity: 'N'=None, 'E'=Even, 'O'=Odd
+			unsigned stopBits = 1;				  ///< Stop bits (1 or 2)
+			unsigned readBufferSize = 512;		  ///< Temp buffer size for serial reads
+			unsigned readTimeoutMs = 10;		  ///< Read timeout/poll interval in milliseconds
+			unsigned maxPendingMessages = 16;	  ///< Max messages in ring buffer
 		};
 
 		/**************************************************************************/ /**

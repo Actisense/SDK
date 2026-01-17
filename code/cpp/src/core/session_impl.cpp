@@ -315,6 +315,8 @@ namespace Actisense
 			serialConfig.parity = config.parity;
 			serialConfig.stopBits = config.stopBits;
 			serialConfig.readBufferSize = config.readBufferSize;
+			serialConfig.readTimeoutMs = config.readTimeoutMs;
+			serialConfig.maxPendingMessages = config.maxPendingMessages;
 
 			const auto result = transport->open(serialConfig);
 			if (result != ErrorCode::Ok) {

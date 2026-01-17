@@ -172,9 +172,9 @@ namespace Actisense
 		[[nodiscard]] inline std::string bstIdToString(BstId id) {
 			switch (id) {
 				case BstId::Nmea2000_GatewayToPC:
-					return "BST-93 (N2K Gateway-PC)";
+					return "BST-93 (N2K GW->PC)";
 				case BstId::Nmea2000_PCToGateway:
-					return "BST-94 (N2K PC-Gateway)";
+					return "BST-94 (N2K PC->GW)";
 				case BstId::CanFrame:
 					return "BST-95 (CAN Frame)";
 				case BstId::Nmea0183:

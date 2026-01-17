@@ -54,6 +54,7 @@ TEST_F(LoopbackTransportTest, InitialState)
 	EXPECT_FALSE(m_transport.isOpen());
 	EXPECT_EQ(m_transport.kind(), TransportKind::Loopback);
 	EXPECT_EQ(m_transport.bytesAvailable(), 0u);
+	EXPECT_EQ(m_transport.messagesAvailable(), 0u);
 	EXPECT_EQ(m_transport.bytesSent(), 0u);
 }
 
@@ -245,6 +246,51 @@ TEST_F(LoopbackTransportTest, CreateFactory)
 	auto transport = createLoopbackTransport();
 	EXPECT_NE(transport, nullptr);
 	EXPECT_EQ(transport->kind(), TransportKind::Loopback);
+}
+
+TEST_F(LoopbackTransportTest, MessageOrientedBuffer)
+{
+	openTransport();
+
+	/* Send multiple messages */
+	const std::array<uint8_t, 3> msg1 = {1, 2, 3};
+	const std::array<uint8_t, 4> msg2 = {4, 5, 6, 7};
+	const std::array<uint8_t, 2> msg3 = {8, 9};
+
+	m_transport.asyncSend(msg1, [](ErrorCode, std::size_t) {});
+	m_transport.asyncSend(msg2, [](ErrorCode, std::size_t) {});
+	m_transport.asyncSend(msg3, [](ErrorCode, std::size_t) {});
+
+	EXPECT_EQ(m_transport.messagesAvailable(), 3u);
+	EXPECT_EQ(m_transport.bytesAvailable(), 9u);  /* 3 + 4 + 2 */
+
+	/* Receive each message separately */
+	std::array<uint8_t, 10> recvBuffer = {};
+
+	m_transport.asyncRecv(recvBuffer, [&](ErrorCode ec, std::size_t bytes)
+	{
+		EXPECT_EQ(ec, ErrorCode::Ok);
+		EXPECT_EQ(bytes, 3u);  /* First message only */
+	});
+
+	EXPECT_EQ(m_transport.messagesAvailable(), 2u);
+
+	m_transport.asyncRecv(recvBuffer, [&](ErrorCode ec, std::size_t bytes)
+	{
+		EXPECT_EQ(ec, ErrorCode::Ok);
+		EXPECT_EQ(bytes, 4u);  /* Second message */
+	});
+
+	EXPECT_EQ(m_transport.messagesAvailable(), 1u);
+
+	m_transport.asyncRecv(recvBuffer, [&](ErrorCode ec, std::size_t bytes)
+	{
+		EXPECT_EQ(ec, ErrorCode::Ok);
+		EXPECT_EQ(bytes, 2u);  /* Third message */
+	});
+
+	EXPECT_EQ(m_transport.messagesAvailable(), 0u);
+	EXPECT_EQ(m_transport.bytesAvailable(), 0u);
 }
 
 }; /* namespace Test */

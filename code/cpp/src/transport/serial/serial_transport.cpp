@@ -33,11 +33,12 @@ namespace Actisense
 	{
 		/* Constants ------------------------------------------------------------ */
 
-		static constexpr std::size_t kDefaultReadBufferSize = 4096;
+		static constexpr std::size_t kDefaultTempBufferSize = 512;
+		static constexpr std::size_t kDefaultMaxPendingMessages = 16;
 
 		/* Public Function Definitions ------------------------------------------ */
 
-		SerialTransport::SerialTransport() : readBuffer_(kDefaultReadBufferSize) {}
+		SerialTransport::SerialTransport() : messageBuffer_(kDefaultMaxPendingMessages), tempBufferSize_(kDefaultTempBufferSize) {}
 
 		SerialTransport::~SerialTransport() {
 			close();
@@ -115,6 +116,10 @@ namespace Actisense
 					pendingSends_.pop();
 				}
 			}
+
+			/* Clear message buffer and notify waiting threads */
+			messageBuffer_.clear();
+			messageBuffer_.notifyAll();
 		}
 
 		bool SerialTransport::isOpen() const noexcept {
@@ -142,20 +147,18 @@ namespace Actisense
 				return;
 			}
 
-			/* Check if data already available */
+			/* Check if message already available */
 			{
 				std::lock_guard<std::mutex> lock(readMutex_);
-				const auto available = readBuffer_.size();
-				if (available > 0) {
-					const auto toRead = (std::min)(buffer.size(), available);
-					readBuffer_.read(std::span<uint8_t>(buffer.data(), toRead));
+				std::size_t bytesRead = 0;
+				if (messageBuffer_.readPartial(buffer, bytesRead)) {
 					if (completion)
-						completion(ErrorCode::Ok, toRead);
+						completion(ErrorCode::Ok, bytesRead);
 					return;
 				}
 			}
 
-			/* Queue for later when data arrives */
+			/* Queue for later when message arrives */
 			{
 				std::lock_guard<std::mutex> lock(asyncMutex_);
 				pendingRecvs_.push({buffer, std::move(completion)});
@@ -216,11 +219,10 @@ namespace Actisense
 				return configResult;
 			}
 
-			/* Resize read buffer if needed */
-			if (config.readBufferSize != readBuffer_.capacity()) {
-				readBuffer_ = RingBuffer<uint8_t>(config.readBufferSize);
-			}
-			readBuffer_.clear();
+			/* Configure message buffer */
+			messageBuffer_ = MessageRingBuffer<std::vector<uint8_t>>(config.maxPendingMessages);
+			tempBufferSize_ = config.readBufferSize;
+			messagesReceived_ = 0;
 
 			isOpen_ = true;
 
@@ -236,7 +238,12 @@ namespace Actisense
 
 		std::size_t SerialTransport::bytesAvailable() const {
 			std::lock_guard<std::mutex> lock(readMutex_);
-			return readBuffer_.size();
+			return messageBuffer_.totalBytes();
+		}
+
+		std::size_t SerialTransport::messagesAvailable() const {
+			std::lock_guard<std::mutex> lock(readMutex_);
+			return messageBuffer_.size();
 		}
 
 		std::size_t SerialTransport::readSync(uint8_t* buffer, std::size_t maxBytes,
@@ -518,12 +525,12 @@ namespace Actisense
 		}
 
 		void SerialTransport::readThreadFunc() {
-			std::vector<uint8_t> tempBuffer(512);
+			std::vector<uint8_t> tempBuffer(tempBufferSize_);
 
 			ACTISENSE_LOG_INFO("Serial", "Read thread started");
 
 			while (!stopRequested_ && isOpen()) {
-				/* Read from port */
+				/* Read from port into temp buffer */
 				const auto bytesRead = readSync(tempBuffer.data(), tempBuffer.size(), 100);
 
 				if (bytesRead > 0) {
@@ -533,23 +540,22 @@ namespace Actisense
 						ACTISENSE_LOG_TRACE("Serial", ss.str());
 					}
 
-					/* Add to ring buffer */
-					std::size_t written = 0;
+					/* Create right-sized message and move into ring buffer */
+					std::vector<uint8_t> message(tempBuffer.begin(), tempBuffer.begin() + bytesRead);
+
 					{
 						std::lock_guard<std::mutex> lock(readMutex_);
-						const auto availableBefore = readBuffer_.available();
-						written = readBuffer_.write(std::span<const uint8_t>(tempBuffer.data(), bytesRead));
-						if (written < bytesRead) {
+						if (!messageBuffer_.enqueue(std::move(message))) {
 							std::ostringstream ss;
-							ss << "Ring buffer overflow! Only wrote " << written 
-							   << " of " << bytesRead << " bytes (available was " 
-							   << availableBefore << ")";
+							ss << "Message buffer overflow! Dropped " << bytesRead << " bytes"
+							   << " (buffer has " << messageBuffer_.size() << " messages)";
 							ACTISENSE_LOG_ERROR("Serial", ss.str());
+						} else {
+							++messagesReceived_;
 						}
 					}
 
-					/* Notify waiting readers and process async operations */
-					readCv_.notify_all();
+					/* Process async operations */
 					processAsyncOperations();
 				}
 			}
@@ -570,26 +576,30 @@ namespace Actisense
 			while (!pendingRecvs_.empty()) {
 				std::lock_guard<std::mutex> readLock(readMutex_);
 
-				const auto available = readBuffer_.size();
-				if (available == 0) {
+				if (messageBuffer_.empty()) {
 					break;
 				}
 
 				auto& op = pendingRecvs_.front();
-				const auto toRead = (std::min)(op.buffer.size(), available);
-				readBuffer_.read(std::span<uint8_t>(op.buffer.data(), toRead));
+				std::size_t bytesRead = 0;
 
-				{
-					std::ostringstream ss;
-					ss << "Completing async recv: " << toRead << " bytes";
-					ACTISENSE_LOG_TRACE("Serial", ss.str());
+				/* Read message from buffer - copies to caller's buffer */
+				if (messageBuffer_.readPartial(op.buffer, bytesRead)) {
+					{
+						std::ostringstream ss;
+						ss << "Completing async recv: " << bytesRead << " bytes";
+						ACTISENSE_LOG_TRACE("Serial", ss.str());
+					}
+
+					if (op.completion) {
+						op.completion(ErrorCode::Ok, bytesRead);
+					}
+
+					pendingRecvs_.pop();
+				} else {
+					/* No message available */
+					break;
 				}
-
-				if (op.completion) {
-					op.completion(ErrorCode::Ok, toRead);
-				}
-
-				pendingRecvs_.pop();
 			}
 		}
 

@@ -348,7 +348,7 @@ int main(int argc, char* argv[])
 	/* Open frame log file if specified */
 	if (!logPath.empty())
 	{
-		g_logFile.open(logPath, std::ios::out | std::ios::app);
+		g_logFile.open(logPath, std::ios::out | std::ios::trunc);
 		if (!g_logFile.is_open())
 		{
 			std::cerr << "Warning: Could not open log file: " << logPath << std::endl;

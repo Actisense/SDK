@@ -17,7 +17,7 @@
 #include <thread>
 
 #include "transport/transport.hpp"
-#include "util/dynamic_ring_buffer.hpp"
+#include "util/message_ring_buffer.hpp"
 
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -42,9 +42,10 @@ namespace Actisense
 			unsigned dataBits = 8;				///< Data bits (5-8)
 			char parity = 'N';					///< Parity: 'N'=None, 'E'=Even, 'O'=Odd
 			unsigned stopBits = 1;				///< Stop bits (1 or 2)
-			std::size_t readBufferSize = 4096;	///< Read buffer size
+			std::size_t readBufferSize = 512;	///< Temp buffer size for serial reads
 			std::size_t writeBufferSize = 4096; ///< Write buffer size
-			unsigned readTimeoutMs = 100;		///< Read timeout in milliseconds
+			unsigned readTimeoutMs = 10;		///< Read timeout/poll interval in milliseconds
+			std::size_t maxPendingMessages = 16;///< Max messages in ring buffer
 		};
 
 		/**************************************************************************/ /**
@@ -101,9 +102,15 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Get bytes available for reading
-			 \return     Number of bytes in receive buffer
+			 \return     Total bytes across all pending messages
 			 *******************************************************************************/
 			[[nodiscard]] std::size_t bytesAvailable() const;
+
+			/**************************************************************************/ /**
+			 \brief      Get messages available for reading
+			 \return     Number of complete messages in buffer
+			 *******************************************************************************/
+			[[nodiscard]] std::size_t messagesAvailable() const;
 
 			/**************************************************************************/ /**
 			 \brief      Synchronous read (blocking)
@@ -168,11 +175,11 @@ namespace Actisense
 			std::atomic<bool> isOpen_{false};
 			std::atomic<bool> stopRequested_{false};
 
-			/* Read thread and buffer */
+			/* Read thread and message buffer */
 			std::thread readThread_;
 			mutable std::mutex readMutex_;
-			RingBuffer<uint8_t> readBuffer_;
-			std::condition_variable readCv_;
+			MessageRingBuffer<std::vector<uint8_t>> messageBuffer_;
+			std::size_t tempBufferSize_ = 512; ///< Size of temp read buffer
 
 			/* Async operation queues */
 			struct PendingRecv
@@ -193,6 +200,7 @@ namespace Actisense
 			/* Statistics */
 			std::atomic<std::size_t> totalBytesReceived_{0};
 			std::atomic<std::size_t> totalBytesSent_{0};
+			std::atomic<std::size_t> messagesReceived_{0};
 		};
 
 	}; /* namespace Sdk */

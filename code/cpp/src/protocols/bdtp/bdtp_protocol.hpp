@@ -38,8 +38,8 @@ namespace Actisense
 		 *******************************************************************************/
 		struct BstDatagram
 		{
-			uint8_t bstId;			   ///< BST message type identifier
-			uint16_t storeLength;	   ///< Length of data payload (16-bit for BST Type 2 frames)
+			uint8_t bstId=0;		   ///< BST message type identifier
+			uint16_t storeLength=0;	   ///< Length of data payload (16-bit for BST Type 2 frames)
 			std::vector<uint8_t> data; ///< Payload data
 		};
 

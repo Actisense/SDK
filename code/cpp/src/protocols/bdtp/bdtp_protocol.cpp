@@ -39,7 +39,7 @@ namespace Actisense
 										ErrorEmitter emitError) {
 			std::size_t bytesConsumed = 0;
 
-			ACTISENSE_LOG_HEX(LogLevel::Trace, "BDTP", "Parse input", data.data(), data.size());
+			//ACTISENSE_LOG_HEX(LogLevel::Trace, "BDTP", "Parse input", data.data(), data.size());
 
 			for (const uint8_t byte : data) {
 				++bytesConsumed;
@@ -262,8 +262,9 @@ namespace Actisense
 				/* Empty frame - ignore */
 				return;
 			}
-
-			/* Try to parse as BST datagram */
+			ACTISENSE_LOG_HEX(LogLevel::Trace, "BDTP::processCompletedFrame",
+							  "Frame data",
+							  frame_buffer_.data(), frame_buffer_.size());
 			BstDatagram datagram;
 			std::string parseError;
 
