@@ -228,53 +228,6 @@ namespace Actisense
 			 *******************************************************************************/
 			void notifyAll() noexcept { dataAvailable_.notify_all(); }
 
-			/**************************************************************************/ /**
-			 \brief      Try to copy message data to a buffer
-			 \param[out] buffer  Buffer to copy message data into
-			 \return     Number of bytes copied, 0 if no message available or buffer too small
-			 \details    If message fits, it is moved out of the ring. If buffer is too
-			             small, message remains in ring and 0 is returned.
-			 *******************************************************************************/
-			std::size_t tryRead(std::span<uint8_t> buffer) noexcept {
-				std::lock_guard<std::mutex> lock(mutex_);
-				if (messages_.empty()) {
-					return 0;
-				}
-
-				const auto& front = messages_.front();
-				if (front.size() > buffer.size()) {
-					/* Buffer too small - leave message in ring */
-					return 0;
-				}
-
-				std::copy(front.begin(), front.end(), buffer.begin());
-				const std::size_t bytesRead = front.size();
-				messages_.pop_front();
-				return bytesRead;
-			}
-
-			/**************************************************************************/ /**
-			 \brief      Read message bytes into buffer, removing message from ring
-			 \param[out] buffer    Buffer to copy message data into
-			 \param[out] bytesRead Number of bytes actually copied
-			 \return     True if a message was read, false if no message available
-			 \details    Copies as many bytes as fit, discards the rest.
-			             Returns partial data if buffer is smaller than message.
-			 *******************************************************************************/
-			bool readPartial(std::span<uint8_t> buffer, std::size_t& bytesRead) noexcept {
-				std::lock_guard<std::mutex> lock(mutex_);
-				if (messages_.empty()) {
-					bytesRead = 0;
-					return false;
-				}
-
-				const auto& front = messages_.front();
-				bytesRead = std::min(front.size(), buffer.size());
-				std::copy(front.begin(), front.begin() + bytesRead, buffer.begin());
-				messages_.pop_front();
-				return true;
-			}
-
 		private:
 			std::size_t maxMessages_;
 			std::deque<T> messages_;

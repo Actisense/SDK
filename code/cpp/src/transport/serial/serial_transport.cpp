@@ -106,7 +106,7 @@ namespace Actisense
 				while (!pendingRecvs_.empty()) {
 					auto& op = pendingRecvs_.front();
 					if (op.completion)
-						op.completion(ErrorCode::TransportClosed, 0);
+						op.completion(ErrorCode::TransportClosed, {});
 					pendingRecvs_.pop();
 				}
 				while (!pendingSends_.empty()) {
@@ -140,20 +140,20 @@ namespace Actisense
 			}
 		}
 
-		void SerialTransport::asyncRecv(ByteSpan buffer, RecvCompletionHandler completion) {
+		void SerialTransport::asyncRecv(RecvCompletionHandler completion) {
 			if (!isOpen()) {
 				if (completion)
-					completion(ErrorCode::NotConnected, 0);
+					completion(ErrorCode::NotConnected, {});
 				return;
 			}
 
 			/* Check if message already available */
 			{
 				std::lock_guard<std::mutex> lock(readMutex_);
-				std::size_t bytesRead = 0;
-				if (messageBuffer_.readPartial(buffer, bytesRead)) {
+				auto message = messageBuffer_.dequeue();
+				if (message) {
 					if (completion)
-						completion(ErrorCode::Ok, bytesRead);
+						completion(ErrorCode::Ok, *message);
 					return;
 				}
 			}
@@ -161,7 +161,7 @@ namespace Actisense
 			/* Queue for later when message arrives */
 			{
 				std::lock_guard<std::mutex> lock(asyncMutex_);
-				pendingRecvs_.push({buffer, std::move(completion)});
+				pendingRecvs_.push({std::move(completion)});
 			}
 		}
 
@@ -222,6 +222,7 @@ namespace Actisense
 			/* Configure message buffer */
 			messageBuffer_.reset(config.maxPendingMessages);
 			tempBufferSize_ = config.readBufferSize;
+			readTimeoutMs_ = config.readTimeoutMs;
 			messagesReceived_ = 0;
 
 			isOpen_ = true;
@@ -256,14 +257,27 @@ namespace Actisense
 			DWORD bytesRead = 0;
 			ResetEvent(readOverlapped_.hEvent);
 
-			if (!ReadFile(handle_, buffer, static_cast<DWORD>(maxBytes), &bytesRead,
-						  &readOverlapped_)) {
+			BOOL readResult = ReadFile(handle_, buffer, static_cast<DWORD>(maxBytes), nullptr,
+									   &readOverlapped_);
+
+			if (!readResult) {
 				if (GetLastError() == ERROR_IO_PENDING) {
 					const DWORD waitTime = (timeoutMs == 0) ? INFINITE : timeoutMs;
-					if (WaitForSingleObject(readOverlapped_.hEvent, waitTime) == WAIT_OBJECT_0) {
-						GetOverlappedResult(handle_, &readOverlapped_, &bytesRead, FALSE);
+					DWORD waitResult = WaitForSingleObject(readOverlapped_.hEvent, waitTime);
+					if (waitResult != WAIT_OBJECT_0) {
+						/* Timeout or error - cancel the I/O */
+						CancelIo(handle_);
+						return 0;
 					}
+				} else {
+					/* Immediate error */
+					return 0;
 				}
+			}
+
+			/* Always use GetOverlappedResult to get the actual byte count */
+			if (!GetOverlappedResult(handle_, &readOverlapped_, &bytesRead, FALSE)) {
+				return 0;
 			}
 
 			totalBytesReceived_ += bytesRead;
@@ -531,7 +545,7 @@ namespace Actisense
 
 			while (!stopRequested_ && isOpen()) {
 				/* Read from port into temp buffer */
-				const auto bytesRead = readSync(tempBuffer.data(), tempBuffer.size(), 100);
+				const auto bytesRead = readSync(tempBuffer.data(), tempBuffer.size(), readTimeoutMs_);
 
 				if (bytesRead > 0) {
 					{
@@ -576,29 +590,22 @@ namespace Actisense
 			while (!pendingRecvs_.empty()) {
 				std::lock_guard<std::mutex> readLock(readMutex_);
 
-				if (messageBuffer_.empty()) {
+				auto message = messageBuffer_.dequeue();
+				if (!message) {
 					break;
 				}
 
-				auto& op = pendingRecvs_.front();
-				std::size_t bytesRead = 0;
+				auto op = std::move(pendingRecvs_.front());
+				pendingRecvs_.pop();
 
-				/* Read message from buffer - copies to caller's buffer */
-				if (messageBuffer_.readPartial(op.buffer, bytesRead)) {
-					{
-						std::ostringstream ss;
-						ss << "Completing async recv: " << bytesRead << " bytes";
-						ACTISENSE_LOG_TRACE("Serial", ss.str());
-					}
+				{
+					std::ostringstream ss;
+					ss << "Completing async recv: " << message->size() << " bytes";
+					ACTISENSE_LOG_TRACE("Serial", ss.str());
+				}
 
-					if (op.completion) {
-						op.completion(ErrorCode::Ok, bytesRead);
-					}
-
-					pendingRecvs_.pop();
-				} else {
-					/* No message available */
-					break;
+				if (op.completion) {
+					op.completion(ErrorCode::Ok, *message);
 				}
 			}
 		}

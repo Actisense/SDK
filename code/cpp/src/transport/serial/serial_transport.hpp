@@ -81,7 +81,7 @@ namespace Actisense
 
 			void asyncSend(ConstByteSpan data, SendCompletionHandler completion) override;
 
-			void asyncRecv(ByteSpan buffer, RecvCompletionHandler completion) override;
+			void asyncRecv(RecvCompletionHandler completion) override;
 
 			[[nodiscard]] TransportKind kind() const noexcept override;
 
@@ -180,11 +180,11 @@ namespace Actisense
 			mutable std::mutex readMutex_;
 			MessageRingBuffer<std::vector<uint8_t>> messageBuffer_;
 			std::size_t tempBufferSize_ = 512; ///< Size of temp read buffer
+			unsigned readTimeoutMs_ = 10;      ///< Read timeout/poll interval
 
 			/* Async operation queues */
 			struct PendingRecv
 			{
-				ByteSpan buffer;
 				RecvCompletionHandler completion;
 			};
 			struct PendingSend

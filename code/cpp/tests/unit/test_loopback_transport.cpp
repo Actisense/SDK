@@ -100,20 +100,19 @@ TEST_F(LoopbackTransportTest, SendReceiveRoundTrip)
 	EXPECT_EQ(m_transport.bytesAvailable(), 5u);
 
 	/* Receive the data back */
-	std::array<uint8_t, 5> recvData = {};
+	std::vector<uint8_t> recvData;
 	bool recvComplete = false;
-	std::size_t recvBytes = 0;
 
-	m_transport.asyncRecv(recvData, [&](ErrorCode ec, std::size_t bytes)
+	m_transport.asyncRecv([&](ErrorCode ec, ConstByteSpan data)
 	{
 		EXPECT_EQ(ec, ErrorCode::Ok);
 		recvComplete = true;
-		recvBytes = bytes;
+		recvData.assign(data.begin(), data.end());
 	});
 
 	EXPECT_TRUE(recvComplete);
-	EXPECT_EQ(recvBytes, 5u);
-	EXPECT_EQ(recvData, sendData);
+	EXPECT_EQ(recvData.size(), 5u);
+	EXPECT_TRUE(std::equal(recvData.begin(), recvData.end(), sendData.begin()));
 	EXPECT_EQ(m_transport.bytesAvailable(), 0u);
 }
 
@@ -126,14 +125,15 @@ TEST_F(LoopbackTransportTest, DataInjection)
 	EXPECT_EQ(injected, 4u);
 	EXPECT_EQ(m_transport.bytesAvailable(), 4u);
 
-	std::array<uint8_t, 4> recvData = {};
-	m_transport.asyncRecv(recvData, [&](ErrorCode ec, std::size_t bytes)
+	std::vector<uint8_t> recvData;
+	m_transport.asyncRecv([&](ErrorCode ec, ConstByteSpan data)
 	{
 		EXPECT_EQ(ec, ErrorCode::Ok);
-		EXPECT_EQ(bytes, 4u);
+		EXPECT_EQ(data.size(), 4u);
+		recvData.assign(data.begin(), data.end());
 	});
 
-	EXPECT_EQ(recvData, injectData);
+	EXPECT_TRUE(std::equal(recvData.begin(), recvData.end(), injectData.begin()));
 }
 
 TEST_F(LoopbackTransportTest, PendingReceive)
@@ -141,13 +141,14 @@ TEST_F(LoopbackTransportTest, PendingReceive)
 	openTransport();
 
 	/* Queue a receive before data is available */
-	std::array<uint8_t, 4> recvData = {};
+	std::vector<uint8_t> recvData;
 	bool recvComplete = false;
 
-	m_transport.asyncRecv(recvData, [&](ErrorCode ec, std::size_t bytes)
+	m_transport.asyncRecv([&](ErrorCode ec, ConstByteSpan data)
 	{
 		EXPECT_EQ(ec, ErrorCode::Ok);
-		EXPECT_EQ(bytes, 4u);
+		EXPECT_EQ(data.size(), 4u);
+		recvData.assign(data.begin(), data.end());
 		recvComplete = true;
 	});
 
@@ -159,7 +160,7 @@ TEST_F(LoopbackTransportTest, PendingReceive)
 	m_transport.injectData(injectData);
 
 	EXPECT_TRUE(recvComplete);
-	EXPECT_EQ(recvData, injectData);
+	EXPECT_TRUE(std::equal(recvData.begin(), recvData.end(), injectData.begin()));
 }
 
 TEST_F(LoopbackTransportTest, SendWhenNotConnected)
@@ -179,13 +180,12 @@ TEST_F(LoopbackTransportTest, SendWhenNotConnected)
 
 TEST_F(LoopbackTransportTest, RecvWhenNotConnected)
 {
-	std::array<uint8_t, 3> data = {};
 	bool errorReceived = false;
 
-	m_transport.asyncRecv(data, [&](ErrorCode ec, std::size_t bytes)
+	m_transport.asyncRecv([&](ErrorCode ec, ConstByteSpan data)
 	{
 		EXPECT_EQ(ec, ErrorCode::NotConnected);
-		EXPECT_EQ(bytes, 0u);
+		EXPECT_TRUE(data.empty());
 		errorReceived = true;
 	});
 
@@ -226,13 +226,12 @@ TEST_F(LoopbackTransportTest, CloseWithPendingReceives)
 {
 	openTransport();
 
-	std::array<uint8_t, 10> data = {};
 	bool canceled = false;
 
-	m_transport.asyncRecv(data, [&](ErrorCode ec, std::size_t bytes)
+	m_transport.asyncRecv([&](ErrorCode ec, ConstByteSpan data)
 	{
 		EXPECT_EQ(ec, ErrorCode::Canceled);
-		EXPECT_EQ(bytes, 0u);
+		EXPECT_TRUE(data.empty());
 		canceled = true;
 	});
 
@@ -265,28 +264,26 @@ TEST_F(LoopbackTransportTest, MessageOrientedBuffer)
 	EXPECT_EQ(m_transport.bytesAvailable(), 9u);  /* 3 + 4 + 2 */
 
 	/* Receive each message separately */
-	std::array<uint8_t, 10> recvBuffer = {};
-
-	m_transport.asyncRecv(recvBuffer, [&](ErrorCode ec, std::size_t bytes)
+	m_transport.asyncRecv([&](ErrorCode ec, ConstByteSpan data)
 	{
 		EXPECT_EQ(ec, ErrorCode::Ok);
-		EXPECT_EQ(bytes, 3u);  /* First message only */
+		EXPECT_EQ(data.size(), 3u);  /* First message only */
 	});
 
 	EXPECT_EQ(m_transport.messagesAvailable(), 2u);
 
-	m_transport.asyncRecv(recvBuffer, [&](ErrorCode ec, std::size_t bytes)
+	m_transport.asyncRecv([&](ErrorCode ec, ConstByteSpan data)
 	{
 		EXPECT_EQ(ec, ErrorCode::Ok);
-		EXPECT_EQ(bytes, 4u);  /* Second message */
+		EXPECT_EQ(data.size(), 4u);  /* Second message */
 	});
 
 	EXPECT_EQ(m_transport.messagesAvailable(), 1u);
 
-	m_transport.asyncRecv(recvBuffer, [&](ErrorCode ec, std::size_t bytes)
+	m_transport.asyncRecv([&](ErrorCode ec, ConstByteSpan data)
 	{
 		EXPECT_EQ(ec, ErrorCode::Ok);
-		EXPECT_EQ(bytes, 2u);  /* Third message */
+		EXPECT_EQ(data.size(), 2u);  /* Third message */
 	});
 
 	EXPECT_EQ(m_transport.messagesAvailable(), 0u);

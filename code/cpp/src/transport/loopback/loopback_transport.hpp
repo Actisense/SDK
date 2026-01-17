@@ -61,7 +61,7 @@ namespace Actisense
 
 			void asyncSend(ConstByteSpan data, SendCompletionHandler completion) override;
 
-			void asyncRecv(ByteSpan buffer, RecvCompletionHandler completion) override;
+			void asyncRecv(RecvCompletionHandler completion) override;
 
 			[[nodiscard]] TransportKind kind() const noexcept override;
 
@@ -124,7 +124,6 @@ namespace Actisense
 			/* Pending receive requests */
 			struct PendingRecv
 			{
-				ByteSpan buffer;
 				RecvCompletionHandler completion;
 			};
 			std::queue<PendingRecv> pending_recvs_;

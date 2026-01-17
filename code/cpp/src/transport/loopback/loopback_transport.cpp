@@ -64,7 +64,7 @@ namespace Actisense
 				pending_recvs_.pop();
 
 				if (pending.completion) {
-					pending.completion(ErrorCode::Canceled, 0);
+					pending.completion(ErrorCode::Canceled, {});
 				}
 			}
 
@@ -111,29 +111,27 @@ namespace Actisense
 			}
 		}
 
-		void LoopbackTransport::asyncRecv(ByteSpan buffer, RecvCompletionHandler completion) {
+		void LoopbackTransport::asyncRecv(RecvCompletionHandler completion) {
 			std::lock_guard<std::mutex> lock(mutex_);
 
 			if (!is_open_) {
 				if (completion) {
-					completion(ErrorCode::NotConnected, 0);
+					completion(ErrorCode::NotConnected, {});
 				}
 				return;
 			}
 
 			/* Try to read immediately if message available */
-			if (!messageBuffer_.empty()) {
-				std::size_t bytesRead = 0;
-				if (messageBuffer_.readPartial(buffer, bytesRead)) {
-					if (completion) {
-						completion(ErrorCode::Ok, bytesRead);
-					}
-					return;
+			auto message = messageBuffer_.dequeue();
+			if (message) {
+				if (completion) {
+					completion(ErrorCode::Ok, *message);
 				}
+				return;
 			}
 
 			/* No message available - queue the receive request */
-			pending_recvs_.push(PendingRecv{buffer, std::move(completion)});
+			pending_recvs_.push(PendingRecv{std::move(completion)});
 		}
 
 		TransportKind LoopbackTransport::kind() const noexcept {
@@ -189,15 +187,17 @@ namespace Actisense
 
 		void LoopbackTransport::tryCompletePendingRecvs() {
 			/* Called with lock held */
-			while (!pending_recvs_.empty() && !messageBuffer_.empty()) {
+			while (!pending_recvs_.empty()) {
+				auto message = messageBuffer_.dequeue();
+				if (!message) {
+					break;
+				}
+
 				auto pending = std::move(pending_recvs_.front());
 				pending_recvs_.pop();
 
-				std::size_t bytesRead = 0;
-				messageBuffer_.readPartial(pending.buffer, bytesRead);
-
 				if (pending.completion) {
-					pending.completion(ErrorCode::Ok, bytesRead);
+					pending.completion(ErrorCode::Ok, *message);
 				}
 			}
 		}

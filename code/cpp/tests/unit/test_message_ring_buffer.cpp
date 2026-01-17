@@ -168,66 +168,6 @@ TEST_F(MessageRingBufferTest, Clear)
 	EXPECT_EQ(m_buffer.totalBytes(), 0u);
 }
 
-TEST_F(MessageRingBufferTest, TryRead)
-{
-	std::vector<uint8_t> msg = {1, 2, 3, 4, 5};
-	m_buffer.enqueue(std::vector<uint8_t>(msg));
-
-	std::array<uint8_t, 10> buffer = {};
-	const auto bytesRead = m_buffer.tryRead(buffer);
-	
-	EXPECT_EQ(bytesRead, 5u);
-	EXPECT_TRUE(m_buffer.empty());
-	
-	for (std::size_t i = 0; i < 5; ++i)
-	{
-		EXPECT_EQ(buffer[i], msg[i]);
-	}
-}
-
-TEST_F(MessageRingBufferTest, TryReadBufferTooSmall)
-{
-	std::vector<uint8_t> msg = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-	m_buffer.enqueue(std::vector<uint8_t>(msg));
-
-	std::array<uint8_t, 5> smallBuffer = {};
-	const auto bytesRead = m_buffer.tryRead(smallBuffer);
-	
-	/* Buffer too small - message should remain in ring */
-	EXPECT_EQ(bytesRead, 0u);
-	EXPECT_EQ(m_buffer.size(), 1u);
-}
-
-TEST_F(MessageRingBufferTest, ReadPartial)
-{
-	std::vector<uint8_t> msg = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-	m_buffer.enqueue(std::vector<uint8_t>(msg));
-
-	std::array<uint8_t, 5> smallBuffer = {};
-	std::size_t bytesRead = 0;
-	const bool success = m_buffer.readPartial(smallBuffer, bytesRead);
-	
-	/* Partial read - copies what fits, discards the rest */
-	EXPECT_TRUE(success);
-	EXPECT_EQ(bytesRead, 5u);
-	EXPECT_TRUE(m_buffer.empty()); /* Message removed */
-	
-	for (std::size_t i = 0; i < 5; ++i)
-	{
-		EXPECT_EQ(smallBuffer[i], msg[i]);
-	}
-}
-
-TEST_F(MessageRingBufferTest, ReadPartialEmpty)
-{
-	std::array<uint8_t, 10> buffer = {};
-	std::size_t bytesRead = 0;
-	const bool success = m_buffer.readPartial(buffer, bytesRead);
-	
-	EXPECT_FALSE(success);
-	EXPECT_EQ(bytesRead, 0u);
-}
-
 TEST_F(MessageRingBufferTest, DequeueWaitWithData)
 {
 	std::vector<uint8_t> msg = {0xAA, 0xBB};

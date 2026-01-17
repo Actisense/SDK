@@ -43,9 +43,11 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Completion handler for async receive operations
 		 \param[in]  code         Error code (Ok on success)
-		 \param[in]  bytesRead    Number of bytes received
+		 \param[in]  data         Received data (valid only during callback)
+		 \details    Data is passed by span to avoid copying. The span is only
+		             valid during the callback - callers must copy if needed later.
 		 *******************************************************************************/
-		using RecvCompletionHandler = std::function<void(ErrorCode code, std::size_t bytesRead)>;
+		using RecvCompletionHandler = std::function<void(ErrorCode code, ConstByteSpan data)>;
 
 		/**************************************************************************/ /**
 		 \brief      Abstract transport interface (internal use only)
@@ -85,11 +87,14 @@ namespace Actisense
 			virtual void asyncSend(ConstByteSpan data, SendCompletionHandler completion) = 0;
 
 			/**************************************************************************/ /**
-			 \brief      Receive data asynchronously (stream-oriented)
-			 \param[out] buffer      Buffer to receive data into
+			 \brief      Receive data asynchronously (message-oriented)
 			 \param[in]  completion  Called when data is received
+			 \details    Data is passed directly to the completion handler as a span.
+			             This avoids the need for caller-provided buffers and eliminates
+			             partial read complexity. Each call receives one complete message
+			             (transport read chunk).
 			 *******************************************************************************/
-			virtual void asyncRecv(ByteSpan buffer, RecvCompletionHandler completion) = 0;
+			virtual void asyncRecv(RecvCompletionHandler completion) = 0;
 
 			/**************************************************************************/ /**
 			 \brief      Get transport kind

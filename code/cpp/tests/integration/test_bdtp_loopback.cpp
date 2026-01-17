@@ -76,12 +76,12 @@ protected:
 		EXPECT_TRUE(sendComplete);
 
 		/* Read from transport */
-		std::vector<uint8_t> recvBuffer(data.size());
+		std::vector<uint8_t> recvBuffer;
 		bool recvComplete = false;
-		m_transport.asyncRecv(ByteSpan(recvBuffer), [&](ErrorCode ec, std::size_t bytes)
+		m_transport.asyncRecv([&](ErrorCode ec, ConstByteSpan recvData)
 		{
 			EXPECT_EQ(ec, ErrorCode::Ok);
-			recvBuffer.resize(bytes);
+			recvBuffer.assign(recvData.begin(), recvData.end());
 			recvComplete = true;
 		});
 		EXPECT_TRUE(recvComplete);
@@ -182,11 +182,11 @@ TEST_F(BdtpLoopbackIntegrationTest, DataInjectionSimulatesDevice)
 	EXPECT_EQ(injected, frame.size());
 
 	/* Read and parse */
-	std::vector<uint8_t> recvBuffer(frame.size());
-	m_transport.asyncRecv(recvBuffer, [&](ErrorCode ec, std::size_t bytes)
+	std::vector<uint8_t> recvBuffer;
+	m_transport.asyncRecv([&](ErrorCode ec, ConstByteSpan data)
 	{
 		EXPECT_EQ(ec, ErrorCode::Ok);
-		recvBuffer.resize(bytes);
+		recvBuffer.assign(data.begin(), data.end());
 	});
 
 	m_protocol.parse(recvBuffer, messageEmitter(), errorEmitter());
@@ -214,23 +214,22 @@ TEST_F(BdtpLoopbackIntegrationTest, ChunkedReceive)
 	});
 
 	/* Receive complete message (message-oriented buffer returns full message) */
-	std::vector<uint8_t> recvBuffer(frame.size());
-	std::size_t totalBytesRead = 0;
+	std::vector<uint8_t> recvBuffer;
 	
-	m_transport.asyncRecv(recvBuffer, [&](ErrorCode ec, std::size_t bytes)
+	m_transport.asyncRecv([&](ErrorCode ec, ConstByteSpan data)
 	{
 		EXPECT_EQ(ec, ErrorCode::Ok);
-		totalBytesRead = bytes;
+		recvBuffer.assign(data.begin(), data.end());
 	});
 
-	EXPECT_EQ(totalBytesRead, frame.size());
+	EXPECT_EQ(recvBuffer.size(), frame.size());
 
 	/* Parse progressively in small chunks to test BDTP parser's chunked parsing */
 	std::size_t offset = 0;
 	constexpr std::size_t chunkSize = 3;
-	while (offset < totalBytesRead)
+	while (offset < recvBuffer.size())
 	{
-		std::size_t bytesToParse = std::min(chunkSize, totalBytesRead - offset);
+		std::size_t bytesToParse = std::min(chunkSize, recvBuffer.size() - offset);
 		m_protocol.parse(ConstByteSpan(recvBuffer.data() + offset, bytesToParse),
 		                 messageEmitter(), errorEmitter());
 		offset += bytesToParse;
@@ -280,8 +279,10 @@ TEST_F(BdtpLoopbackIntegrationTest, BiDirectionalCommunication)
 	m_transport.injectData(deviceFrame);
 
 	/* "Host" receives and parses */
-	std::vector<uint8_t> hostBuffer(deviceFrame.size());
-	m_transport.asyncRecv(hostBuffer, [](ErrorCode, std::size_t) {});
+	std::vector<uint8_t> hostBuffer;
+	m_transport.asyncRecv([&](ErrorCode, ConstByteSpan data) {
+		hostBuffer.assign(data.begin(), data.end());
+	});
 	m_protocol.parse(hostBuffer, messageEmitter(), errorEmitter());
 
 	ASSERT_EQ(m_receivedMessages.size(), 1u);
@@ -333,8 +334,10 @@ TEST_F(BdtpLoopbackIntegrationTest, ErrorRecoveryAfterCorruptedFrame)
 
 	m_transport.injectData(combined);
 
-	std::vector<uint8_t> recvBuffer(combined.size());
-	m_transport.asyncRecv(recvBuffer, [](ErrorCode, std::size_t) {});
+	std::vector<uint8_t> recvBuffer;
+	m_transport.asyncRecv([&](ErrorCode, ConstByteSpan data) {
+		recvBuffer.assign(data.begin(), data.end());
+	});
 	m_protocol.parse(recvBuffer, messageEmitter(), errorEmitter());
 
 	/* Should have one error and one valid message */

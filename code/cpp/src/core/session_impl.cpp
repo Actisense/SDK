@@ -155,32 +155,30 @@ namespace Actisense
 		}
 
 		void SessionImpl::receiveThreadFunc() {
-			std::vector<uint8_t> buffer(512);
-
 			ACTISENSE_LOG_INFO("Session", "Receive thread started");
 
 			while (running_ && isConnected()) {
 				/* Use synchronous flag to track completion */
 				std::atomic<bool> completed{false};
 
-				/* Request data from transport */
+				/* Request data from transport - data arrives via callback */
 				transport_->asyncRecv(
-					buffer, [this, &buffer, &completed](ErrorCode code, std::size_t bytesRead) {
-						if (code == ErrorCode::Ok && bytesRead > 0) {
+					[this, &completed](ErrorCode code, ConstByteSpan data) {
+						if (code == ErrorCode::Ok && !data.empty()) {
 							{
 								std::ostringstream ss;
-								ss << "Received " << bytesRead << " bytes from transport";
+								ss << "Received " << data.size() << " bytes from transport";
 								ACTISENSE_LOG_DEBUG("Session", ss.str());
 							}
 							ACTISENSE_LOG_HEX(LogLevel::Trace, "Session", "Raw data",
-											  buffer.data(), bytesRead);
-							processReceivedData(std::span<const uint8_t>(buffer.data(), bytesRead));
+											  data.data(), data.size());
+							processReceivedData(data);
 						}
 						completed.store(true, std::memory_order_release);
 					});
 
 				/* Wait for the async operation to complete before continuing */
-				/* This prevents queuing multiple operations with the same buffer */
+				/* This prevents queuing multiple operations */
 				while (!completed.load(std::memory_order_acquire) && running_ && isConnected()) {
 					/* Process any timeouts while waiting */
 					processTimeouts();
