@@ -113,15 +113,6 @@ namespace Actisense
 			[[nodiscard]] std::size_t messagesAvailable() const;
 
 			/**************************************************************************/ /**
-			 \brief      Synchronous read (blocking)
-			 \param[out] buffer     Buffer to read into
-			 \param[in]  maxBytes   Maximum bytes to read
-			 \param[in]  timeoutMs  Timeout in milliseconds (0 = infinite)
-			 \return     Number of bytes read, or 0 on timeout/error
-			 *******************************************************************************/
-			std::size_t readSync(uint8_t* buffer, std::size_t maxBytes, unsigned timeoutMs = 0);
-
-			/**************************************************************************/ /**
 			 \brief      Synchronous write (blocking)
 			 \param[in]  data   Data to write
 			 \param[in]  size   Number of bytes to write
@@ -158,12 +149,12 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Process pending async operations
 			 *******************************************************************************/
-			void processAsyncOperations();
+			void processAsyncOperations(uint8_t* buffer, std::size_t bytes_read);
 
 			/* Platform handle */
 #if defined(_WIN32)
 			HANDLE handle_ = INVALID_HANDLE_VALUE;
-			OVERLAPPED readOverlapped_{};
+			HANDLE rx_terminate_handle_ = INVALID_HANDLE_VALUE;
 			OVERLAPPED writeOverlapped_{};
 #else
 			int fd_ = -1;
