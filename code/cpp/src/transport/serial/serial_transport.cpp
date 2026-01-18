@@ -34,7 +34,7 @@ namespace Actisense
 		/* Constants ------------------------------------------------------------ */
 
 		static constexpr std::size_t kDefaultTempBufferSize = 512;
-		static constexpr std::size_t kDefaultMaxPendingMessages = 16;
+		static constexpr std::size_t kDefaultMaxPendingMessages = 32;
 
 		/* Public Function Definitions ------------------------------------------ */
 
@@ -563,7 +563,7 @@ namespace Actisense
 					DWORD dwBytesRead = 0;
 					if (!fWaitingOnRead) {
 						/* Issue read operation */
-						if (!ReadFile(handle_, read_buffer, tempBufferSize_, &dwBytesRead,
+						if (!ReadFile(handle_, read_buffer, static_cast<DWORD>(tempBufferSize_), &dwBytesRead,
 									  &readOverlapped)) {
 							/* Error occurred - (IO PENDING error is ok) */
 							if (GetLastError() != ERROR_IO_PENDING) {
@@ -717,8 +717,9 @@ namespace Actisense
 			}
 			{
 				std::ostringstream ss;
-				ss << "Read " << bytes_read << " bytes from port";
-				ACTISENSE_LOG_TRACE("Serial", ss.str());
+				ss << "Read " << bytes_read << " bytes from port - Total=" << totalBytesReceived_
+				   << " bytes";
+				ACTISENSE_LOG_INFO("Serial", ss.str());
 			}
 
 			/* Create right-sized message and move into ring buffer */
