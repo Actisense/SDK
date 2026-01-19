@@ -1,0 +1,146 @@
+{
+	"pgns": [
+		{
+			"pgn": 126992,
+			"pgnRef": 29,
+			"name": "System Time",
+			"description": "The purpose of this parameter group is to provide a regular transmission of UTC time and date, with minimal latency. Optionally, the transmission of this parameter group may use the SID to provide synchronism for measurement data in other parameter groups from the same source address. The default update rate for this PGN is only applicable when sending the current UTC time and date independently, otherwise the update rate will be determined by the update rate of the PGN(s) related by the SID.",
+			"shortDescription": "The purpose of this PGN is to provide a regular transmission of UTC time and date; optionally synchronized to other parameter groups from the same source.",
+			"singleFrame": "Yes",
+			"defaultPriority": "3",
+			"defaultUpdate": "1000",
+			"destination": "Global",
+			"fields": [
+				{
+					"field": 1,
+					"name": "Sequence ID",
+					"bitLength": 8
+				},
+				{
+					"field": 2,
+					"name": "Source",
+					"bitLength": 4
+				},
+				{
+					"field": 3,
+					"name": "NMEA Reserved",
+					"bitLength": 4
+				},
+				{
+					"field": 4,
+					"name": "Date",
+					"bitLength": 16
+				},
+				{
+					"field": 5,
+					"name": "Time",
+					"bitLength": 32
+				}
+			]
+		},
+		{
+			"pgn": 129026,
+			"pgnRef": 31,
+			"name": "COG & SOG (Rapid Update)",
+			"description": "This PGN is a single frame PGN that provides Course Over Ground (COG) and Speed Over Ground (SOG).\n\nBeing a single frame message, as opposed to other PGNs that include COG and SOG and are defined as multi-packet, this PGN lends itself to being transmitted more frequently, without using up excessive bandwidth on the bus. This may be of benefit to receiving equipment requiring rapid COG and SOG updates.",
+			"shortDescription": "This parameter group is a single frame parameter group that provides Course Over Ground (COG) and Speed Over Ground (SOG).",
+			"singleFrame": "Yes",
+			"defaultPriority": "2",
+			"defaultUpdate": "250",
+			"destination": "Global",
+			"fields": [
+				{
+					"field": 1,
+					"name": "Sequence ID",
+					"bitLength": 8
+				},
+				{
+					"field": 2,
+					"name": "COG Reference",
+					"bitLength": 2
+				},
+				{
+					"field": 3,
+					"name": "NMEA Reserved",
+					"bitLength": 6
+				},
+				{
+					"field": 4,
+					"name": "Course Over Ground",
+					"bitLength": 16
+				},
+				{
+					"field": 5,
+					"name": "Speed Over Ground",
+					"bitLength": 16
+				},
+				{
+					"field": 6,
+					"name": "NMEA Reserved",
+					"bitLength": 16
+				}
+			]
+		},
+		{
+			"pgn": 128267,
+			"pgnRef": 60,
+			"name": "Water Depth",
+			"description": "Water depth relative to the transducer and offset of the measuring transducer. Positive offset numbers provide the distance from the transducer to the waterline. Negative offset numbers provide the distance from the transducer to the part of the keel of interest.",
+			"shortDescription": "Water depth relative to the transducer and offset of the measuring transducer. Positive offset numbers provide the distance from the transducer to the waterline.",
+			"singleFrame": "Yes",
+			"defaultPriority": "3",
+			"defaultUpdate": "1000",
+			"destination": "Global",
+			"fields": [
+				{
+					"field": 1,
+					"name": "Sequence ID",
+					"bitLength": 8
+				},
+				{
+					"field": 2,
+					"name": "Water Depth, Transducer",
+					"bitLength": 32
+				},
+				{
+					"field": 3,
+					"name": "Offset",
+					"bitLength": 16
+				},
+				{
+					"field": 4,
+					"name": "Maximum Depth Range",
+					"bitLength": 8
+				}
+			]
+		},
+		{
+			"pgn": 127251,
+			"pgnRef": 90,
+			"name": "Rate of Turn",
+			"description": "Rate of Turn is the rate of change of the Heading.\n\nHeading is defined as the direction of the vertical projection of the fore-and-aft line of the ship onto the horizontal plane.",
+			"shortDescription": "Rate of Turn is the rate of change of the Heading.",
+			"singleFrame": "Yes",
+			"defaultPriority": "2",
+			"defaultUpdate": "100",
+			"destination": "Global",
+			"fields": [
+				{
+					"field": 1,
+					"name": "Sequence ID",
+					"bitLength": 8
+				},
+				{
+					"field": 2,
+					"name": "Rate of Turn",
+					"bitLength": 32
+				},
+				{
+					"field": 3,
+					"name": "NMEA Reserved",
+					"bitLength": 24
+				}
+			]
+		}
+	]
+}
