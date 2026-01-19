@@ -1,2 +1,3 @@
 *.log
 /code/python/utils/n2ksender/n2ksender.ini
+/code/python/utils/n2ksender/__pycache__/n2ksender.cpython-314.pyc
