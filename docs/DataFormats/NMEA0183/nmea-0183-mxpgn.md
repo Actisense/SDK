@@ -1,8 +1,8 @@
 # CAN Frame NMEA 0183 $MXPGN
 
-Tx Format: `NMEA 0183` - with additional setup required in NMEA 0183 settings to enable MXPGN output. 
+> :memo: **Note:** The "$MXPGN" sentence is not an approved NMEA 0183 sentence, nor does it follow the rules for manufacturer Proprietary sentences, putting it in a 'grey area'.
 
-**Note** The "$MXPGN" sentence is not an approved NMEA 0183 sentence and it does not follow the rules for manufacturer Proprietary sentences.
+Tx Format `NMEA 0183`, with additional setup required in NMEA 0183 settings to enable $MXPGN output. 
 
 ## Description
 
@@ -22,7 +22,7 @@ Clearly, this has some drawbacks, but it is supported in iNavx and many other ap
 
 ## Disadvantages of this Format
 
-Only some applications support this format. This format uses more bandwidth than other formats and does not encode the whole NMEA 2000 PGN, they must be concatenated for PGNs longer than 8 bytes (NMEA 2000 Fast packets).
+Only some applications support this format. As this format uses ASCII, it uses more bandwidth than other formats and only single-frame PGNs are straightforward; fast-packet PGNs require a sequence of sentences to be created and a deep level understanding of NMEA 2000 fast-packet formatting.
 
 ## Format of a $--PGN Message
 
