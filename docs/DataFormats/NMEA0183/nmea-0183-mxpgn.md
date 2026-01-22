@@ -1,6 +1,8 @@
 # CAN Frame NMEA 0183 $MXPGN
 
-Tx Format: `NMEA 0183` - with additional setup required in NMEA 0183 settings to enable MXPGN output. The "$MXPGN" sentence is not an approved NMEA 0183 sentence and it does not follow the rules for manufacturer Proprietary sentences.
+Tx Format: `NMEA 0183` - with additional setup required in NMEA 0183 settings to enable MXPGN output. 
+
+**Note** The "$MXPGN" sentence is not an approved NMEA 0183 sentence and it does not follow the rules for manufacturer Proprietary sentences.
 
 ## Description
 
