@@ -194,7 +194,8 @@ namespace Actisense
 			ACTISENSE_LOG_INFO("Session", "Receive thread exiting");
 		}
 
-		void SessionImpl::processReceivedData(std::span<const uint8_t> data) {
+		void SessionImpl::processReceivedData(std::span<const uint8_t> data) 
+		{
 			/* Feed data through BDTP parser */
 			bdtp_.parse(
 				data,

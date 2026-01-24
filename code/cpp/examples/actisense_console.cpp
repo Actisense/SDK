@@ -23,6 +23,7 @@ Examples:
 #include "core/session_impl.hpp"
 #include "protocols/bst/bst_types.hpp"
 #include "protocols/bst/bst_decoder.hpp"
+#include "protocols/bst/bst_frame.hpp"
 #include "protocols/bem/bem_types.hpp"
 #include "protocols/bem/bem_commands/operating_mode.hpp"
 #include "protocols/bem/bem_commands/system_status.hpp"
@@ -172,56 +173,26 @@ void onEvent(const EventVariant& event)
 				return;
 			}
 
-			/* Try to extract frame-specific details - try each type directly */
-			try
+			/* Use BstFrame for unified access to all BST frame types */
+			if (auto frame = BstFrame::fromParsedEvent(e))
 			{
-				const auto& frame = std::any_cast<const Bst93Frame&>(e.payload);
-				ss << " | PGN=" << std::hex << std::setw(5) << std::setfill('0') << frame.pgn
-				   << " Src=" << std::dec << static_cast<int>(frame.source)
-				   << " Dst=" << static_cast<int>(frame.destination)
-				   << " Pri=" << static_cast<int>(frame.priority)
-				   << " T=" << frame.timestamp << "ms"
-				   << " | " << formatHexBytes(frame.data);
-			}
-			catch (const std::bad_any_cast&)
-			{
-				try
-				{
-					const auto& frame = std::any_cast<const Bst94Frame&>(e.payload);
-					ss << " | PGN=" << std::hex << std::setw(5) << std::setfill('0') << frame.pgn
-					   << " Dst=" << std::dec << static_cast<int>(frame.destination)
-					   << " Pri=" << static_cast<int>(frame.priority)
-					   << " | " << formatHexBytes(frame.data);
+				ss << " | PGN=" << std::hex << std::setw(5) << std::setfill('0') << frame->pgn()
+				   << " Src=" << std::dec << static_cast<int>(frame->source())
+				   << " Dst=" << static_cast<int>(frame->destination())
+				   << " Pri=" << static_cast<int>(frame->priority());
+
+				if (frame->hasTimestamp()) {
+					ss << " T=" << frame->timestamp() << "ms";
 				}
-				catch (const std::bad_any_cast&)
-				{
-					try
-					{
-						const auto& frame = std::any_cast<const Bst95Frame&>(e.payload);
-						ss << " | PGN=" << std::hex << std::setw(5) << std::setfill('0') << frame.pgn
-						   << " Src=" << std::dec << static_cast<int>(frame.source)
-						   << " T=" << frame.timestamp
-						   << " | " << formatHexBytes(frame.data);
-					}
-					catch (const std::bad_any_cast&)
-					{
-						try
-						{
-							const auto& frame = std::any_cast<const BstD0Frame&>(e.payload);
-							ss << " | PGN=" << std::hex << std::setw(5) << std::setfill('0') << frame.pgn
-							   << " Src=" << std::dec << static_cast<int>(frame.source)
-							   << " Dst=" << static_cast<int>(frame.destination)
-							   << " Pri=" << static_cast<int>(frame.priority)
-							   << " T=" << frame.timestamp << "ms"
-							   << " Type=" << static_cast<int>(frame.messageType)
-							   << " | " << formatHexBytes(frame.data);
-						}
-						catch (const std::bad_any_cast&)
-						{
-							/* Not a BST frame we can display */
-						}
-					}
+
+				if (frame->hasExtendedFields()) {
+					ss << " Type=" << static_cast<int>(frame->messageType());
 				}
+
+				/* Convert span to vector for formatHexBytes */
+				auto dataSpan = frame->data();
+				std::vector<uint8_t> dataVec(dataSpan.begin(), dataSpan.end());
+				ss << " | " << formatHexBytes(dataVec);
 			}
 
 			const std::string message = ss.str();
