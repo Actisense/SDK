@@ -4,15 +4,12 @@ The system status message is an unsolicited message sent regularly from an Actis
 
 It is encoded using bem reponse encoding.
 
-## Encoding
-
-And [BEM Response](../bst-bem-response.md)
-
 ## Command Ids
 
-BST Command Id - None, this is an unsolicited message and is not commandable
-BST Response Id = A0H
-BEM Id = F2H
+| Type | BST ID | BEM Id | Notes |
+| -------- | ------- | ------- | --- |
+| Command | N/A | N/A | This is an unsolicited message and is not commandable |
+| Response | A0H | F2H | Unsolicited - if enabled, sent every second |
 
 ## BEM Header
 
