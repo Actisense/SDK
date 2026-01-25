@@ -3,9 +3,9 @@
 
 /**************************************************************************/ /**
 \file       bst_frame.hpp
-\brief      BstFrame wrapper class for unified BST frame access
+\brief      BstFrame class for unified BST frame access
 \details    Provides a unified interface to access BST-93, BST-94, BST-95, and
-            BST-D0 frame data without needing dynamic casts or variant visitors.
+            BST-D0 frame data. Stores raw bytes and decodes fields on access.
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 *******************************************************************************/
@@ -16,10 +16,9 @@
 #include <optional>
 #include <span>
 #include <string>
-#include <variant>
+#include <vector>
 
 #include "protocols/bst/bst_types.hpp"
-#include "protocols/bst/bst_decoder.hpp"
 
 namespace Actisense
 {
@@ -29,71 +28,142 @@ namespace Actisense
 		struct ParsedMessageEvent;
 
 		/**************************************************************************/ /**
-		 \brief      Unified wrapper for BST frame variants
+		 \brief      Unified BST frame class
 		 \details    Provides type-safe access to BST frame data regardless of
-		             underlying format (BST-93, BST-94, BST-95, BST-D0). Returns
-		             sensible defaults for fields not present in all formats.
+		             underlying format (BST-93, BST-94, BST-95, BST-D0). Stores raw
+		             bytes internally and decodes fields on access. Returns sensible
+		             defaults for fields not present in all formats.
 
 		 Example usage:
 		 \code
+		     // From received data
 		     auto frame = BstFrame::fromParsedEvent(event);
 		     if (frame && frame->isN2k()) {
 		         std::cout << "PGN: " << frame->pgn()
 		                   << " Src: " << frame->source()
 		                   << " Data: " << frame->toHexDump() << std::endl;
 		     }
+
+		     // For transmission
+		     std::vector<uint8_t> payload = {0x01, 0x02, 0x03};
+		     auto txFrame = BstFrame::createD0(127250, 0x01, 0xFF, payload);
 		 \endcode
 		 *******************************************************************************/
 		class BstFrame
 		{
 		private:
-			BstFrameVariant variant_;
+			std::vector<uint8_t> raw_data_; ///< Complete BST payload (ID + length + data)
+			BstId bst_id_;                  ///< Cached BST message type
+			bool valid_;                    ///< Whether frame passed validation
 
 		public:
 			/* Construction --------------------------------------------------------- */
 
 			/**************************************************************************/ /**
-			 \brief      Construct from variant (move)
-			 \param[in]  variant  BST frame variant to wrap
+			 \brief      Construct from raw BST data (move)
+			 \param[in]  raw_data  Complete BST payload (starts with BST ID byte)
 			 *******************************************************************************/
-			explicit BstFrame(BstFrameVariant&& variant);
+			explicit BstFrame(std::vector<uint8_t>&& raw_data);
 
 			/**************************************************************************/ /**
-			 \brief      Construct from variant (copy)
-			 \param[in]  variant  BST frame variant to wrap
+			 \brief      Construct from raw BST data (copy)
+			 \param[in]  raw_data  Complete BST payload (starts with BST ID byte)
 			 *******************************************************************************/
-			explicit BstFrame(const BstFrameVariant& variant);
+			explicit BstFrame(std::span<const uint8_t> raw_data);
 
-			/* Factory Methods ------------------------------------------------------ */
+			/**************************************************************************/ /**
+			 \brief      Default constructor (creates invalid frame)
+			 *******************************************************************************/
+			BstFrame();
+
+			/* Factory Methods - Parsing -------------------------------------------- */
 
 			/**************************************************************************/ /**
 			 \brief      Create BstFrame from a ParsedMessageEvent
 			 \param[in]  event  Parsed message event (from SDK callback)
 			 \return     BstFrame if event contains a BST frame, nullopt otherwise
-			 \details    Extracts BST frame from event payload using std::any_cast
 			 *******************************************************************************/
 			[[nodiscard]] static std::optional<BstFrame> fromParsedEvent(const ParsedMessageEvent& event);
 
 			/**************************************************************************/ /**
 			 \brief      Create BstFrame from raw BST data
 			 \param[in]  data  Raw BST payload (starts with BST ID byte)
-			 \return     BstFrame if decode succeeds, nullopt otherwise
+			 \return     BstFrame if validation succeeds, nullopt otherwise
 			 *******************************************************************************/
 			[[nodiscard]] static std::optional<BstFrame> fromRawData(std::span<const uint8_t> data);
 
-			/**************************************************************************/ /**
-			 \brief      Create BstFrame from variant (move)
-			 \param[in]  variant  BST frame variant
-			 \return     BstFrame wrapping the variant
-			 *******************************************************************************/
-			[[nodiscard]] static BstFrame fromVariant(BstFrameVariant&& variant);
+			/* Factory Methods - Frame Creation ------------------------------------- */
 
 			/**************************************************************************/ /**
-			 \brief      Create BstFrame from variant (copy)
-			 \param[in]  variant  BST frame variant
-			 \return     BstFrame wrapping the variant
+			 \brief      Create a BST-93 frame (Gateway→PC NMEA 2000)
+			 \param[in]  pgn          Parameter Group Number
+			 \param[in]  source       Source address
+			 \param[in]  destination  Destination address (0xFF for broadcast)
+			 \param[in]  payload      PGN payload data
+			 \param[in]  timestamp    Timestamp in milliseconds (default 0)
+			 \param[in]  priority     Message priority 0-7 (default 6)
+			 \return     Constructed BstFrame
 			 *******************************************************************************/
-			[[nodiscard]] static BstFrame fromVariant(const BstFrameVariant& variant);
+			[[nodiscard]] static BstFrame create93(uint32_t pgn, uint8_t source,
+			                                       uint8_t destination,
+			                                       std::span<const uint8_t> payload,
+			                                       uint32_t timestamp = 0,
+			                                       uint8_t priority = 6);
+
+			/**************************************************************************/ /**
+			 \brief      Create a BST-94 frame (PC→Gateway NMEA 2000)
+			 \param[in]  pgn          Parameter Group Number
+			 \param[in]  destination  Destination address (0xFF for broadcast)
+			 \param[in]  payload      PGN payload data
+			 \param[in]  priority     Message priority 0-7 (default 6)
+			 \return     Constructed BstFrame
+			 \note       BST-94 has no source or timestamp (gateway assigns these)
+			 *******************************************************************************/
+			[[nodiscard]] static BstFrame create94(uint32_t pgn, uint8_t destination,
+			                                       std::span<const uint8_t> payload,
+			                                       uint8_t priority = 6);
+
+			/**************************************************************************/ /**
+			 \brief      Create a BST-95 frame (CAN Frame)
+			 \param[in]  pgn          Parameter Group Number
+			 \param[in]  source       Source address
+			 \param[in]  payload      CAN payload data (0-8 bytes)
+			 \param[in]  timestamp    16-bit timestamp (default 0)
+			 \param[in]  resolution   Timestamp resolution (default 1ms)
+			 \param[in]  direction    Message direction (default Received)
+			 \param[in]  priority     Message priority 0-7 (default 6)
+			 \return     Constructed BstFrame
+			 *******************************************************************************/
+			[[nodiscard]] static BstFrame create95(uint32_t pgn, uint8_t source,
+			                                       std::span<const uint8_t> payload,
+			                                       uint16_t timestamp = 0,
+			                                       TimestampResolution resolution = TimestampResolution::Millisecond_1ms,
+			                                       MessageDirection direction = MessageDirection::Received,
+			                                       uint8_t priority = 6);
+
+			/**************************************************************************/ /**
+			 \brief      Create a BST-D0 frame (Latest NMEA 2000)
+			 \param[in]  pgn            Parameter Group Number
+			 \param[in]  source         Source address
+			 \param[in]  destination    Destination address (0xFF for broadcast)
+			 \param[in]  payload        PGN payload data
+			 \param[in]  timestamp      Timestamp in milliseconds (default 0)
+			 \param[in]  msg_type       Message type (default SinglePacket)
+			 \param[in]  direction      Message direction (default Received)
+			 \param[in]  priority       Message priority 0-7 (default 6)
+			 \param[in]  internal_src   Internal source flag (default false)
+			 \param[in]  fp_seq_id      Fast-packet sequence ID 0-7 (default 0)
+			 \return     Constructed BstFrame
+			 *******************************************************************************/
+			[[nodiscard]] static BstFrame createD0(uint32_t pgn, uint8_t source,
+			                                       uint8_t destination,
+			                                       std::span<const uint8_t> payload,
+			                                       uint32_t timestamp = 0,
+			                                       D0MessageType msg_type = D0MessageType::SinglePacket,
+			                                       MessageDirection direction = MessageDirection::Received,
+			                                       uint8_t priority = 6,
+			                                       bool internal_src = false,
+			                                       uint8_t fp_seq_id = 0);
 
 			/* Type Identification -------------------------------------------------- */
 
@@ -299,21 +369,62 @@ namespace Actisense
 			/* Raw Access ----------------------------------------------------------- */
 
 			/**************************************************************************/ /**
-			 \brief      Get underlying variant
-			 \return     Const reference to BstFrameVariant
+			 \brief      Get raw BST frame data
+			 \return     Span over complete raw frame bytes (ID + length + payload)
 			 *******************************************************************************/
-			[[nodiscard]] const BstFrameVariant& variant() const noexcept;
+			[[nodiscard]] std::span<const uint8_t> rawData() const noexcept;
+
+		private:
+			/* Private Helpers ------------------------------------------------------ */
 
 			/**************************************************************************/ /**
-			 \brief      Get typed frame pointer
-			 \tparam     T  Frame type (Bst93Frame, Bst94Frame, etc.)
-			 \return     Pointer to frame if type matches, nullptr otherwise
+			 \brief      Validate raw frame data and set valid_ flag
 			 *******************************************************************************/
-			template<typename T>
-			[[nodiscard]] const T* as() const noexcept
-			{
-				return std::get_if<T>(&variant_);
-			}
+			void validate() noexcept;
+
+			/**************************************************************************/ /**
+			 \brief      Get pointer to payload section (after ID and length bytes)
+			 \return     Pointer to start of payload, nullptr if invalid
+			 *******************************************************************************/
+			[[nodiscard]] const uint8_t* payloadPtr() const noexcept;
+
+			/**************************************************************************/ /**
+			 \brief      Get payload length from length field
+			 \return     Payload length in bytes
+			 *******************************************************************************/
+			[[nodiscard]] std::size_t payloadLength() const noexcept;
+
+			/**************************************************************************/ /**
+			 \brief      Calculate PGN from PDU fields
+			 *******************************************************************************/
+			[[nodiscard]] static uint32_t calculatePgn(uint8_t pduf, uint8_t pdus,
+			                                           uint8_t data_page) noexcept;
+
+			/**************************************************************************/ /**
+			 \brief      Extract PDU fields from PGN
+			 *******************************************************************************/
+			static void extractPduFields(uint32_t pgn, uint8_t& pduf, uint8_t& pdus,
+			                             uint8_t& data_page) noexcept;
+
+			/**************************************************************************/ /**
+			 \brief      Read little-endian 16-bit value
+			 *******************************************************************************/
+			[[nodiscard]] static uint16_t readU16LE(const uint8_t* p) noexcept;
+
+			/**************************************************************************/ /**
+			 \brief      Read little-endian 32-bit value
+			 *******************************************************************************/
+			[[nodiscard]] static uint32_t readU32LE(const uint8_t* p) noexcept;
+
+			/**************************************************************************/ /**
+			 \brief      Write little-endian 16-bit value
+			 *******************************************************************************/
+			static void writeU16LE(uint8_t* p, uint16_t value) noexcept;
+
+			/**************************************************************************/ /**
+			 \brief      Write little-endian 32-bit value
+			 *******************************************************************************/
+			static void writeU32LE(uint8_t* p, uint32_t value) noexcept;
 		};
 
 	} /* namespace Sdk */
