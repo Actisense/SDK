@@ -38,8 +38,7 @@ Here is the table of implemented BST-BEM encoders & decoders for the Actisense S
 | [Params PGN Enable Lists](params-pgn-enable-lists.md) | A1H | A0H | 4DH |
 | [Rx PGN Enable List F2](rx-pgn-enable-list-f2.md) | A1H | A0H | 4EH |
 | [Tx PGN Enable List F2](tx-pgn-enable-list-f2.md) | A1H | A0H | 4FH |
-| [PGN Enable Lists](pgn-enable-lists.md) | A1H | A0H | 4DH |
-| [Channel Range](channel-rnage.md) | A1H | A0H | 60H |
+| [Channel Range](channel-range.md) | A1H | A0H | 60H |
 | [Channel IFeed](channel-ifeed.md) | A1H | A0H | 61H |
 | [Analogue sample](analogue-sample.md) | A1H | A0H | 62H |
 
