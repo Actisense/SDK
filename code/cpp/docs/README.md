@@ -36,6 +36,7 @@ A modern C++20 SDK for Actisense device communication, supporting serial and UDP
    
    **Option A - Command line**:
    ```powershell
+   cd Public\SDK\code\cpp
    cmake --build build --config Release
    ```
 
