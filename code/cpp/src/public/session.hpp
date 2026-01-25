@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "public/error.hpp"
+#include "public/metrics.hpp"
 
 namespace Actisense
 {
@@ -96,6 +97,17 @@ namespace Actisense
 			 \return     True if transport is open and session is active
 			 *******************************************************************************/
 			[[nodiscard]] virtual bool isConnected() const noexcept = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Get current session metrics snapshot
+			 \return     Copy of all current metrics (thread-safe)
+			 *******************************************************************************/
+			[[nodiscard]] virtual SessionMetrics metrics() const = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Reset all metrics counters to zero
+			 *******************************************************************************/
+			virtual void resetMetrics() = 0;
 
 		protected:
 			Session() = default;

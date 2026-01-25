@@ -7,7 +7,9 @@
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include <error.hpp>
+#include <public/error.hpp>
+#include <protocols/protocol_error.hpp>
+#include <transport/transport_error.hpp>
 
 #include <gtest/gtest.h>
 
@@ -102,6 +104,153 @@ TEST_F(ErrorCategoryTest, UnknownErrorCode)
 	/* Test handling of invalid error code value */
 	const auto message = errorMessage(static_cast<ErrorCode>(999));
 	EXPECT_EQ(message, "Unknown error");
+}
+
+/* Transport Error Tests ---------------------------------------------------- */
+
+class TransportErrorTest : public ::testing::Test
+{
+};
+
+TEST_F(TransportErrorTest, CategoryName)
+{
+	const auto& category = transportErrorCategory();
+	EXPECT_STREQ(category.name(), "actisense_sdk_transport");
+}
+
+TEST_F(TransportErrorTest, AllCodesHaveMessages)
+{
+	const TransportErrorCode codes[] = {
+		TransportErrorCode::Ok,
+		TransportErrorCode::PortNotFound,
+		TransportErrorCode::PortBusy,
+		TransportErrorCode::PermissionDenied,
+		TransportErrorCode::ConfigurationFailed,
+		TransportErrorCode::BufferOverflow,
+		TransportErrorCode::ReadFailed,
+		TransportErrorCode::WriteFailed,
+		TransportErrorCode::Disconnected,
+		TransportErrorCode::InvalidHandle,
+		TransportErrorCode::Timeout,
+		TransportErrorCode::HostNotFound,
+		TransportErrorCode::ConnectionRefused,
+		TransportErrorCode::NetworkUnreachable,
+		TransportErrorCode::AddressInUse,
+		TransportErrorCode::InvalidAddress,
+		TransportErrorCode::SocketError
+	};
+
+	for (const auto code : codes) {
+		const auto message = transportErrorMessage(code);
+		EXPECT_FALSE(message.empty()) << "Empty message for code " << static_cast<int>(code);
+	}
+}
+
+TEST_F(TransportErrorTest, ConversionToErrorCode)
+{
+	EXPECT_EQ(toErrorCode(TransportErrorCode::Ok), ErrorCode::Ok);
+	EXPECT_EQ(toErrorCode(TransportErrorCode::PortNotFound), ErrorCode::TransportOpenFailed);
+	EXPECT_EQ(toErrorCode(TransportErrorCode::ReadFailed), ErrorCode::TransportIo);
+	EXPECT_EQ(toErrorCode(TransportErrorCode::Disconnected), ErrorCode::TransportClosed);
+	EXPECT_EQ(toErrorCode(TransportErrorCode::Timeout), ErrorCode::Timeout);
+	EXPECT_EQ(toErrorCode(TransportErrorCode::BufferOverflow), ErrorCode::RateLimited);
+}
+
+TEST_F(TransportErrorTest, StdErrorCodeIntegration)
+{
+	std::error_code ec = TransportErrorCode::PortBusy;
+	EXPECT_EQ(ec.value(), static_cast<int>(TransportErrorCode::PortBusy));
+	EXPECT_EQ(std::string(ec.category().name()), "actisense_sdk_transport");
+}
+
+/* Protocol Error Tests ----------------------------------------------------- */
+
+class ProtocolErrorTest : public ::testing::Test
+{
+};
+
+TEST_F(ProtocolErrorTest, CategoryName)
+{
+	const auto& category = protocolErrorCategory();
+	EXPECT_STREQ(category.name(), "actisense_sdk_protocol");
+}
+
+TEST_F(ProtocolErrorTest, BdtpErrorMessages)
+{
+	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BdtpFrameCorrupted).empty());
+	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BdtpBufferOverrun).empty());
+	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BdtpIncompleteFrame).empty());
+}
+
+TEST_F(ProtocolErrorTest, BstErrorMessages)
+{
+	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BstUnknownType).empty());
+	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BstChecksumMismatch).empty());
+}
+
+TEST_F(ProtocolErrorTest, BemErrorMessages)
+{
+	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BemSequenceMismatch).empty());
+	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BemDeviceError).empty());
+	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BemTimeout).empty());
+}
+
+TEST_F(ProtocolErrorTest, ConversionToErrorCode)
+{
+	EXPECT_EQ(toErrorCode(ProtocolErrorCode::Ok), ErrorCode::Ok);
+	EXPECT_EQ(toErrorCode(ProtocolErrorCode::BdtpFrameCorrupted), ErrorCode::MalformedFrame);
+	EXPECT_EQ(toErrorCode(ProtocolErrorCode::BstChecksumMismatch), ErrorCode::ChecksumError);
+	EXPECT_EQ(toErrorCode(ProtocolErrorCode::BemTimeout), ErrorCode::Timeout);
+}
+
+TEST_F(ProtocolErrorTest, StdErrorCodeIntegration)
+{
+	std::error_code ec = ProtocolErrorCode::BstChecksumMismatch;
+	EXPECT_EQ(ec.value(), static_cast<int>(ProtocolErrorCode::BstChecksumMismatch));
+	EXPECT_EQ(std::string(ec.category().name()), "actisense_sdk_protocol");
+}
+
+/* Extended Error Tests ----------------------------------------------------- */
+
+class ExtendedErrorTest : public ::testing::Test
+{
+};
+
+TEST_F(ExtendedErrorTest, DefaultConstructedIsNotError)
+{
+	ExtendedError err;
+	EXPECT_FALSE(err.isError());
+	EXPECT_FALSE(err.isDeviceError());
+}
+
+TEST_F(ExtendedErrorTest, ErrorCodeMakesItError)
+{
+	ExtendedError err;
+	err.code = ErrorCode::Timeout;
+	EXPECT_TRUE(err.isError());
+	EXPECT_FALSE(err.isDeviceError());
+}
+
+TEST_F(ExtendedErrorTest, DeviceErrorCode)
+{
+	ExtendedError err;
+	err.code = ErrorCode::UnsupportedOperation;
+	err.deviceErrorCode = -1077;
+	EXPECT_TRUE(err.isError());
+	EXPECT_TRUE(err.isDeviceError());
+}
+
+TEST_F(ExtendedErrorTest, BemDeviceErrorMessages)
+{
+	/* Test known device error codes */
+	EXPECT_EQ(bemDeviceErrorMessage(0), "No error");
+	EXPECT_EQ(bemDeviceErrorMessage(-1), "Unspecified error");
+	EXPECT_EQ(bemDeviceErrorMessage(-87), "Timed out");
+	EXPECT_EQ(bemDeviceErrorMessage(-91), "Invalid checksum");
+	EXPECT_EQ(bemDeviceErrorMessage(-1077), "Target device detected error");
+
+	/* Unknown code should return generic message */
+	EXPECT_FALSE(bemDeviceErrorMessage(-99999).empty());
 }
 
 }; /* namespace Test */

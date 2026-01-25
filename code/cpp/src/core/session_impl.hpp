@@ -15,6 +15,7 @@
 #include <thread>
 #include <vector>
 
+#include "core/metrics_collector.hpp"
 #include "protocols/bdtp/bdtp_protocol.hpp"
 #include "protocols/bem/bem_protocol.hpp"
 #include "protocols/bst/bst_decoder.hpp"
@@ -63,6 +64,10 @@ namespace Actisense
 			void close() override;
 
 			[[nodiscard]] bool isConnected() const noexcept override;
+
+			[[nodiscard]] SessionMetrics metrics() const override;
+
+			void resetMetrics() override;
 
 			/* Session-specific methods --------------------------------------------- */
 
@@ -187,6 +192,9 @@ namespace Actisense
 			/* Statistics */
 			std::atomic<std::size_t> frames_received_{0};
 			std::atomic<std::size_t> bem_responses_received_{0};
+
+			/* Metrics collector */
+			MetricsCollector metricsCollector_;
 		};
 
 		/**************************************************************************/ /**

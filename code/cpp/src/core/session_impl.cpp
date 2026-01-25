@@ -95,6 +95,14 @@ namespace Actisense
 			return transport_ && transport_->isOpen();
 		}
 
+		SessionMetrics SessionImpl::metrics() const {
+			return metricsCollector_.snapshot();
+		}
+
+		void SessionImpl::resetMetrics() {
+			metricsCollector_.reset();
+		}
+
 		void SessionImpl::sendBemCommand(const BemCommand& command,
 										 std::chrono::milliseconds timeout,
 										 BemResponseCallback callback) {

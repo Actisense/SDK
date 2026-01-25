@@ -64,10 +64,52 @@ namespace Actisense
 		[[nodiscard]] std::string_view errorMessage(ErrorCode code) noexcept;
 
 		/**************************************************************************/ /**
-		 \brief      Error callback signature
+		 \brief      Extended error information
+		 \details    Provides additional context for errors, especially device errors.
+		             Used when more detail is needed beyond the basic ErrorCode.
+		 *******************************************************************************/
+		struct ExtendedError
+		{
+			ErrorCode code = ErrorCode::Ok;	   ///< SDK-level error code
+			int32_t deviceErrorCode = 0;	   ///< Original device error code (if BemDeviceError)
+			std::string_view deviceMessage;	   ///< Device error description
+			std::string_view context;		   ///< Additional context (command name, etc.)
+
+			/**************************************************************************/ /**
+			 \brief      Check if this represents an error condition
+			 \return     True if code is not Ok
+			 *******************************************************************************/
+			[[nodiscard]] constexpr bool isError() const noexcept {
+				return code != ErrorCode::Ok;
+			}
+
+			/**************************************************************************/ /**
+			 \brief      Check if this is a device-reported error
+			 \return     True if deviceErrorCode is non-zero
+			 *******************************************************************************/
+			[[nodiscard]] constexpr bool isDeviceError() const noexcept {
+				return deviceErrorCode != 0;
+			}
+		};
+
+		/**************************************************************************/ /**
+		 \brief      Get human-readable message for ARL device error code
+		 \param[in]  deviceErrorCode  The device error code from BEM response
+		 \return     String view of error description
+		 *******************************************************************************/
+		[[nodiscard]] std::string_view bemDeviceErrorMessage(int32_t deviceErrorCode) noexcept;
+
+		/**************************************************************************/ /**
+		 \brief      Error callback signature (basic)
 		 \details    Used for asynchronous error notification
 		 *******************************************************************************/
 		using ErrorCallback = std::function<void(ErrorCode code, std::string_view message)>;
+
+		/**************************************************************************/ /**
+		 \brief      Extended error callback signature
+		 \details    Used when detailed error information is needed
+		 *******************************************************************************/
+		using ExtendedErrorCallback = std::function<void(const ExtendedError& error)>;
 
 		/**************************************************************************/ /**
 		 \brief      ADL-compatible make_error_code for ErrorCode

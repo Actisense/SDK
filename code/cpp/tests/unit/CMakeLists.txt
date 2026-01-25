@@ -3,6 +3,12 @@
 # Error handling tests
 add_sdk_test(test_error_category test_error_category.cpp)
 
+# Logging tests
+add_sdk_test(test_logging test_logging.cpp)
+
+# Metrics tests
+add_sdk_test(test_metrics test_metrics.cpp)
+
 # Utility tests
 add_sdk_test(test_message_ring_buffer test_message_ring_buffer.cpp)
 

@@ -24,6 +24,8 @@ set(PUBLIC_HEADERS
     public/events.hpp
     public/session.hpp
     public/api.hpp
+    public/logging.hpp
+    public/metrics.hpp
 )
 
 # ============================================================================
@@ -33,10 +35,13 @@ set(SDK_SOURCES
     # Core
     core/error_category.cpp
     core/session_impl.cpp
+    core/logger.cpp
+    core/metrics_collector.cpp
 
     # Transport layer (internal)
     transport/loopback/loopback_transport.cpp
     transport/serial/serial_transport.cpp
+    transport/transport_error.cpp
 
     # Protocols
     protocols/bdtp/bdtp_protocol.cpp
@@ -44,6 +49,10 @@ set(SDK_SOURCES
     protocols/bst/bst_frame.cpp
     protocols/bem/bem_protocol.cpp
     protocols/bem/bem_commands/operating_mode.cpp
+    protocols/protocol_error.cpp
+
+    # Utilities
+    util/stderr_logger.cpp
 
     # Public API implementation
     public/api.cpp
