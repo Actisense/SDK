@@ -13,6 +13,7 @@
 #include <format>
 #include <sstream>
 
+#include "protocols/bst/bst_frame.hpp"
 #include "transport/serial/serial_transport.hpp"
 #include "util/debug_log.hpp"
 
@@ -264,16 +265,20 @@ namespace Actisense
 			auto result = bstDecoder_.decode(rawBst);
 			if (result.success) {
 				++frames_received_;
-				handleBstFrame(result.frame);
+				handleBstFrame(rawBst, result.frame);
 			} else if (errorCallback_) {
 				errorCallback_(ErrorCode::MalformedFrame, result.error);
 			}
 		}
 
-		void SessionImpl::handleBstFrame(const BstFrameVariant& frame) {
+		void SessionImpl::handleBstFrame(std::span<const uint8_t> rawData,
+		                                  const BstFrameVariant& frame) {
 			if (!eventCallback_) {
 				return;
 			}
+
+			/* Create BstFrame from raw data for unified access */
+			BstFrame bstFrame(rawData);
 
 			/* Emit event to user callback */
 			ParsedMessageEvent event;
@@ -282,9 +287,10 @@ namespace Actisense
 			std::visit(
 				[&event](const auto& f) {
 					event.messageType = bstIdToString(f.bstId);
-					event.payload = f;
 				},
 				frame);
+
+			event.payload = std::move(bstFrame);
 
 			eventCallback_(EventVariant{event});
 		}

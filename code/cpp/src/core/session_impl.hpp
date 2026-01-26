@@ -164,9 +164,10 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Handle a decoded BST frame
-			 \param[in]  frame  Decoded BST frame variant
+			 \param[in]  rawData  Raw BST bytes (ID + length + payload)
+			 \param[in]  frame    Decoded BST frame variant (for message type)
 			 *******************************************************************************/
-			void handleBstFrame(const BstFrameVariant& frame);
+			void handleBstFrame(std::span<const uint8_t> rawData, const BstFrameVariant& frame);
 
 			/**************************************************************************/ /**
 			 \brief      Handle a BEM response

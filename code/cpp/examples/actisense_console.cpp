@@ -189,6 +189,8 @@ void onEvent(const EventVariant& event)
 					ss << " Type=" << static_cast<int>(frame->messageType());
 				}
 
+				ss << " Len=" << frame->dataLength();
+
 				/* Convert span to vector for formatHexBytes */
 				auto dataSpan = frame->data();
 				std::vector<uint8_t> dataVec(dataSpan.begin(), dataSpan.end());
