@@ -1,8 +1,17 @@
-# Get / Set Hardware Baud
+# Get / Set Hardware Baud ⚠️ DEPRECATED
 
-Configures or retrieves the hardware-level baud rate settings for device interfaces. This command controls the physical layer communication speed, which may differ from logical port baudrate settings.
+> **⚠️ DEPRECATION WARNING**
+> This command is **DEPRECATED** and should not be used in new applications.
+> Use [Port Baudrate](port-baudrate.md) (BEM ID 0x17) instead, which provides:
+> - Unified control of both session (hardware) and store (EEPROM) baudrates
+> - Direct baudrate values instead of baud codes
+> - Single command for complete baudrate management
 
-This command supports both Get (read current hardware baud) and Set (write new hardware baud) operations.
+---
+
+Configures or retrieves the hardware-level baud rate settings for device interfaces using legacy baud code values. This command was used to set immediate (session) communication speeds without affecting stored (EEPROM) values.
+
+This command has been superseded by **BEMCMD_PortBaudrate (0x17)**, which manages both session and store baudrates in a single, more flexible interface.
 
 ## Command Ids
 
@@ -11,43 +20,84 @@ This command supports both Get (read current hardware baud) and Set (write new h
 | Command | A1H | 16H |
 | Response | A0H | 16H |
 
-## BEM Data Block details
+## Replacement Command
 
-**TODO**: Data format specification pending. The data block will contain hardware interface identifier and baud rate value.
+**Use [Port Baudrate](port-baudrate.md) (0x17) for all new development.**
 
-| Offset  | Description              | Size           |
-| ------- | ------------------------ | ---------------|
-| TBD     | Hardware interface ID    | TBD            |
-| TBD     | Hardware baud value      | TBD (likely 32-bit) |
+The Port Baudrate command provides superior functionality:
+- **Session Baudrate**: Replaces Hardware Baud (0x16) - immediate hardware changes
+- **Store Baudrate**: Replaces Port Baud Config (0x12) - persistent EEPROM values
+- **Single Command**: One command controls both session and store, eliminating the need for two separate commands
+- **Direct Values**: Uses actual baudrate values (115200, 230400, etc.) instead of baud codes
 
-### Example - Get Hardware Baud
+## Migration Guide
 
-**TODO**: Concrete example pending data format specification.
+If you are currently using Hardware Baud (0x16), migrate to Port Baudrate (0x17):
 
-| Offset | Field | Value | Description |
-| -------- | ------- | ------- | ------------- |
-| 0 | BST ID | A1H | Hardware Baud BEM command |
-| 1 | BST Length | TBD | BEM ID + data size |
-| 2 | BEM Id | 16H | Hardware Baud identifier |
-| 3+ | Data Block | TBD | Hardware interface ID for Get request |
+### Old Workflow (Two Commands Required)
+```
+1. Set Port Baud Config (0x12) - Configure EEPROM baudrate
+2. Commit To EEPROM (0x01) - Save to EEPROM
+3. Set Hardware Baud (0x16) - Apply immediately to hardware
+```
 
-### Example - Set Hardware Baud
+### New Workflow (Single Command)
+```
+1. Set Port Baudrate (0x17) with both session and store values
+2. Commit To EEPROM (0x01) - Only if store baudrate was changed
+```
 
-**TODO**: Concrete example pending data format specification.
+**Example - Set Immediate Baudrate Only**:
+```
+Port Baudrate (0x17):
+- Port: 1
+- Session baudrate: 230400 (immediate hardware change)
+- Store baudrate: 0xFFFFFFFF (do not change EEPROM)
+```
 
-| Offset | Field | Value | Description |
-|--------|-------|-------|-------------|
-| 0 | BST ID | A1H | Hardware Baud BEM command |
-| 1 | BST Length | TBD | BEM ID + data size |
-| 2 | BEM Id | 16H | Hardware Baud identifier |
-| 3+ | Data Block | TBD | Hardware interface ID and baud value |
+**Example - Set Both Immediate and Persistent**:
+```
+Port Baudrate (0x17):
+- Port: 1
+- Session baudrate: 115200 (immediate hardware change)
+- Store baudrate: 115200 (will persist after reboot)
 
-### Response
+Then send: Commit To EEPROM (0x01)
+```
 
-The device will respond with a standard BEM Response (BST A0H, BEM 16H). The response follows the standard [BEM Response](../bst-bem-response.md) format with the BEM header containing:
+See [Port Baudrate](port-baudrate.md) documentation for detailed examples.
 
-- Response Code indicating success or failure
-- Device information (Serial Number, Model ID, Firmware version)
-- Current hardware baud configuration (for Get requests)
+## Legacy Information
 
-**Note**: Changing hardware baud rates may temporarily interrupt communications. Applications should handle reconnection after baud rate changes.
+This command provided hardware-level (immediate, non-persistent) baudrate control using device-specific baud code arrays. Changes took effect immediately but were lost on device reset unless Port Baud Config (0x12) was also used.
+
+**Hardware Baud is no longer documented or supported in the SDK.**
+
+For historical reference:
+- Changed hardware baudrate immediately (session/RAM only)
+- Did not modify EEPROM - changes were temporary
+- Used array of baud code values (one per port)
+- Required Port Baud Config (0x12) for persistent changes
+- Baud codes varied between device families
+
+## Comparison: Old vs New
+
+| Feature | Hardware Baud (0x16) | Port Baudrate (0x17) |
+|---------|---------------------|---------------------|
+| Immediate change | ✓ | ✓ (session baudrate) |
+| Persistent change | ✗ (need 0x12) | ✓ (store baudrate) |
+| Value format | Baud codes | Actual baudrates |
+| Single command | ✗ | ✓ |
+| Device-independent | ✗ | ✓ |
+
+## Notes
+
+- **Do Not Use**: This command should not be used in new applications
+- **Existing Code**: Applications using this command should migrate to Port Baudrate (0x17)
+- **Device Support**: Newer devices may not support this legacy command
+- **No Decode Function**: The decode function for this command has been removed from current SDK versions
+- **Connection Warning**: Changing session baudrates interrupts the active connection. Applications must close, wait, and reconnect at the new baudrate
+- **See Also**:
+  - [Port Baudrate](port-baudrate.md) - Recommended replacement for both session and store baudrate control
+  - [Port Baud Config](port-baud-config.md) - Also deprecated, use Port Baudrate (0x17)
+  - [Commit To EEPROM](commit-to-eeprom.md) - Required after changing store baudrate
