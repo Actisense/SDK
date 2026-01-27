@@ -96,7 +96,7 @@ namespace Actisense
 			// Latency tracking (milliseconds)
 			uint64_t totalLatencyMs = 0;			  ///< Sum of all response latencies
 			uint32_t maxLatencyMs = 0;				  ///< Maximum observed latency
-			uint32_t minLatencyMs = std::numeric_limits<uint32_t>::max(); ///< Minimum latency
+			uint32_t minLatencyMs = (std::numeric_limits<uint32_t>::max)(); ///< Minimum latency
 
 			/**************************************************************************/ /**
 			 \brief      Calculate average latency
@@ -132,7 +132,7 @@ namespace Actisense
 				deviceErrors = 0;
 				totalLatencyMs = 0;
 				maxLatencyMs = 0;
-				minLatencyMs = std::numeric_limits<uint32_t>::max();
+				minLatencyMs = (std::numeric_limits<uint32_t>::max)();
 			}
 		};
 
