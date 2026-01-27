@@ -87,6 +87,154 @@ namespace Actisense
 			return encodeCommand(cmd, outFrame, outError);
 		}
 
+		bool BemProtocol::buildGetPortBaudrate(uint8_t portNumber,
+											   std::vector<uint8_t>& outFrame,
+											   std::string& outError) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetPortBaudrate;
+
+			/* GET request: just port number (1 byte) */
+			cmd.data.push_back(portNumber);
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
+		bool BemProtocol::buildSetPortBaudrate(uint8_t portNumber,
+											   uint32_t sessionBaud,
+											   uint32_t storeBaud,
+											   std::vector<uint8_t>& outFrame,
+											   std::string& outError) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetPortBaudrate;
+
+			/* SET request: port number (1) + session baud (4) + store baud (4) = 9 bytes */
+			cmd.data.resize(9);
+			cmd.data[0] = portNumber;
+			writeU32LE(&cmd.data[1], sessionBaud);
+			writeU32LE(&cmd.data[5], storeBaud);
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
+		bool BemProtocol::buildGetPortPCode(std::vector<uint8_t>& outFrame,
+											std::string& outError) {
+			/* GET request has no data payload */
+			return encodeSimpleCommand(BemCommandId::GetSetPortPCode, BstId::Bem_PG_A1,
+									   outFrame, outError);
+		}
+
+		bool BemProtocol::buildSetPortPCode(std::span<const uint8_t> pCodes,
+											std::vector<uint8_t>& outFrame,
+											std::string& outError) {
+			if (pCodes.empty()) {
+				outError = "P-Code array cannot be empty for SET request";
+				return false;
+			}
+
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetPortPCode;
+
+			/* SET request: array of P-Code values, one per port */
+			cmd.data.assign(pCodes.begin(), pCodes.end());
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
+		bool BemProtocol::buildGetRxPgnEnable(uint32_t pgn,
+											  std::vector<uint8_t>& outFrame,
+											  std::string& outError) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetRxPgnEnable;
+
+			/* GET request: PGN only (4 bytes, little-endian) */
+			cmd.data.resize(4);
+			writeU32LE(cmd.data.data(), pgn);
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
+		bool BemProtocol::buildSetRxPgnEnable(uint32_t pgn, uint8_t enable,
+											  std::vector<uint8_t>& outFrame,
+											  std::string& outError) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetRxPgnEnable;
+
+			/* SET request: PGN (4) + enable (1) = 5 bytes */
+			cmd.data.resize(5);
+			writeU32LE(cmd.data.data(), pgn);
+			cmd.data[4] = enable;
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
+		bool BemProtocol::buildSetRxPgnEnableWithMask(uint32_t pgn, uint8_t enable,
+													  uint32_t mask,
+													  std::vector<uint8_t>& outFrame,
+													  std::string& outError) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetRxPgnEnable;
+
+			/* SET request with mask: PGN (4) + enable (1) + mask (4) = 9 bytes */
+			cmd.data.resize(9);
+			writeU32LE(cmd.data.data(), pgn);
+			cmd.data[4] = enable;
+			writeU32LE(&cmd.data[5], mask);
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
+		bool BemProtocol::buildGetTxPgnEnable(uint32_t pgn,
+											  std::vector<uint8_t>& outFrame,
+											  std::string& outError) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetTxPgnEnable;
+
+			/* GET request: PGN only (4 bytes, little-endian) */
+			cmd.data.resize(4);
+			writeU32LE(cmd.data.data(), pgn);
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
+		bool BemProtocol::buildSetTxPgnEnable(uint32_t pgn, uint8_t enable,
+											  std::vector<uint8_t>& outFrame,
+											  std::string& outError) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetTxPgnEnable;
+
+			/* SET request: PGN (4) + enable (1) = 5 bytes */
+			cmd.data.resize(5);
+			writeU32LE(cmd.data.data(), pgn);
+			cmd.data[4] = enable;
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
+		bool BemProtocol::buildSetTxPgnEnableWithRate(uint32_t pgn, uint8_t enable,
+													  uint32_t txRate,
+													  std::vector<uint8_t>& outFrame,
+													  std::string& outError) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetTxPgnEnable;
+
+			/* SET request with rate: PGN (4) + enable (1) + txRate (4) = 9 bytes */
+			cmd.data.resize(9);
+			writeU32LE(cmd.data.data(), pgn);
+			cmd.data[4] = enable;
+			writeU32LE(&cmd.data[5], txRate);
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
 		bool BemProtocol::isBemResponse(const BstDatagram& datagram) const {
 			return Actisense::Sdk::isBemResponse(static_cast<BstId>(datagram.bstId));
 		}
@@ -322,6 +470,13 @@ namespace Actisense
 		void BemProtocol::writeU16LE(uint8_t* p, uint16_t value) noexcept {
 			p[0] = static_cast<uint8_t>(value & 0xFF);
 			p[1] = static_cast<uint8_t>((value >> 8) & 0xFF);
+		}
+
+		void BemProtocol::writeU32LE(uint8_t* p, uint32_t value) noexcept {
+			p[0] = static_cast<uint8_t>(value & 0xFF);
+			p[1] = static_cast<uint8_t>((value >> 8) & 0xFF);
+			p[2] = static_cast<uint8_t>((value >> 16) & 0xFF);
+			p[3] = static_cast<uint8_t>((value >> 24) & 0xFF);
 		}
 
 	}; /* namespace Sdk */

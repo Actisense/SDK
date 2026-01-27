@@ -122,6 +122,104 @@ namespace Actisense
 								  BemResponseCallback callback);
 
 			/**************************************************************************/ /**
+			 \brief      Send Get Port Baudrate command
+			 \param[in]  portNumber  Port to query (0-based)
+			 \param[in]  timeout     Timeout for response
+			 \param[in]  callback    Callback invoked on response or timeout
+			 *******************************************************************************/
+			void getPortBaudrate(uint8_t portNumber, std::chrono::milliseconds timeout,
+								 BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Set Port Baudrate command
+			 \param[in]  portNumber   Port to configure (0-based)
+			 \param[in]  sessionBaud  Session baudrate (use kBaudRateNoChange to skip)
+			 \param[in]  storeBaud    Store baudrate (use kBaudRateNoChange to skip)
+			 \param[in]  timeout      Timeout for response
+			 \param[in]  callback     Callback invoked on response or timeout
+			 *******************************************************************************/
+			void setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud, uint32_t storeBaud,
+								 std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Get Port P-Code command
+			 \param[in]  timeout     Timeout for response
+			 \param[in]  callback    Callback invoked on response or timeout
+			 *******************************************************************************/
+			void getPortPCode(std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Set Port P-Code command
+			 \param[in]  pCodes      P-Code values for each port
+			 \param[in]  timeout     Timeout for response
+			 \param[in]  callback    Callback invoked on response or timeout
+			 *******************************************************************************/
+			void setPortPCode(std::span<const uint8_t> pCodes,
+							  std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Get Rx PGN Enable command
+			 \param[in]  pgn         PGN to query
+			 \param[in]  timeout     Timeout for response
+			 \param[in]  callback    Callback invoked on response or timeout
+			 *******************************************************************************/
+			void getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+								BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Set Rx PGN Enable command
+			 \param[in]  pgn         PGN to configure
+			 \param[in]  enable      Enable flag (0=disabled, 1=enabled, 2=respond mode)
+			 \param[in]  timeout     Timeout for response
+			 \param[in]  callback    Callback invoked on response or timeout
+			 *******************************************************************************/
+			void setRxPgnEnable(uint32_t pgn, uint8_t enable,
+								std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Set Rx PGN Enable command with mask
+			 \param[in]  pgn         PGN to configure
+			 \param[in]  enable      Enable flag
+			 \param[in]  mask        PGN mask for filtering
+			 \param[in]  timeout     Timeout for response
+			 \param[in]  callback    Callback invoked on response or timeout
+			 *******************************************************************************/
+			void setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
+										std::chrono::milliseconds timeout,
+										BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Get Tx PGN Enable command
+			 \param[in]  pgn         PGN to query
+			 \param[in]  timeout     Timeout for response
+			 \param[in]  callback    Callback invoked on response or timeout
+			 *******************************************************************************/
+			void getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+								BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Set Tx PGN Enable command
+			 \param[in]  pgn         PGN to configure
+			 \param[in]  enable      Enable flag (0=disabled, 1=enabled, 2=respond mode)
+			 \param[in]  timeout     Timeout for response
+			 \param[in]  callback    Callback invoked on response or timeout
+			 *******************************************************************************/
+			void setTxPgnEnable(uint32_t pgn, uint8_t enable,
+								std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Set Tx PGN Enable command with rate
+			 \param[in]  pgn         PGN to configure
+			 \param[in]  enable      Enable flag
+			 \param[in]  txRate      Transmission rate in milliseconds
+			 \param[in]  timeout     Timeout for response
+			 \param[in]  callback    Callback invoked on response or timeout
+			 *******************************************************************************/
+			void setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
+										std::chrono::milliseconds timeout,
+										BemResponseCallback callback);
+
+			/**************************************************************************/ /**
 			 \brief      Start the receive loop (non-blocking)
 			 *******************************************************************************/
 			void startReceiving();

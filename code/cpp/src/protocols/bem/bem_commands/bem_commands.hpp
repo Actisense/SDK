@@ -11,7 +11,11 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include "protocols/bem/bem_commands/operating_mode.hpp"
+#include "protocols/bem/bem_commands/port_baudrate.hpp"
+#include "protocols/bem/bem_commands/port_pcode.hpp"
+#include "protocols/bem/bem_commands/rx_pgn_enable.hpp"
 #include "protocols/bem/bem_commands/system_status.hpp"
+#include "protocols/bem/bem_commands/tx_pgn_enable.hpp"
 
 namespace Actisense
 {
@@ -30,6 +34,14 @@ namespace Actisense
 		{
 			/* Device Information Commands */
 			GetSetOperatingMode = 0x11, ///< Get/Set operating mode (BST A1H→A0H)
+
+			/* Port Configuration Commands */
+			GetSetPortPCode = 0x13,	   ///< Get/Set port P-Code configuration
+			GetSetPortBaudrate = 0x17, ///< Get/Set port baudrate configuration
+
+			/* PGN Enable Commands */
+			GetSetRxPgnEnable = 0x46, ///< Get/Set Rx PGN enable state
+			GetSetTxPgnEnable = 0x47, ///< Get/Set Tx PGN enable state
 
 			/* Unsolicited Messages (no command, response only via BST A0H) */
 			StartupStatus = 0xF0, ///< (Unsolicited) startup status information

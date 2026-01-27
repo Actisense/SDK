@@ -86,6 +86,126 @@ namespace Actisense
 			[[nodiscard]] bool buildSetOperatingMode(uint16_t mode, std::vector<uint8_t>& outFrame,
 													 std::string& outError);
 
+			/**************************************************************************/ /**
+			 \brief      Build Get Port Baudrate command
+			 \param[in]  portNumber Port to query (0-based)
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetPortBaudrate(uint8_t portNumber,
+													std::vector<uint8_t>& outFrame,
+													std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Set Port Baudrate command
+			 \param[in]  portNumber   Port to configure (0-based)
+			 \param[in]  sessionBaud  Session baudrate (use kBaudRateNoChange to skip)
+			 \param[in]  storeBaud    Store baudrate (use kBaudRateNoChange to skip)
+			 \param[out] outFrame     Complete BDTP-framed message
+			 \param[out] outError     Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildSetPortBaudrate(uint8_t portNumber,
+													uint32_t sessionBaud,
+													uint32_t storeBaud,
+													std::vector<uint8_t>& outFrame,
+													std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Get Port P-Code command
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetPortPCode(std::vector<uint8_t>& outFrame,
+												 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Set Port P-Code command
+			 \param[in]  pCodes      P-Code values for each port
+			 \param[out] outFrame    Complete BDTP-framed message
+			 \param[out] outError    Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildSetPortPCode(std::span<const uint8_t> pCodes,
+												 std::vector<uint8_t>& outFrame,
+												 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Get Rx PGN Enable command
+			 \param[in]  pgn         PGN to query (24-bit)
+			 \param[out] outFrame    Complete BDTP-framed message
+			 \param[out] outError    Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetRxPgnEnable(uint32_t pgn,
+												   std::vector<uint8_t>& outFrame,
+												   std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Set Rx PGN Enable command (basic)
+			 \param[in]  pgn         PGN to configure (24-bit)
+			 \param[in]  enable      Enable flag value
+			 \param[out] outFrame    Complete BDTP-framed message
+			 \param[out] outError    Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildSetRxPgnEnable(uint32_t pgn, uint8_t enable,
+												   std::vector<uint8_t>& outFrame,
+												   std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Set Rx PGN Enable command (with mask)
+			 \param[in]  pgn         PGN to configure (24-bit)
+			 \param[in]  enable      Enable flag value
+			 \param[in]  mask        PGN mask for filtering
+			 \param[out] outFrame    Complete BDTP-framed message
+			 \param[out] outError    Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildSetRxPgnEnableWithMask(uint32_t pgn, uint8_t enable,
+														   uint32_t mask,
+														   std::vector<uint8_t>& outFrame,
+														   std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Get Tx PGN Enable command
+			 \param[in]  pgn         PGN to query (24-bit)
+			 \param[out] outFrame    Complete BDTP-framed message
+			 \param[out] outError    Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetTxPgnEnable(uint32_t pgn,
+												   std::vector<uint8_t>& outFrame,
+												   std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Set Tx PGN Enable command (basic)
+			 \param[in]  pgn         PGN to configure (24-bit)
+			 \param[in]  enable      Enable flag value
+			 \param[out] outFrame    Complete BDTP-framed message
+			 \param[out] outError    Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildSetTxPgnEnable(uint32_t pgn, uint8_t enable,
+												   std::vector<uint8_t>& outFrame,
+												   std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Set Tx PGN Enable command (with rate)
+			 \param[in]  pgn         PGN to configure (24-bit)
+			 \param[in]  enable      Enable flag value
+			 \param[in]  txRate      Transmission rate in milliseconds
+			 \param[out] outFrame    Complete BDTP-framed message
+			 \param[out] outError    Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildSetTxPgnEnableWithRate(uint32_t pgn, uint8_t enable,
+														   uint32_t txRate,
+														   std::vector<uint8_t>& outFrame,
+														   std::string& outError);
+
 			/* Response Decoding ---------------------------------------------------- */
 
 			/**************************************************************************/ /**
@@ -216,6 +336,11 @@ namespace Actisense
 			 \brief      Write little-endian 16-bit value
 			 *******************************************************************************/
 			static void writeU16LE(uint8_t* p, uint16_t value) noexcept;
+
+			/**************************************************************************/ /**
+			 \brief      Write little-endian 32-bit value
+			 *******************************************************************************/
+			static void writeU32LE(uint8_t* p, uint32_t value) noexcept;
 
 			mutable std::mutex mutex_;
 			uint8_t sequence_counter_ = 0;

@@ -151,6 +151,167 @@ namespace Actisense
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
+		void SessionImpl::getPortBaudrate(uint8_t portNumber, std::chrono::milliseconds timeout,
+										  BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetPortBaudrate;
+			cmd.data.push_back(portNumber);
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud,
+										  uint32_t storeBaud, std::chrono::milliseconds timeout,
+										  BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetPortBaudrate;
+			cmd.data.resize(9);
+			cmd.data[0] = portNumber;
+			/* Session baud: 4 bytes, little-endian */
+			cmd.data[1] = static_cast<uint8_t>(sessionBaud & 0xFF);
+			cmd.data[2] = static_cast<uint8_t>((sessionBaud >> 8) & 0xFF);
+			cmd.data[3] = static_cast<uint8_t>((sessionBaud >> 16) & 0xFF);
+			cmd.data[4] = static_cast<uint8_t>((sessionBaud >> 24) & 0xFF);
+			/* Store baud: 4 bytes, little-endian */
+			cmd.data[5] = static_cast<uint8_t>(storeBaud & 0xFF);
+			cmd.data[6] = static_cast<uint8_t>((storeBaud >> 8) & 0xFF);
+			cmd.data[7] = static_cast<uint8_t>((storeBaud >> 16) & 0xFF);
+			cmd.data[8] = static_cast<uint8_t>((storeBaud >> 24) & 0xFF);
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::getPortPCode(std::chrono::milliseconds timeout,
+									   BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetPortPCode;
+			/* GET request has no data payload */
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::setPortPCode(std::span<const uint8_t> pCodes,
+									   std::chrono::milliseconds timeout,
+									   BemResponseCallback callback) {
+			if (pCodes.empty()) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument,
+							 "P-Code array cannot be empty");
+				}
+				return;
+			}
+
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetPortPCode;
+			cmd.data.assign(pCodes.begin(), pCodes.end());
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+										 BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetRxPgnEnable;
+			cmd.data.resize(4);
+			cmd.data[0] = static_cast<uint8_t>(pgn & 0xFF);
+			cmd.data[1] = static_cast<uint8_t>((pgn >> 8) & 0xFF);
+			cmd.data[2] = static_cast<uint8_t>((pgn >> 16) & 0xFF);
+			cmd.data[3] = static_cast<uint8_t>((pgn >> 24) & 0xFF);
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::setRxPgnEnable(uint32_t pgn, uint8_t enable,
+										 std::chrono::milliseconds timeout,
+										 BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetRxPgnEnable;
+			cmd.data.resize(5);
+			cmd.data[0] = static_cast<uint8_t>(pgn & 0xFF);
+			cmd.data[1] = static_cast<uint8_t>((pgn >> 8) & 0xFF);
+			cmd.data[2] = static_cast<uint8_t>((pgn >> 16) & 0xFF);
+			cmd.data[3] = static_cast<uint8_t>((pgn >> 24) & 0xFF);
+			cmd.data[4] = enable;
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
+												 std::chrono::milliseconds timeout,
+												 BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetRxPgnEnable;
+			cmd.data.resize(9);
+			cmd.data[0] = static_cast<uint8_t>(pgn & 0xFF);
+			cmd.data[1] = static_cast<uint8_t>((pgn >> 8) & 0xFF);
+			cmd.data[2] = static_cast<uint8_t>((pgn >> 16) & 0xFF);
+			cmd.data[3] = static_cast<uint8_t>((pgn >> 24) & 0xFF);
+			cmd.data[4] = enable;
+			cmd.data[5] = static_cast<uint8_t>(mask & 0xFF);
+			cmd.data[6] = static_cast<uint8_t>((mask >> 8) & 0xFF);
+			cmd.data[7] = static_cast<uint8_t>((mask >> 16) & 0xFF);
+			cmd.data[8] = static_cast<uint8_t>((mask >> 24) & 0xFF);
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+										 BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetTxPgnEnable;
+			cmd.data.resize(4);
+			cmd.data[0] = static_cast<uint8_t>(pgn & 0xFF);
+			cmd.data[1] = static_cast<uint8_t>((pgn >> 8) & 0xFF);
+			cmd.data[2] = static_cast<uint8_t>((pgn >> 16) & 0xFF);
+			cmd.data[3] = static_cast<uint8_t>((pgn >> 24) & 0xFF);
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::setTxPgnEnable(uint32_t pgn, uint8_t enable,
+										 std::chrono::milliseconds timeout,
+										 BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetTxPgnEnable;
+			cmd.data.resize(5);
+			cmd.data[0] = static_cast<uint8_t>(pgn & 0xFF);
+			cmd.data[1] = static_cast<uint8_t>((pgn >> 8) & 0xFF);
+			cmd.data[2] = static_cast<uint8_t>((pgn >> 16) & 0xFF);
+			cmd.data[3] = static_cast<uint8_t>((pgn >> 24) & 0xFF);
+			cmd.data[4] = enable;
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
+												 std::chrono::milliseconds timeout,
+												 BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetTxPgnEnable;
+			cmd.data.resize(9);
+			cmd.data[0] = static_cast<uint8_t>(pgn & 0xFF);
+			cmd.data[1] = static_cast<uint8_t>((pgn >> 8) & 0xFF);
+			cmd.data[2] = static_cast<uint8_t>((pgn >> 16) & 0xFF);
+			cmd.data[3] = static_cast<uint8_t>((pgn >> 24) & 0xFF);
+			cmd.data[4] = enable;
+			cmd.data[5] = static_cast<uint8_t>(txRate & 0xFF);
+			cmd.data[6] = static_cast<uint8_t>((txRate >> 8) & 0xFF);
+			cmd.data[7] = static_cast<uint8_t>((txRate >> 16) & 0xFF);
+			cmd.data[8] = static_cast<uint8_t>((txRate >> 24) & 0xFF);
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
 		void SessionImpl::startReceiving() {
 			if (running_.exchange(true)) {
 				return; /* Already running */

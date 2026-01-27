@@ -18,3 +18,9 @@ add_sdk_test(test_loopback_transport test_loopback_transport.cpp)
 # Protocol tests
 add_sdk_test(test_bdtp_protocol test_bdtp_protocol.cpp)
 add_sdk_test(test_bst_frame test_bst_frame.cpp)
+
+# BEM Command tests
+add_sdk_test(test_port_baudrate test_port_baudrate.cpp)
+add_sdk_test(test_port_pcode test_port_pcode.cpp)
+add_sdk_test(test_rx_pgn_enable test_rx_pgn_enable.cpp)
+add_sdk_test(test_tx_pgn_enable test_tx_pgn_enable.cpp)
