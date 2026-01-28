@@ -206,6 +206,265 @@ namespace Actisense
 														   std::vector<uint8_t>& outFrame,
 														   std::string& outError);
 
+			/* Device Control Commands ---------------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Build ReInit Main App command (device reboot)
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 \note       Device will reboot after receiving this command
+			 *******************************************************************************/
+			[[nodiscard]] bool buildReInitMainApp(std::vector<uint8_t>& outFrame,
+												  std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Commit To EEPROM command (save settings)
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildCommitToEeprom(std::vector<uint8_t>& outFrame,
+												   std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Commit To FLASH command (save settings)
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildCommitToFlash(std::vector<uint8_t>& outFrame,
+												  std::string& outError);
+
+			/* Device Information Commands ------------------------------------------ */
+
+			/**************************************************************************/ /**
+			 \brief      Build Get Total Time command
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetTotalTime(std::vector<uint8_t>& outFrame,
+												 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Set Total Time command
+			 \param[in]  totalTime  Total time value in seconds
+			 \param[in]  passkey    Security passkey for write access
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildSetTotalTime(uint32_t totalTime, uint32_t passkey,
+												 std::vector<uint8_t>& outFrame,
+												 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Echo command
+			 \param[in]  data       Data to echo (0-254 bytes)
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildEcho(std::span<const uint8_t> data,
+										 std::vector<uint8_t>& outFrame,
+										 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Echo command (vector overload)
+			 \param[in]  data       Data to echo (0-254 bytes)
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildEcho(const std::vector<uint8_t>& data,
+										 std::vector<uint8_t>& outFrame,
+										 std::string& outError);
+
+			/* NMEA 2000 Product Information Commands ------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Build Get Supported PGN List command
+			 \param[in]  pgnIndex    Starting PGN index (0 for first request)
+			 \param[in]  transferId  Transfer ID for multi-message tracking
+			 \param[out] outFrame    Complete BDTP-framed message
+			 \param[out] outError    Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
+														std::vector<uint8_t>& outFrame,
+														std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Get Product Info command
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetProductInfo(std::vector<uint8_t>& outFrame,
+												   std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Get CAN Config command
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetCanConfig(std::vector<uint8_t>& outFrame,
+												 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Set CAN Config command
+			 \param[in]  name          NMEA 2000 NAME to set
+			 \param[in]  sourceAddress Preferred source address
+			 \param[out] outFrame      Complete BDTP-framed message
+			 \param[out] outError      Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildSetCanConfig(uint64_t name, uint8_t sourceAddress,
+												 std::vector<uint8_t>& outFrame,
+												 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Get CAN Info Field 1 command (Installation Description 1)
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetCanInfoField1(std::vector<uint8_t>& outFrame,
+													 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Set CAN Info Field 1 command (Installation Description 1)
+			 \param[in]  text       Text to set (max 70 characters)
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildSetCanInfoField1(const std::string& text,
+													 std::vector<uint8_t>& outFrame,
+													 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Get CAN Info Field 2 command (Installation Description 2)
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetCanInfoField2(std::vector<uint8_t>& outFrame,
+													 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Set CAN Info Field 2 command (Installation Description 2)
+			 \param[in]  text       Text to set (max 70 characters)
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildSetCanInfoField2(const std::string& text,
+													 std::vector<uint8_t>& outFrame,
+													 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Get CAN Info Field 3 command (Manufacturer Info, read-only)
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetCanInfoField3(std::vector<uint8_t>& outFrame,
+													 std::string& outError);
+
+			/* PGN List Management Commands ----------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Build Delete PGN Enable Lists command
+			 \param[in]  selector   Which list(s) to delete (0=Rx, 1=Tx, 2=Both)
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildDeletePgnEnableLists(uint8_t selector,
+														 std::vector<uint8_t>& outFrame,
+														 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Activate PGN Enable Lists command
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildActivatePgnEnableLists(std::vector<uint8_t>& outFrame,
+														   std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Default PGN Enable List command
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildDefaultPgnEnableList(std::vector<uint8_t>& outFrame,
+														 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Get Params PGN Enable Lists command
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetParamsPgnEnableLists(std::vector<uint8_t>& outFrame,
+															std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Get Rx PGN Enable List F2 command
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetRxPgnEnableListF2(std::vector<uint8_t>& outFrame,
+														 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Set Rx PGN Enable List F2 command
+			 \param[in]  pgns       List of PGNs to enable
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildSetRxPgnEnableListF2(const std::vector<uint32_t>& pgns,
+														 std::vector<uint8_t>& outFrame,
+														 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Get Tx PGN Enable List F2 command
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetTxPgnEnableListF2(std::vector<uint8_t>& outFrame,
+														 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Get Rx PGN Enable List F1 command (legacy)
+			 \param[in]  messageIndex  Message to request (0 or 1)
+			 \param[out] outFrame      Complete BDTP-framed message
+			 \param[out] outError      Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetRxPgnEnableListF1(uint8_t messageIndex,
+														 std::vector<uint8_t>& outFrame,
+														 std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Build Get Tx PGN Enable List F1 command (legacy)
+			 \param[in]  messageIndex  Message to request (0-3)
+			 \param[out] outFrame      Complete BDTP-framed message
+			 \param[out] outError      Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetTxPgnEnableListF1(uint8_t messageIndex,
+														 std::vector<uint8_t>& outFrame,
+														 std::string& outError);
+
 			/* Response Decoding ---------------------------------------------------- */
 
 			/**************************************************************************/ /**

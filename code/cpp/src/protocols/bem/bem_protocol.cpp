@@ -235,6 +235,295 @@ namespace Actisense
 			return encodeCommand(cmd, outFrame, outError);
 		}
 
+		/* Device Control Commands ---------------------------------------------- */
+
+		bool BemProtocol::buildReInitMainApp(std::vector<uint8_t>& outFrame,
+											 std::string& outError) {
+			/* ReInit Main App has no data payload */
+			return encodeSimpleCommand(BemCommandId::ReInitMainApp, BstId::Bem_PG_A1,
+									   outFrame, outError);
+		}
+
+		bool BemProtocol::buildCommitToEeprom(std::vector<uint8_t>& outFrame,
+											  std::string& outError) {
+			/* Commit To EEPROM has no data payload */
+			return encodeSimpleCommand(BemCommandId::CommitToEeprom, BstId::Bem_PG_A1,
+									   outFrame, outError);
+		}
+
+		bool BemProtocol::buildCommitToFlash(std::vector<uint8_t>& outFrame,
+											 std::string& outError) {
+			/* Commit To FLASH has no data payload */
+			return encodeSimpleCommand(BemCommandId::CommitToFlash, BstId::Bem_PG_A1,
+									   outFrame, outError);
+		}
+
+		/* Device Information Commands ------------------------------------------ */
+
+		bool BemProtocol::buildGetTotalTime(std::vector<uint8_t>& outFrame,
+											std::string& outError) {
+			/* GET Total Time has no data payload */
+			return encodeSimpleCommand(BemCommandId::GetSetTotalTime, BstId::Bem_PG_A1,
+									   outFrame, outError);
+		}
+
+		bool BemProtocol::buildSetTotalTime(uint32_t totalTime, uint32_t passkey,
+											std::vector<uint8_t>& outFrame,
+											std::string& outError) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetTotalTime;
+
+			/* SET request: totalTime (4) + passkey (4) = 8 bytes */
+			cmd.data.resize(8);
+			writeU32LE(cmd.data.data(), totalTime);
+			writeU32LE(&cmd.data[4], passkey);
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
+		bool BemProtocol::buildEcho(std::span<const uint8_t> data,
+									std::vector<uint8_t>& outFrame,
+									std::string& outError) {
+			if (data.size() > 254) {
+				outError = "Echo data too large: max 254 bytes, got " +
+				           std::to_string(data.size());
+				return false;
+			}
+
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::Echo;
+			cmd.data.assign(data.begin(), data.end());
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
+		bool BemProtocol::buildEcho(const std::vector<uint8_t>& data,
+									std::vector<uint8_t>& outFrame,
+									std::string& outError) {
+			return buildEcho(std::span<const uint8_t>(data), outFrame, outError);
+		}
+
+		/* NMEA 2000 Product Information Commands ------------------------------- */
+
+		bool BemProtocol::buildGetSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
+												   std::vector<uint8_t>& outFrame,
+												   std::string& outError) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSupportedPgnList;
+
+			/* GET request: pgnIndex (1) + transferId (1) = 2 bytes */
+			cmd.data.resize(2);
+			cmd.data[0] = pgnIndex;
+			cmd.data[1] = transferId;
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
+		bool BemProtocol::buildGetProductInfo(std::vector<uint8_t>& outFrame,
+											  std::string& outError) {
+			/* GET Product Info has no data payload */
+			return encodeSimpleCommand(BemCommandId::GetProductInfo, BstId::Bem_PG_A1,
+									   outFrame, outError);
+		}
+
+		bool BemProtocol::buildGetCanConfig(std::vector<uint8_t>& outFrame,
+											std::string& outError) {
+			/* GET CAN Config has no data payload */
+			return encodeSimpleCommand(BemCommandId::GetSetCanConfig, BstId::Bem_PG_A1,
+									   outFrame, outError);
+		}
+
+		bool BemProtocol::buildSetCanConfig(uint64_t name, uint8_t sourceAddress,
+											std::vector<uint8_t>& outFrame,
+											std::string& outError) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetCanConfig;
+
+			/* SET request: NAME (8) + sourceAddress (1) = 9 bytes */
+			cmd.data.resize(9);
+
+			/* NAME: 8 bytes, little-endian */
+			cmd.data[0] = static_cast<uint8_t>(name & 0xFF);
+			cmd.data[1] = static_cast<uint8_t>((name >> 8) & 0xFF);
+			cmd.data[2] = static_cast<uint8_t>((name >> 16) & 0xFF);
+			cmd.data[3] = static_cast<uint8_t>((name >> 24) & 0xFF);
+			cmd.data[4] = static_cast<uint8_t>((name >> 32) & 0xFF);
+			cmd.data[5] = static_cast<uint8_t>((name >> 40) & 0xFF);
+			cmd.data[6] = static_cast<uint8_t>((name >> 48) & 0xFF);
+			cmd.data[7] = static_cast<uint8_t>((name >> 56) & 0xFF);
+
+			cmd.data[8] = sourceAddress;
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
+		bool BemProtocol::buildGetCanInfoField1(std::vector<uint8_t>& outFrame,
+												std::string& outError) {
+			/* GET CAN Info Field 1 has no data payload */
+			return encodeSimpleCommand(BemCommandId::GetSetCanInfoField1, BstId::Bem_PG_A1,
+									   outFrame, outError);
+		}
+
+		bool BemProtocol::buildSetCanInfoField1(const std::string& text,
+												std::vector<uint8_t>& outFrame,
+												std::string& outError) {
+			if (text.length() > 70) {
+				outError = "CAN Info Field 1 text too long: max 70 characters, got " +
+				           std::to_string(text.length());
+				return false;
+			}
+
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetCanInfoField1;
+
+			/* SET request: text padded with 0xFF to 70 bytes */
+			cmd.data.resize(70, 0xFF);
+			for (std::size_t i = 0; i < text.length(); ++i) {
+				cmd.data[i] = static_cast<uint8_t>(text[i]);
+			}
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
+		bool BemProtocol::buildGetCanInfoField2(std::vector<uint8_t>& outFrame,
+												std::string& outError) {
+			/* GET CAN Info Field 2 has no data payload */
+			return encodeSimpleCommand(BemCommandId::GetSetCanInfoField2, BstId::Bem_PG_A1,
+									   outFrame, outError);
+		}
+
+		bool BemProtocol::buildSetCanInfoField2(const std::string& text,
+												std::vector<uint8_t>& outFrame,
+												std::string& outError) {
+			if (text.length() > 70) {
+				outError = "CAN Info Field 2 text too long: max 70 characters, got " +
+				           std::to_string(text.length());
+				return false;
+			}
+
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetCanInfoField2;
+
+			/* SET request: text padded with 0xFF to 70 bytes */
+			cmd.data.resize(70, 0xFF);
+			for (std::size_t i = 0; i < text.length(); ++i) {
+				cmd.data[i] = static_cast<uint8_t>(text[i]);
+			}
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
+		bool BemProtocol::buildGetCanInfoField3(std::vector<uint8_t>& outFrame,
+												std::string& outError) {
+			/* GET CAN Info Field 3 has no data payload (read-only) */
+			return encodeSimpleCommand(BemCommandId::GetCanInfoField3, BstId::Bem_PG_A1,
+									   outFrame, outError);
+		}
+
+
+	/* PGN List Management Commands --------------------------------------------- */
+
+	bool BemProtocol::buildDeletePgnEnableLists(uint8_t selector,
+												std::vector<uint8_t>& outFrame,
+												std::string& outError) {
+		if (selector > 2) {
+			outError = "Invalid selector value: must be 0 (Rx), 1 (Tx), or 2 (Both)";
+			return false;
+		}
+
+		BemCommand cmd;
+		cmd.bstId = BstId::Bem_PG_A1;
+		cmd.bemId = BemCommandId::DeletePgnEnableLists;
+		cmd.data.push_back(selector);
+
+		return encodeCommand(cmd, outFrame, outError);
+	}
+
+	bool BemProtocol::buildActivatePgnEnableLists(std::vector<uint8_t>& outFrame,
+												  std::string& outError) {
+		return encodeSimpleCommand(BemCommandId::ActivatePgnEnableLists, BstId::Bem_PG_A1,
+								   outFrame, outError);
+	}
+
+	bool BemProtocol::buildDefaultPgnEnableList(std::vector<uint8_t>& outFrame,
+												std::string& outError) {
+		return encodeSimpleCommand(BemCommandId::DefaultPgnEnableList, BstId::Bem_PG_A1,
+								   outFrame, outError);
+	}
+
+	bool BemProtocol::buildGetParamsPgnEnableLists(std::vector<uint8_t>& outFrame,
+												   std::string& outError) {
+		return encodeSimpleCommand(BemCommandId::ParamsPgnEnableLists, BstId::Bem_PG_A1,
+								   outFrame, outError);
+	}
+
+	bool BemProtocol::buildGetRxPgnEnableListF2(std::vector<uint8_t>& outFrame,
+												std::string& outError) {
+		return encodeSimpleCommand(BemCommandId::GetSetRxPgnEnableListF2, BstId::Bem_PG_A1,
+								   outFrame, outError);
+	}
+
+	bool BemProtocol::buildSetRxPgnEnableListF2(const std::vector<uint32_t>& pgns,
+												std::vector<uint8_t>& outFrame,
+												std::string& outError) {
+		std::string encodeError;
+		std::vector<uint8_t> data;
+		if (!encodeRxPgnEnableListF2SetRequest(pgns, data, encodeError)) {
+			outError = encodeError;
+			return false;
+		}
+
+		BemCommand cmd;
+		cmd.bstId = BstId::Bem_PG_A1;
+		cmd.bemId = BemCommandId::GetSetRxPgnEnableListF2;
+		cmd.data = std::move(data);
+
+		return encodeCommand(cmd, outFrame, outError);
+	}
+
+	bool BemProtocol::buildGetTxPgnEnableListF2(std::vector<uint8_t>& outFrame,
+												std::string& outError) {
+		return encodeSimpleCommand(BemCommandId::GetSetTxPgnEnableListF2, BstId::Bem_PG_A1,
+								   outFrame, outError);
+	}
+
+	bool BemProtocol::buildGetRxPgnEnableListF1(uint8_t messageIndex,
+												std::vector<uint8_t>& outFrame,
+												std::string& outError) {
+		if (messageIndex > 1) {
+			outError = "Invalid message index for Rx F1: must be 0 or 1";
+			return false;
+		}
+
+		BemCommand cmd;
+		cmd.bstId = BstId::Bem_PG_A1;
+		cmd.bemId = BemCommandId::GetSetRxPgnEnableListF1;
+		cmd.data.push_back(messageIndex);
+
+		return encodeCommand(cmd, outFrame, outError);
+	}
+
+	bool BemProtocol::buildGetTxPgnEnableListF1(uint8_t messageIndex,
+												std::vector<uint8_t>& outFrame,
+												std::string& outError) {
+		if (messageIndex > 3) {
+			outError = "Invalid message index for Tx F1: must be 0-3";
+			return false;
+		}
+
+		BemCommand cmd;
+		cmd.bstId = BstId::Bem_PG_A1;
+		cmd.bemId = BemCommandId::GetSetTxPgnEnableListF1;
+		cmd.data.push_back(messageIndex);
+
+		return encodeCommand(cmd, outFrame, outError);
+	}
 		bool BemProtocol::isBemResponse(const BstDatagram& datagram) const {
 			return Actisense::Sdk::isBemResponse(static_cast<BstId>(datagram.bstId));
 		}

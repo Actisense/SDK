@@ -81,15 +81,19 @@ namespace Actisense
 		void SessionImpl::close() {
 			running_ = false;
 
+			/* Close transport first to cancel any pending async operations.
+			 * This ensures the receive thread's asyncRecv callback fires
+			 * (with TransportClosed) before the thread exits and destroys
+			 * the callback's captured stack references. */
+			if (transport_ && transport_->isOpen()) {
+				transport_->close();
+			}
+
 			if (receiveThread_.joinable()) {
 				receiveThread_.join();
 			}
 
 			bem_.clearPendingRequests();
-
-			if (transport_ && transport_->isOpen()) {
-				transport_->close();
-			}
 		}
 
 		bool SessionImpl::isConnected() const noexcept {
@@ -347,11 +351,17 @@ namespace Actisense
 						completed.store(true, std::memory_order_release);
 					});
 
-				/* Wait for the async operation to complete before continuing */
-				/* This prevents queuing multiple operations */
-				while (!completed.load(std::memory_order_acquire) && running_ && isConnected()) {
-					/* Process any timeouts while waiting */
-					processTimeouts();
+				/* Wait for the async operation to complete before continuing.
+				 * IMPORTANT: We must always wait for completed to become true,
+				 * even if running_ or isConnected() becomes false, because the
+				 * callback captures &completed by reference. The transport's
+				 * close() method will fire pending callbacks with TransportClosed,
+				 * which sets completed = true. */
+				while (!completed.load(std::memory_order_acquire)) {
+					if (running_ && isConnected()) {
+						/* Process any timeouts while waiting */
+						processTimeouts();
+					}
 
 					/* Small sleep to prevent busy-waiting */
 					std::this_thread::sleep_for(std::chrono::milliseconds(1));
