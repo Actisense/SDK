@@ -45,7 +45,7 @@ namespace Actisense
 		/* BST-95 field offsets */
 		static constexpr std::size_t kBst95MinPayload = 6; /* T0,T1,S,PDUS,PDUF,DPPC */
 		static constexpr std::size_t kBst95OffTimeL = 0;
-		static constexpr std::size_t kBst95OffTimeH = 1;
+		/* kBst95OffTimeH = 1: not used directly, timestamp read via readU16LE */
 		static constexpr std::size_t kBst95OffSrc = 2;
 		static constexpr std::size_t kBst95OffPdus = 3;
 		static constexpr std::size_t kBst95OffPduf = 4;
