@@ -7,10 +7,10 @@
  \date       (Created) 28/01/2026
  \brief      Product Info BEM command types and helpers
  \details    Structures and functions for encoding/decoding Product Info
-             (0x41) BEM commands. Supports two formats:
-             - Format 1: Legacy multi-message format (5 messages)
-             - Format 2: Modern single-message format (138 bytes, v2.500+)
-             Format is auto-detected by Structure Variant ID.
+			 (0x41) BEM commands. Supports two formats:
+			 - Format 1: Legacy multi-message format (5 messages)
+			 - Format 2: Modern single-message format (138 bytes, v2.500+)
+			 Format is auto-detected by Structure Variant ID.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -48,9 +48,9 @@ namespace Actisense
 		 *******************************************************************************/
 		enum class ProductInfoFormat : uint8_t
 		{
-			Unknown = 0,  ///< Could not determine format
-			Format1 = 1,  ///< Legacy multi-message format
-			Format2 = 2   ///< Modern single-message format (v2.500+)
+			Unknown = 0, ///< Could not determine format
+			Format1 = 1, ///< Legacy multi-message format
+			Format2 = 2	 ///< Modern single-message format (v2.500+)
 		};
 
 		/* Data Structures ------------------------------------------------------ */
@@ -65,14 +65,14 @@ namespace Actisense
 			uint32_t structureVariantId = 0;
 
 			/* NMEA 2000 Product Information fields */
-			uint16_t nmea2000Version = 0;     ///< NMEA 2000 database version
-			uint16_t productCode = 0;         ///< Manufacturer's product code
-			std::string modelId;              ///< Model ID string (max 32 chars)
-			std::string softwareVersion;      ///< Software version string (max 32 chars)
-			std::string modelVersion;         ///< Model version string (max 32 chars)
-			std::string modelSerialCode;      ///< Serial number string (max 32 chars)
-			uint8_t certificationLevel = 0;   ///< NMEA 2000 certification level
-			uint8_t loadEquivalency = 0;      ///< NMEA 2000 load equivalency (mA / 50)
+			uint16_t nmea2000Version = 0;	///< NMEA 2000 database version
+			uint16_t productCode = 0;		///< Manufacturer's product code
+			std::string modelId;			///< Model ID string (max 32 chars)
+			std::string softwareVersion;	///< Software version string (max 32 chars)
+			std::string modelVersion;		///< Model version string (max 32 chars)
+			std::string modelSerialCode;	///< Serial number string (max 32 chars)
+			uint8_t certificationLevel = 0; ///< NMEA 2000 certification level
+			uint8_t loadEquivalency = 0;	///< NMEA 2000 load equivalency (mA / 50)
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -83,18 +83,16 @@ namespace Actisense
 		 \param[in]  maxLen     Maximum string length
 		 \return     Converted string (trimmed of 0xFF padding)
 		 \details    Strings in Product Info are padded with 0xFF to fill the
-		             fixed-length fields. This function extracts the actual string.
+					 fixed-length fields. This function extracts the actual string.
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string convertPaddedString(
-			const uint8_t* data,
-			std::size_t maxLen)
-		{
+		[[nodiscard]] inline std::string convertPaddedString(const uint8_t* data,
+															 std::size_t maxLen) {
 			std::string result;
 			result.reserve(maxLen);
 
 			for (std::size_t i = 0; i < maxLen; ++i) {
 				if (data[i] == 0xFF || data[i] == 0x00) {
-					break;  /* End of string (0xFF padding or null terminator) */
+					break; /* End of string (0xFF padding or null terminator) */
 				}
 				result += static_cast<char>(data[i]);
 			}
@@ -109,11 +107,7 @@ namespace Actisense
 		 \param[in]  maxLen     Maximum string length (buffer will be padded to this)
 		 \details    Encodes a string into a fixed-length buffer, padding with 0xFF.
 		 *******************************************************************************/
-		inline void encodePaddedString(
-			const std::string& str,
-			uint8_t* data,
-			std::size_t maxLen)
-		{
+		inline void encodePaddedString(const std::string& str, uint8_t* data, std::size_t maxLen) {
 			const std::size_t copyLen = (str.size() < maxLen) ? str.size() : maxLen;
 
 			for (std::size_t i = 0; i < copyLen; ++i) {
@@ -133,49 +127,46 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 \details    Format 2 structure (138 bytes total):
-		             - Bytes 0-3:   Structure Variant ID (0x00000011)
-		             - Bytes 4-5:   NMEA 2000 Version (uint16_t LE)
-		             - Bytes 6-7:   Product Code (uint16_t LE)
-		             - Bytes 8-39:  Model ID (32 bytes, 0xFF padded)
-		             - Bytes 40-71: Software Version (32 bytes, 0xFF padded)
-		             - Bytes 72-103: Model Version (32 bytes, 0xFF padded)
-		             - Bytes 104-135: Model Serial Code (32 bytes, 0xFF padded)
-		             - Byte 136:   Certification Level
-		             - Byte 137:   Load Equivalency (mA / 50)
+					 - Bytes 0-3:   Structure Variant ID (0x00000011)
+					 - Bytes 4-5:   NMEA 2000 Version (uint16_t LE)
+					 - Bytes 6-7:   Product Code (uint16_t LE)
+					 - Bytes 8-39:  Model ID (32 bytes, 0xFF padded)
+					 - Bytes 40-71: Software Version (32 bytes, 0xFF padded)
+					 - Bytes 72-103: Model Version (32 bytes, 0xFF padded)
+					 - Bytes 104-135: Model Serial Code (32 bytes, 0xFF padded)
+					 - Byte 136:   Certification Level
+					 - Byte 137:   Load Equivalency (mA / 50)
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeProductInfoFormat2(
-			std::span<const uint8_t> data,
-			ProductInfoResponse& response,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool decodeProductInfoFormat2(std::span<const uint8_t> data,
+														   ProductInfoResponse& response,
+														   std::string& outError) {
 			if (data.size() < kProductInfoFormat2MinSize) {
 				outError = "Product Info Format 2 response too short: expected " +
-				           std::to_string(kProductInfoFormat2MinSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(kProductInfoFormat2MinSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
 			/* Structure Variant ID: bytes 0-3, little-endian */
-			response.structureVariantId = static_cast<uint32_t>(data[0]) |
-			                              (static_cast<uint32_t>(data[1]) << 8) |
-			                              (static_cast<uint32_t>(data[2]) << 16) |
-			                              (static_cast<uint32_t>(data[3]) << 24);
+			response.structureVariantId =
+				static_cast<uint32_t>(data[0]) | (static_cast<uint32_t>(data[1]) << 8) |
+				(static_cast<uint32_t>(data[2]) << 16) | (static_cast<uint32_t>(data[3]) << 24);
 
 			if (response.structureVariantId != kProductInfoFormat2StructVariantId) {
 				outError = "Unexpected Structure Variant ID: 0x" +
-				           std::to_string(response.structureVariantId);
+						   std::to_string(response.structureVariantId);
 				return false;
 			}
 
 			response.format = ProductInfoFormat::Format2;
 
 			/* NMEA 2000 Version: bytes 4-5, little-endian */
-			response.nmea2000Version = static_cast<uint16_t>(data[4]) |
-			                           (static_cast<uint16_t>(data[5]) << 8);
+			response.nmea2000Version =
+				static_cast<uint16_t>(data[4]) | (static_cast<uint16_t>(data[5]) << 8);
 
 			/* Product Code: bytes 6-7, little-endian */
-			response.productCode = static_cast<uint16_t>(data[6]) |
-			                       (static_cast<uint16_t>(data[7]) << 8);
+			response.productCode =
+				static_cast<uint16_t>(data[6]) | (static_cast<uint16_t>(data[7]) << 8);
 
 			/* Model ID: bytes 8-39 (32 bytes) */
 			response.modelId = convertPaddedString(&data[8], kProductInfoStringMaxLen);
@@ -205,24 +196,21 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 \details    Auto-detects format by checking Structure Variant ID:
-		             - If SV ID is 0x00000011, decode as Format 2
-		             - Otherwise, assume Format 1 (legacy multi-message)
+					 - If SV ID is 0x00000011, decode as Format 2
+					 - Otherwise, assume Format 1 (legacy multi-message)
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeProductInfoResponse(
-			std::span<const uint8_t> data,
-			ProductInfoResponse& response,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool decodeProductInfoResponse(std::span<const uint8_t> data,
+															ProductInfoResponse& response,
+															std::string& outError) {
 			if (data.size() < 4) {
 				outError = "Product Info response too short for format detection";
 				return false;
 			}
 
 			/* Check Structure Variant ID */
-			const uint32_t svId = static_cast<uint32_t>(data[0]) |
-			                      (static_cast<uint32_t>(data[1]) << 8) |
-			                      (static_cast<uint32_t>(data[2]) << 16) |
-			                      (static_cast<uint32_t>(data[3]) << 24);
+			const uint32_t svId =
+				static_cast<uint32_t>(data[0]) | (static_cast<uint32_t>(data[1]) << 8) |
+				(static_cast<uint32_t>(data[2]) << 16) | (static_cast<uint32_t>(data[3]) << 24);
 
 			if (svId == kProductInfoFormat2StructVariantId) {
 				return decodeProductInfoFormat2(data, response, outError);
@@ -243,8 +231,7 @@ namespace Actisense
 		 \brief      Encode Product Info GET request data
 		 \param[out] outData  Encoded request data (empty for GET)
 		 *******************************************************************************/
-		inline void encodeProductInfoGetRequest(std::vector<uint8_t>& outData)
-		{
+		inline void encodeProductInfoGetRequest(std::vector<uint8_t>& outData) {
 			outData.clear();
 			/* No payload for GET request */
 		}
@@ -254,8 +241,7 @@ namespace Actisense
 		 \param[in]  format  Format value
 		 \return     Human-readable format name
 		 *******************************************************************************/
-		[[nodiscard]] inline const char* productInfoFormatToString(ProductInfoFormat format)
-		{
+		[[nodiscard]] inline const char* productInfoFormatToString(ProductInfoFormat format) {
 			switch (format) {
 				case ProductInfoFormat::Format1:
 					return "Format 1 (Legacy Multi-Message)";
@@ -272,8 +258,7 @@ namespace Actisense
 		 \param[in]  info  Decoded product info
 		 \return     Formatted string representation
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatProductInfo(const ProductInfoResponse& info)
-		{
+		[[nodiscard]] inline std::string formatProductInfo(const ProductInfoResponse& info) {
 			std::string result;
 			result.reserve(512);
 

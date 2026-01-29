@@ -336,20 +336,19 @@ namespace Actisense
 				std::atomic<bool> completed{false};
 
 				/* Request data from transport - data arrives via callback */
-				transport_->asyncRecv(
-					[this, &completed](ErrorCode code, ConstByteSpan data) {
-						if (code == ErrorCode::Ok && !data.empty()) {
-							{
-								std::ostringstream ss;
-								ss << "Received " << data.size() << " bytes from transport";
-								ACTISENSE_LOG_DEBUG("Session", ss.str());
-							}
-							ACTISENSE_LOG_HEX(LogLevel::Trace, "Session", "Raw data",
-											  data.data(), data.size());
-							processReceivedData(data);
+				transport_->asyncRecv([this, &completed](ErrorCode code, ConstByteSpan data) {
+					if (code == ErrorCode::Ok && !data.empty()) {
+						{
+							std::ostringstream ss;
+							ss << "Received " << data.size() << " bytes from transport";
+							ACTISENSE_LOG_DEBUG("Session", ss.str());
 						}
-						completed.store(true, std::memory_order_release);
-					});
+						ACTISENSE_LOG_HEX(LogLevel::Trace, "Session", "Raw data", data.data(),
+										  data.size());
+						processReceivedData(data);
+					}
+					completed.store(true, std::memory_order_release);
+				});
 
 				/* Wait for the async operation to complete before continuing.
 				 * IMPORTANT: We must always wait for completed to become true,
@@ -374,8 +373,7 @@ namespace Actisense
 			ACTISENSE_LOG_INFO("Session", "Receive thread exiting");
 		}
 
-		void SessionImpl::processReceivedData(std::span<const uint8_t> data) 
-		{
+		void SessionImpl::processReceivedData(std::span<const uint8_t> data) {
 			/* Feed data through BDTP parser */
 			bdtp_.parse(
 				data,
@@ -389,7 +387,8 @@ namespace Actisense
 					}
 				},
 				[this](ErrorCode code, std::string_view message) {
-					ACTISENSE_LOG_ERROR("Session", std::string("BDTP error: ") + std::string(message));
+					ACTISENSE_LOG_ERROR("Session",
+										std::string("BDTP error: ") + std::string(message));
 					if (errorCallback_) {
 						errorCallback_(code, std::string(message));
 					}
@@ -443,7 +442,7 @@ namespace Actisense
 		}
 
 		void SessionImpl::handleBstFrame(std::span<const uint8_t> rawData,
-		                                  const BstFrameVariant& frame) {
+										 const BstFrameVariant& frame) {
 			if (!eventCallback_) {
 				return;
 			}
@@ -455,11 +454,8 @@ namespace Actisense
 			ParsedMessageEvent event;
 			event.protocol = "bst";
 
-			std::visit(
-				[&event](const auto& f) {
-					event.messageType = bstIdToString(f.bstId);
-				},
-				frame);
+			std::visit([&event](const auto& f) { event.messageType = bstIdToString(f.bstId); },
+					   frame);
 
 			event.payload = std::move(bstFrame);
 

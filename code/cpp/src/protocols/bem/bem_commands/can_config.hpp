@@ -7,8 +7,8 @@
  \date       (Created) 28/01/2026
  \brief      CAN Config BEM command types and helpers
  \details    Structures and functions for encoding/decoding CAN Config (0x42)
-             BEM commands. This command gets/sets the NMEA 2000 NAME and
-             source address configuration.
+			 BEM commands. This command gets/sets the NMEA 2000 NAME and
+			 source address configuration.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -40,11 +40,11 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      NMEA 2000 NAME field structure
 		 \details    64-bit NAME field as defined in NMEA 2000 / ISO 11783-5.
-		             The NAME uniquely identifies a device on the network.
+					 The NAME uniquely identifies a device on the network.
 		 *******************************************************************************/
 		struct Nmea2000Name
 		{
-			uint64_t rawValue = 0;  ///< Raw 64-bit NAME value
+			uint64_t rawValue = 0; ///< Raw 64-bit NAME value
 
 			/* Accessors for NAME field components (per ISO 11783-5) */
 
@@ -105,33 +105,31 @@ namespace Actisense
 			}
 
 			void setManufacturerCode(uint16_t value) noexcept {
-				rawValue = (rawValue & ~(0x7FFULL << 21)) |
-				           (static_cast<uint64_t>(value & 0x7FF) << 21);
+				rawValue =
+					(rawValue & ~(0x7FFULL << 21)) | (static_cast<uint64_t>(value & 0x7FF) << 21);
 			}
 
 			void setDeviceInstance(uint8_t value) noexcept {
-				rawValue = (rawValue & ~(0xFFULL << 32)) |
-				           (static_cast<uint64_t>(value) << 32);
+				rawValue = (rawValue & ~(0xFFULL << 32)) | (static_cast<uint64_t>(value) << 32);
 			}
 
 			void setDeviceFunction(uint8_t value) noexcept {
-				rawValue = (rawValue & ~(0xFFULL << 40)) |
-				           (static_cast<uint64_t>(value) << 40);
+				rawValue = (rawValue & ~(0xFFULL << 40)) | (static_cast<uint64_t>(value) << 40);
 			}
 
 			void setDeviceClass(uint8_t value) noexcept {
-				rawValue = (rawValue & ~(0x7FULL << 49)) |
-				           (static_cast<uint64_t>(value & 0x7F) << 49);
+				rawValue =
+					(rawValue & ~(0x7FULL << 49)) | (static_cast<uint64_t>(value & 0x7F) << 49);
 			}
 
 			void setSystemInstance(uint8_t value) noexcept {
-				rawValue = (rawValue & ~(0x0FULL << 56)) |
-				           (static_cast<uint64_t>(value & 0x0F) << 56);
+				rawValue =
+					(rawValue & ~(0x0FULL << 56)) | (static_cast<uint64_t>(value & 0x0F) << 56);
 			}
 
 			void setIndustryGroup(uint8_t value) noexcept {
-				rawValue = (rawValue & ~(0x07ULL << 60)) |
-				           (static_cast<uint64_t>(value & 0x07) << 60);
+				rawValue =
+					(rawValue & ~(0x07ULL << 60)) | (static_cast<uint64_t>(value & 0x07) << 60);
 			}
 
 			void setArbitraryAddressCapable(bool value) noexcept {
@@ -149,8 +147,8 @@ namespace Actisense
 		 *******************************************************************************/
 		struct CanConfigRequest
 		{
-			std::optional<Nmea2000Name> name;         ///< NAME to set (omit for GET)
-			std::optional<uint8_t> sourceAddress;     ///< Source address to claim (omit for GET)
+			std::optional<Nmea2000Name> name;	  ///< NAME to set (omit for GET)
+			std::optional<uint8_t> sourceAddress; ///< Source address to claim (omit for GET)
 		};
 
 		/**************************************************************************/ /**
@@ -159,8 +157,8 @@ namespace Actisense
 		 *******************************************************************************/
 		struct CanConfigResponse
 		{
-			Nmea2000Name name;                 ///< NMEA 2000 NAME
-			uint8_t sourceAddress = 0xFE;     ///< Current source address (0xFE = not claimed)
+			Nmea2000Name name;			  ///< NMEA 2000 NAME
+			uint8_t sourceAddress = 0xFE; ///< Current source address (0xFE = not claimed)
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -172,27 +170,22 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeCanConfigResponse(
-			std::span<const uint8_t> data,
-			CanConfigResponse& response,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool decodeCanConfigResponse(std::span<const uint8_t> data,
+														  CanConfigResponse& response,
+														  std::string& outError) {
 			if (data.size() < kCanConfigResponseSize) {
 				outError = "CAN Config response too short: expected " +
-				           std::to_string(kCanConfigResponseSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(kCanConfigResponseSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
 			/* NAME: bytes 0-7, little-endian */
-			response.name.rawValue = static_cast<uint64_t>(data[0]) |
-			                         (static_cast<uint64_t>(data[1]) << 8) |
-			                         (static_cast<uint64_t>(data[2]) << 16) |
-			                         (static_cast<uint64_t>(data[3]) << 24) |
-			                         (static_cast<uint64_t>(data[4]) << 32) |
-			                         (static_cast<uint64_t>(data[5]) << 40) |
-			                         (static_cast<uint64_t>(data[6]) << 48) |
-			                         (static_cast<uint64_t>(data[7]) << 56);
+			response.name.rawValue =
+				static_cast<uint64_t>(data[0]) | (static_cast<uint64_t>(data[1]) << 8) |
+				(static_cast<uint64_t>(data[2]) << 16) | (static_cast<uint64_t>(data[3]) << 24) |
+				(static_cast<uint64_t>(data[4]) << 32) | (static_cast<uint64_t>(data[5]) << 40) |
+				(static_cast<uint64_t>(data[6]) << 48) | (static_cast<uint64_t>(data[7]) << 56);
 
 			/* Source Address: byte 8 */
 			response.sourceAddress = data[8];
@@ -204,8 +197,7 @@ namespace Actisense
 		 \brief      Encode CAN Config GET request data
 		 \param[out] outData  Encoded request data (empty for GET)
 		 *******************************************************************************/
-		inline void encodeCanConfigGetRequest(std::vector<uint8_t>& outData)
-		{
+		inline void encodeCanConfigGetRequest(std::vector<uint8_t>& outData) {
 			outData.clear();
 			/* No payload for GET request */
 		}
@@ -216,11 +208,8 @@ namespace Actisense
 		 \param[in]  sourceAddress Preferred source address
 		 \param[out] outData       Encoded request data
 		 *******************************************************************************/
-		inline void encodeCanConfigSetRequest(
-			const Nmea2000Name& name,
-			uint8_t sourceAddress,
-			std::vector<uint8_t>& outData)
-		{
+		inline void encodeCanConfigSetRequest(const Nmea2000Name& name, uint8_t sourceAddress,
+											  std::vector<uint8_t>& outData) {
 			outData.clear();
 			outData.reserve(kCanConfigSetRequestSize);
 
@@ -243,8 +232,7 @@ namespace Actisense
 		 \param[in]  name  NAME structure
 		 \return     Formatted string representation
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatNmea2000Name(const Nmea2000Name& name)
-		{
+		[[nodiscard]] inline std::string formatNmea2000Name(const Nmea2000Name& name) {
 			std::string result;
 			result.reserve(256);
 
@@ -252,7 +240,7 @@ namespace Actisense
 
 			result += "NMEA 2000 NAME: 0x";
 			std::snprintf(buffer, sizeof(buffer), "%016llX",
-			              static_cast<unsigned long long>(name.rawValue));
+						  static_cast<unsigned long long>(name.rawValue));
 			result += buffer;
 			result += "\n";
 
@@ -263,7 +251,8 @@ namespace Actisense
 			result += "  Device Class: " + std::to_string(name.deviceClass()) + "\n";
 			result += "  System Instance: " + std::to_string(name.systemInstance()) + "\n";
 			result += "  Industry Group: " + std::to_string(name.industryGroup()) + "\n";
-			result += "  Arbitrary Address: " + std::string(name.arbitraryAddressCapable() ? "Yes" : "No") + "\n";
+			result += "  Arbitrary Address: " +
+					  std::string(name.arbitraryAddressCapable() ? "Yes" : "No") + "\n";
 
 			return result;
 		}
@@ -273,8 +262,7 @@ namespace Actisense
 		 \param[in]  config  Decoded CAN config
 		 \return     Formatted string representation
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatCanConfig(const CanConfigResponse& config)
-		{
+		[[nodiscard]] inline std::string formatCanConfig(const CanConfigResponse& config) {
 			std::string result = formatNmea2000Name(config.name);
 
 			if (config.sourceAddress == 0xFE) {

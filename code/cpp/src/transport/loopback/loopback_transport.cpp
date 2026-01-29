@@ -18,8 +18,9 @@ namespace Actisense
 		/* Public Function Definitions ------------------------------------------ */
 
 		LoopbackTransport::LoopbackTransport()
-			: mutex_(), messageBuffer_(kMaxPendingMessages), is_open_(false), loopback_enabled_(true),
-			  total_bytes_sent_(0), total_messages_sent_(0), pending_recvs_() {}
+			: mutex_(), messageBuffer_(kMaxPendingMessages), is_open_(false),
+			  loopback_enabled_(true), total_bytes_sent_(0), total_messages_sent_(0),
+			  pending_recvs_() {}
 
 		LoopbackTransport::~LoopbackTransport() {
 			close();

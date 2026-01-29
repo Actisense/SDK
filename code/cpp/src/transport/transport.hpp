@@ -45,7 +45,7 @@ namespace Actisense
 		 \param[in]  code         Error code (Ok on success)
 		 \param[in]  data         Received data (valid only during callback)
 		 \details    Data is passed by span to avoid copying. The span is only
-		             valid during the callback - callers must copy if needed later.
+					 valid during the callback - callers must copy if needed later.
 		 *******************************************************************************/
 		using RecvCompletionHandler = std::function<void(ErrorCode code, ConstByteSpan data)>;
 
@@ -90,9 +90,9 @@ namespace Actisense
 			 \brief      Receive data asynchronously (message-oriented)
 			 \param[in]  completion  Called when data is received
 			 \details    Data is passed directly to the completion handler as a span.
-			             This avoids the need for caller-provided buffers and eliminates
-			             partial read complexity. Each call receives one complete message
-			             (transport read chunk).
+						 This avoids the need for caller-provided buffers and eliminates
+						 partial read complexity. Each call receives one complete message
+						 (transport read chunk).
 			 *******************************************************************************/
 			virtual void asyncRecv(RecvCompletionHandler completion) = 0;
 

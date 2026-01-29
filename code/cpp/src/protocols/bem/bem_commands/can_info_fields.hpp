@@ -7,13 +7,13 @@
  \date       (Created) 28/01/2026
  \brief      CAN Info Fields BEM command types and helpers
  \details    Structures and functions for encoding/decoding CAN Info Fields
-             (0x43, 0x44, 0x45) BEM commands:
-             - 0x43: Installation Description 1 (Get/Set)
-             - 0x44: Installation Description 2 (Get/Set)
-             - 0x45: Manufacturer Information (Get only, read-only)
+			 (0x43, 0x44, 0x45) BEM commands:
+			 - 0x43: Installation Description 1 (Get/Set)
+			 - 0x44: Installation Description 2 (Get/Set)
+			 - 0x45: Manufacturer Information (Get only, read-only)
 
-             These are variable-length ASCII strings (max 70 characters)
-             padded with 0xFF.
+			 These are variable-length ASCII strings (max 70 characters)
+			 padded with 0xFF.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -44,9 +44,9 @@ namespace Actisense
 		 *******************************************************************************/
 		enum class CanInfoField : uint8_t
 		{
-			InstallationDesc1 = 1,   ///< Installation Description 1 (BEM 0x43)
-			InstallationDesc2 = 2,   ///< Installation Description 2 (BEM 0x44)
-			ManufacturerInfo = 3     ///< Manufacturer Information (BEM 0x45, read-only)
+			InstallationDesc1 = 1, ///< Installation Description 1 (BEM 0x43)
+			InstallationDesc2 = 2, ///< Installation Description 2 (BEM 0x44)
+			ManufacturerInfo = 3   ///< Manufacturer Information (BEM 0x45, read-only)
 		};
 
 		/* Data Structures ------------------------------------------------------ */
@@ -58,7 +58,7 @@ namespace Actisense
 		struct CanInfoFieldResponse
 		{
 			CanInfoField field = CanInfoField::InstallationDesc1;
-			std::string text;  ///< Field text (max 70 characters)
+			std::string text; ///< Field text (max 70 characters)
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -69,16 +69,14 @@ namespace Actisense
 		 \param[in]  dataSize   Size of the buffer
 		 \return     Converted string (trimmed of 0xFF padding)
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string decodeCanInfoFieldString(
-			const uint8_t* data,
-			std::size_t dataSize)
-		{
+		[[nodiscard]] inline std::string decodeCanInfoFieldString(const uint8_t* data,
+																  std::size_t dataSize) {
 			std::string result;
 			result.reserve(dataSize);
 
 			for (std::size_t i = 0; i < dataSize; ++i) {
 				if (data[i] == 0xFF || data[i] == 0x00) {
-					break;  /* End of string */
+					break; /* End of string */
 				}
 				result += static_cast<char>(data[i]);
 			}
@@ -94,13 +92,11 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeCanInfoFieldResponse(
-			std::span<const uint8_t> data,
-			CanInfoField field,
-			CanInfoFieldResponse& response,
-			std::string& outError)
-		{
-			(void)outError;  /* No error conditions for decoding */
+		[[nodiscard]] inline bool decodeCanInfoFieldResponse(std::span<const uint8_t> data,
+															 CanInfoField field,
+															 CanInfoFieldResponse& response,
+															 std::string& outError) {
+			(void)outError; /* No error conditions for decoding */
 
 			response.field = field;
 			response.text = decodeCanInfoFieldString(data.data(), data.size());
@@ -112,8 +108,7 @@ namespace Actisense
 		 \brief      Encode CAN Info Field GET request data
 		 \param[out] outData  Encoded request data (empty for GET)
 		 *******************************************************************************/
-		inline void encodeCanInfoFieldGetRequest(std::vector<uint8_t>& outData)
-		{
+		inline void encodeCanInfoFieldGetRequest(std::vector<uint8_t>& outData) {
 			outData.clear();
 			/* No payload for GET request */
 		}
@@ -125,15 +120,13 @@ namespace Actisense
 		 \param[out] outError   Error message if encoding fails
 		 \return     True on success, false on error
 		 *******************************************************************************/
-		[[nodiscard]] inline bool encodeCanInfoFieldSetRequest(
-			const std::string& text,
-			std::vector<uint8_t>& outData,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool encodeCanInfoFieldSetRequest(const std::string& text,
+															   std::vector<uint8_t>& outData,
+															   std::string& outError) {
 			if (text.length() > kCanInfoFieldMaxLen) {
 				outError = "CAN Info Field text too long: max " +
-				           std::to_string(kCanInfoFieldMaxLen) + " characters, got " +
-				           std::to_string(text.length());
+						   std::to_string(kCanInfoFieldMaxLen) + " characters, got " +
+						   std::to_string(text.length());
 				return false;
 			}
 
@@ -158,8 +151,7 @@ namespace Actisense
 		 \param[in]  field  Field value
 		 \return     Human-readable field name
 		 *******************************************************************************/
-		[[nodiscard]] inline const char* canInfoFieldToString(CanInfoField field)
-		{
+		[[nodiscard]] inline const char* canInfoFieldToString(CanInfoField field) {
 			switch (field) {
 				case CanInfoField::InstallationDesc1:
 					return "Installation Description 1";
@@ -177,8 +169,7 @@ namespace Actisense
 		 \param[in]  response  Decoded response
 		 \return     Formatted string representation
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatCanInfoField(const CanInfoFieldResponse& response)
-		{
+		[[nodiscard]] inline std::string formatCanInfoField(const CanInfoFieldResponse& response) {
 			std::string result;
 			result.reserve(128);
 

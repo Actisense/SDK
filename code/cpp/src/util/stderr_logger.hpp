@@ -25,7 +25,7 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Simple stderr logger
 		 \details    Thread-safe logger that outputs to stderr with timestamps.
-		             Format: [HH:MM:SS.mmm] [LEVEL] [Category] message
+					 Format: [HH:MM:SS.mmm] [LEVEL] [Category] message
 		 *******************************************************************************/
 		class StderrLogger final : public ILogger
 		{

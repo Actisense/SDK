@@ -7,9 +7,9 @@
  \date       (Created) 28/01/2026
  \brief      Echo BEM command types and helpers
  \details    Structures and functions for encoding/decoding Echo (0x18) BEM
-             commands. This command sends arbitrary data to the device and
-             receives it back unchanged. Useful for testing connectivity and
-             measuring round-trip latency.
+			 commands. This command sends arbitrary data to the device and
+			 receives it back unchanged. Useful for testing connectivity and
+			 measuring round-trip latency.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -39,7 +39,7 @@ namespace Actisense
 		 *******************************************************************************/
 		struct EchoRequest
 		{
-			std::vector<uint8_t> data;  ///< Data to echo (0-252 bytes)
+			std::vector<uint8_t> data; ///< Data to echo (0-252 bytes)
 		};
 
 		/**************************************************************************/ /**
@@ -48,7 +48,7 @@ namespace Actisense
 		 *******************************************************************************/
 		struct EchoResponse
 		{
-			std::vector<uint8_t> data;  ///< Echoed data (should match request)
+			std::vector<uint8_t> data; ///< Echoed data (should match request)
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -60,11 +60,9 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeEchoResponse(
-			std::span<const uint8_t> data,
-			EchoResponse& response,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool decodeEchoResponse(std::span<const uint8_t> data,
+													 EchoResponse& response,
+													 std::string& outError) {
 			/* Echo can have 0 or more bytes of data */
 			(void)outError;
 			response.data.assign(data.begin(), data.end());
@@ -78,15 +76,12 @@ namespace Actisense
 		 \param[out] outError  Error message if encoding fails
 		 \return     True on success, false on error
 		 *******************************************************************************/
-		[[nodiscard]] inline bool encodeEchoRequest(
-			std::span<const uint8_t> echoData,
-			std::vector<uint8_t>& outData,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool encodeEchoRequest(std::span<const uint8_t> echoData,
+													std::vector<uint8_t>& outData,
+													std::string& outError) {
 			if (echoData.size() > kEchoMaxPayloadSize) {
-				outError = "Echo data too large: max " +
-				           std::to_string(kEchoMaxPayloadSize) + " bytes, got " +
-				           std::to_string(echoData.size());
+				outError = "Echo data too large: max " + std::to_string(kEchoMaxPayloadSize) +
+						   " bytes, got " + std::to_string(echoData.size());
 				return false;
 			}
 
@@ -101,11 +96,9 @@ namespace Actisense
 		 \param[out] outError  Error message if encoding fails
 		 \return     True on success, false on error
 		 *******************************************************************************/
-		[[nodiscard]] inline bool encodeEchoRequest(
-			const std::vector<uint8_t>& echoData,
-			std::vector<uint8_t>& outData,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool encodeEchoRequest(const std::vector<uint8_t>& echoData,
+													std::vector<uint8_t>& outData,
+													std::string& outError) {
 			return encodeEchoRequest(std::span<const uint8_t>(echoData), outData, outError);
 		}
 
@@ -115,10 +108,8 @@ namespace Actisense
 		 \param[in]  received  Data that was received
 		 \return     True if data matches exactly, false otherwise
 		 *******************************************************************************/
-		[[nodiscard]] inline bool verifyEchoResponse(
-			std::span<const uint8_t> sent,
-			std::span<const uint8_t> received)
-		{
+		[[nodiscard]] inline bool verifyEchoResponse(std::span<const uint8_t> sent,
+													 std::span<const uint8_t> received) {
 			if (sent.size() != received.size()) {
 				return false;
 			}
@@ -138,17 +129,14 @@ namespace Actisense
 		 \param[in]  maxBytes  Maximum bytes to show (0 = all)
 		 \return     Hex string representation
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatEchoData(
-			std::span<const uint8_t> data,
-			std::size_t maxBytes = 32)
-		{
+		[[nodiscard]] inline std::string formatEchoData(std::span<const uint8_t> data,
+														std::size_t maxBytes = 32) {
 			if (data.empty()) {
 				return "(empty)";
 			}
 
-			const std::size_t showBytes = (maxBytes > 0 && data.size() > maxBytes)
-			                                ? maxBytes
-			                                : data.size();
+			const std::size_t showBytes =
+				(maxBytes > 0 && data.size() > maxBytes) ? maxBytes : data.size();
 
 			std::string result;
 			result.reserve(showBytes * 3 + 10);

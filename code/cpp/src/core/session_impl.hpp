@@ -154,8 +154,8 @@ namespace Actisense
 			 \param[in]  timeout     Timeout for response
 			 \param[in]  callback    Callback invoked on response or timeout
 			 *******************************************************************************/
-			void setPortPCode(std::span<const uint8_t> pCodes,
-							  std::chrono::milliseconds timeout, BemResponseCallback callback);
+			void setPortPCode(std::span<const uint8_t> pCodes, std::chrono::milliseconds timeout,
+							  BemResponseCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Send Get Rx PGN Enable command
@@ -173,8 +173,8 @@ namespace Actisense
 			 \param[in]  timeout     Timeout for response
 			 \param[in]  callback    Callback invoked on response or timeout
 			 *******************************************************************************/
-			void setRxPgnEnable(uint32_t pgn, uint8_t enable,
-								std::chrono::milliseconds timeout, BemResponseCallback callback);
+			void setRxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
+								BemResponseCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Send Set Rx PGN Enable command with mask
@@ -204,8 +204,8 @@ namespace Actisense
 			 \param[in]  timeout     Timeout for response
 			 \param[in]  callback    Callback invoked on response or timeout
 			 *******************************************************************************/
-			void setTxPgnEnable(uint32_t pgn, uint8_t enable,
-								std::chrono::milliseconds timeout, BemResponseCallback callback);
+			void setTxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
+								BemResponseCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Send Set Tx PGN Enable command with rate

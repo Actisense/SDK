@@ -7,11 +7,11 @@
  \date       (Created) 28/01/2026
  \brief      Error Report unsolicited message types and helpers
  \details    Structures and functions for decoding Error Report (0xF1)
-             BEM unsolicited messages. This message is sent by devices when
-             an error condition occurs that should be reported to the host.
+			 BEM unsolicited messages. This message is sent by devices when
+			 an error condition occurs that should be reported to the host.
 
-             The message contains a Structure Variant ID (first 4 bytes) that
-             identifies the error format, followed by error-specific data.
+			 The message contains a Structure Variant ID (first 4 bytes) that
+			 identifies the error format, followed by error-specific data.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -43,9 +43,9 @@ namespace Actisense
 		 *******************************************************************************/
 		enum class ErrorReportVariant : uint32_t
 		{
-			Unknown = 0x00000000,          ///< Unknown or unrecognized format
-			StandardError = 0x00000001,    ///< Standard error format (4-byte error code)
-			ExtendedError = 0x00000002,    ///< Extended error with context data
+			Unknown = 0x00000000,		   ///< Unknown or unrecognized format
+			StandardError = 0x00000001,	   ///< Standard error format (4-byte error code)
+			ExtendedError = 0x00000002,	   ///< Extended error with context data
 			TimestampedError = 0x00000003, ///< Error with timestamp
 		};
 
@@ -58,7 +58,7 @@ namespace Actisense
 		struct ErrorReportData
 		{
 			uint32_t structureVariantId = 0;   ///< Structure Variant ID
-			uint32_t errorCode = 0;            ///< Primary error code
+			uint32_t errorCode = 0;			   ///< Primary error code
 			std::optional<uint32_t> timestamp; ///< Optional timestamp (if present)
 			std::vector<uint8_t> contextData;  ///< Additional context data (if present)
 		};
@@ -72,25 +72,22 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 \details    Parses the Structure Variant ID and extracts error information
-		             based on the identified format.
+					 based on the identified format.
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeErrorReport(
-			std::span<const uint8_t> data,
-			ErrorReportData& report,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool decodeErrorReport(std::span<const uint8_t> data,
+													ErrorReportData& report,
+													std::string& outError) {
 			if (data.size() < kErrorReportMinSize) {
 				outError = "Error Report data too short: expected at least " +
-				           std::to_string(kErrorReportMinSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(kErrorReportMinSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
 			/* Structure Variant ID: bytes 0-3, little-endian */
-			report.structureVariantId = static_cast<uint32_t>(data[0]) |
-			                            (static_cast<uint32_t>(data[1]) << 8) |
-			                            (static_cast<uint32_t>(data[2]) << 16) |
-			                            (static_cast<uint32_t>(data[3]) << 24);
+			report.structureVariantId =
+				static_cast<uint32_t>(data[0]) | (static_cast<uint32_t>(data[1]) << 8) |
+				(static_cast<uint32_t>(data[2]) << 16) | (static_cast<uint32_t>(data[3]) << 24);
 
 			/* Parse based on Structure Variant ID */
 			const auto variant = static_cast<ErrorReportVariant>(report.structureVariantId);
@@ -100,9 +97,9 @@ namespace Actisense
 					/* Standard error: SV ID + 4-byte error code */
 					if (data.size() >= kErrorReportStandardSize) {
 						report.errorCode = static_cast<uint32_t>(data[4]) |
-						                   (static_cast<uint32_t>(data[5]) << 8) |
-						                   (static_cast<uint32_t>(data[6]) << 16) |
-						                   (static_cast<uint32_t>(data[7]) << 24);
+										   (static_cast<uint32_t>(data[5]) << 8) |
+										   (static_cast<uint32_t>(data[6]) << 16) |
+										   (static_cast<uint32_t>(data[7]) << 24);
 					}
 					break;
 
@@ -110,15 +107,14 @@ namespace Actisense
 					/* Extended error: SV ID + error code + context data */
 					if (data.size() >= kErrorReportStandardSize) {
 						report.errorCode = static_cast<uint32_t>(data[4]) |
-						                   (static_cast<uint32_t>(data[5]) << 8) |
-						                   (static_cast<uint32_t>(data[6]) << 16) |
-						                   (static_cast<uint32_t>(data[7]) << 24);
+										   (static_cast<uint32_t>(data[5]) << 8) |
+										   (static_cast<uint32_t>(data[6]) << 16) |
+										   (static_cast<uint32_t>(data[7]) << 24);
 
 						/* Remaining bytes are context data */
 						if (data.size() > kErrorReportStandardSize) {
-							report.contextData.assign(
-								data.begin() + kErrorReportStandardSize,
-								data.end());
+							report.contextData.assign(data.begin() + kErrorReportStandardSize,
+													  data.end());
 						}
 					}
 					break;
@@ -127,14 +123,14 @@ namespace Actisense
 					/* Timestamped error: SV ID + error code + timestamp */
 					if (data.size() >= 12) {
 						report.errorCode = static_cast<uint32_t>(data[4]) |
-						                   (static_cast<uint32_t>(data[5]) << 8) |
-						                   (static_cast<uint32_t>(data[6]) << 16) |
-						                   (static_cast<uint32_t>(data[7]) << 24);
+										   (static_cast<uint32_t>(data[5]) << 8) |
+										   (static_cast<uint32_t>(data[6]) << 16) |
+										   (static_cast<uint32_t>(data[7]) << 24);
 
 						report.timestamp = static_cast<uint32_t>(data[8]) |
-						                   (static_cast<uint32_t>(data[9]) << 8) |
-						                   (static_cast<uint32_t>(data[10]) << 16) |
-						                   (static_cast<uint32_t>(data[11]) << 24);
+										   (static_cast<uint32_t>(data[9]) << 8) |
+										   (static_cast<uint32_t>(data[10]) << 16) |
+										   (static_cast<uint32_t>(data[11]) << 24);
 					}
 					break;
 
@@ -143,16 +139,15 @@ namespace Actisense
 					/* Unknown format: extract error code if available */
 					if (data.size() >= kErrorReportStandardSize) {
 						report.errorCode = static_cast<uint32_t>(data[4]) |
-						                   (static_cast<uint32_t>(data[5]) << 8) |
-						                   (static_cast<uint32_t>(data[6]) << 16) |
-						                   (static_cast<uint32_t>(data[7]) << 24);
+										   (static_cast<uint32_t>(data[5]) << 8) |
+										   (static_cast<uint32_t>(data[6]) << 16) |
+										   (static_cast<uint32_t>(data[7]) << 24);
 					}
 
 					/* Store remaining data as context */
 					if (data.size() > kErrorReportStandardSize) {
-						report.contextData.assign(
-							data.begin() + kErrorReportStandardSize,
-							data.end());
+						report.contextData.assign(data.begin() + kErrorReportStandardSize,
+												  data.end());
 					}
 					break;
 			}
@@ -165,8 +160,7 @@ namespace Actisense
 		 \param[in]  variant  Variant ID value
 		 \return     Human-readable variant name
 		 *******************************************************************************/
-		[[nodiscard]] inline const char* errorReportVariantToString(ErrorReportVariant variant)
-		{
+		[[nodiscard]] inline const char* errorReportVariantToString(ErrorReportVariant variant) {
 			switch (variant) {
 				case ErrorReportVariant::StandardError:
 					return "Standard Error";
@@ -185,8 +179,7 @@ namespace Actisense
 		 \param[in]  report  Decoded error report
 		 \return     Formatted string representation
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatErrorReport(const ErrorReportData& report)
-		{
+		[[nodiscard]] inline std::string formatErrorReport(const ErrorReportData& report) {
 			std::string result;
 			result.reserve(256);
 

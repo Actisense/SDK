@@ -5,8 +5,8 @@
  \file       debug_log.hpp
  \brief      Debug logging utilities for Actisense SDK
  \details    Compile-time configurable diagnostic logging for debugging
-             protocol and transport issues. Supports separate log levels
-             for console and file outputs.
+			 protocol and transport issues. Supports separate log levels
+			 for console and file outputs.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -31,12 +31,12 @@ namespace Actisense
 		 *******************************************************************************/
 		enum class LogLevel : uint8_t
 		{
-			None = 0,	///< No logging
-			Error = 1,	///< Errors only
-			Warn = 2,	///< Warnings and errors
-			Info = 3,	///< Informational messages
-			Debug = 4,	///< Debug messages
-			Trace = 5	///< Detailed trace (very verbose)
+			None = 0,  ///< No logging
+			Error = 1, ///< Errors only
+			Warn = 2,  ///< Warnings and errors
+			Info = 3,  ///< Informational messages
+			Debug = 4, ///< Debug messages
+			Trace = 5  ///< Detailed trace (very verbose)
 		};
 
 		/**************************************************************************/ /**
@@ -184,7 +184,7 @@ namespace Actisense
 				/* First line includes the prefix and total size */
 				std::ostringstream ss;
 				ss << prefix << " [" << size << " bytes]:";
-				
+
 				if (size == 0) {
 					log(level, tag, ss.str());
 					return;
@@ -194,7 +194,7 @@ namespace Actisense
 				if (size <= kBytesPerLine) {
 					ss << " ";
 					for (std::size_t i = 0; i < size; ++i) {
-						ss << std::hex << std::setw(2) << std::setfill('0') 
+						ss << std::hex << std::setw(2) << std::setfill('0')
 						   << static_cast<int>(data[i]) << " ";
 					}
 					log(level, tag, ss.str());
@@ -206,16 +206,18 @@ namespace Actisense
 
 				for (std::size_t offset = 0; offset < size; offset += kBytesPerLine) {
 					std::ostringstream line;
-					line << "  [" << std::setw(4) << std::setfill('0') << std::dec << offset << "] ";
-					
+					line << "  [" << std::setw(4) << std::setfill('0') << std::dec << offset
+						 << "] ";
+
 					const std::size_t remaining = size - offset;
-					const std::size_t chunkSize = (remaining < kBytesPerLine) ? remaining : kBytesPerLine;
-					
+					const std::size_t chunkSize =
+						(remaining < kBytesPerLine) ? remaining : kBytesPerLine;
+
 					for (std::size_t i = 0; i < chunkSize; ++i) {
-						line << std::hex << std::setw(2) << std::setfill('0') 
+						line << std::hex << std::setw(2) << std::setfill('0')
 							 << static_cast<int>(data[offset + i]) << " ";
 					}
-					
+
 					/* Add ASCII representation for easier pattern recognition */
 					if (chunkSize < kBytesPerLine) {
 						/* Pad to align ASCII column */
@@ -229,24 +231,30 @@ namespace Actisense
 						line << (byte >= 0x20 && byte < 0x7F ? static_cast<char>(byte) : '.');
 					}
 					line << "|";
-					
+
 					log(level, tag, line.str());
 				}
 			}
 
 		private:
-			DebugLog() 
-				: consoleLevel_(static_cast<uint8_t>(LogLevel::None))
-				, fileLevel_(static_cast<uint8_t>(LogLevel::None)) {}
+			DebugLog()
+				: consoleLevel_(static_cast<uint8_t>(LogLevel::None)),
+				  fileLevel_(static_cast<uint8_t>(LogLevel::None)) {}
 
 			static constexpr const char* levelName(LogLevel level) noexcept {
 				switch (level) {
-					case LogLevel::Error: return "ERROR";
-					case LogLevel::Warn:  return "WARN ";
-					case LogLevel::Info:  return "INFO ";
-					case LogLevel::Debug: return "DEBUG";
-					case LogLevel::Trace: return "TRACE";
-					default: return "?????";
+					case LogLevel::Error:
+						return "ERROR";
+					case LogLevel::Warn:
+						return "WARN ";
+					case LogLevel::Info:
+						return "INFO ";
+					case LogLevel::Debug:
+						return "DEBUG";
+					case LogLevel::Trace:
+						return "TRACE";
+					default:
+						return "?????";
 				}
 			}
 
@@ -259,25 +267,25 @@ namespace Actisense
 
 		/* Convenience macros --------------------------------------------------- */
 
-#define ACTISENSE_LOG(level, tag, msg) \
-	do { \
-		if (::Actisense::Sdk::DebugLog::instance().isEnabled(level)) { \
+#define ACTISENSE_LOG(level, tag, msg)                                   \
+	do {                                                                 \
+		if (::Actisense::Sdk::DebugLog::instance().isEnabled(level)) {   \
 			::Actisense::Sdk::DebugLog::instance().log(level, tag, msg); \
-		} \
+		}                                                                \
 	} while (0)
 
-#define ACTISENSE_LOG_HEX(level, tag, prefix, data, size) \
-	do { \
-		if (::Actisense::Sdk::DebugLog::instance().isEnabled(level)) { \
+#define ACTISENSE_LOG_HEX(level, tag, prefix, data, size)                                  \
+	do {                                                                                   \
+		if (::Actisense::Sdk::DebugLog::instance().isEnabled(level)) {                     \
 			::Actisense::Sdk::DebugLog::instance().logHex(level, tag, prefix, data, size); \
-		} \
+		}                                                                                  \
 	} while (0)
 
-#define ACTISENSE_LOG_ERROR(tag, msg)   ACTISENSE_LOG(::Actisense::Sdk::LogLevel::Error, tag, msg)
-#define ACTISENSE_LOG_WARN(tag, msg)    ACTISENSE_LOG(::Actisense::Sdk::LogLevel::Warn, tag, msg)
-#define ACTISENSE_LOG_INFO(tag, msg)    ACTISENSE_LOG(::Actisense::Sdk::LogLevel::Info, tag, msg)
-#define ACTISENSE_LOG_DEBUG(tag, msg)   ACTISENSE_LOG(::Actisense::Sdk::LogLevel::Debug, tag, msg)
-#define ACTISENSE_LOG_TRACE(tag, msg)   ACTISENSE_LOG(::Actisense::Sdk::LogLevel::Trace, tag, msg)
+#define ACTISENSE_LOG_ERROR(tag, msg) ACTISENSE_LOG(::Actisense::Sdk::LogLevel::Error, tag, msg)
+#define ACTISENSE_LOG_WARN(tag, msg)  ACTISENSE_LOG(::Actisense::Sdk::LogLevel::Warn, tag, msg)
+#define ACTISENSE_LOG_INFO(tag, msg)  ACTISENSE_LOG(::Actisense::Sdk::LogLevel::Info, tag, msg)
+#define ACTISENSE_LOG_DEBUG(tag, msg) ACTISENSE_LOG(::Actisense::Sdk::LogLevel::Debug, tag, msg)
+#define ACTISENSE_LOG_TRACE(tag, msg) ACTISENSE_LOG(::Actisense::Sdk::LogLevel::Trace, tag, msg)
 
 	}; /* namespace Sdk */
 }; /* namespace Actisense */

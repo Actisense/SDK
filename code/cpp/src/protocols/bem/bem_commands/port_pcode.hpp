@@ -7,8 +7,8 @@
  \date       (Created) 27/01/2026
  \brief      Port P-Code BEM command types and helpers
  \details    Structures and functions for encoding/decoding Port P-Code
-             (0x13) BEM commands. P-Codes define the communication protocol
-             used on each device port.
+			 (0x13) BEM commands. P-Codes define the communication protocol
+			 used on each device port.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -33,18 +33,18 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      P-Code (Protocol Code) values
 		 \details    Defines the communication protocol used on a port.
-		             Values are device-specific; common values shown here.
+					 Values are device-specific; common values shown here.
 		 *******************************************************************************/
 		enum class PCode : uint8_t
 		{
-			Bst = 0x00,       ///< BST (Binary Standard Transport) Protocol
-			Nmea0183 = 0x01,  ///< NMEA 0183 Protocol
-			Nmea2000 = 0x02,  ///< NMEA 2000 Protocol
-			Ipv4 = 0x03,      ///< IPv4 (reserved)
-			Ipv6 = 0x04,      ///< IPv6 (reserved)
-			RawAscii = 0x05,  ///< Raw ASCII (reserved)
-			N2kAscii = 0x06,  ///< N2K ASCII (reserved)
-			NoChange = 0xFF   ///< Do not change (keep current value)
+			Bst = 0x00,		 ///< BST (Binary Standard Transport) Protocol
+			Nmea0183 = 0x01, ///< NMEA 0183 Protocol
+			Nmea2000 = 0x02, ///< NMEA 2000 Protocol
+			Ipv4 = 0x03,	 ///< IPv4 (reserved)
+			Ipv6 = 0x04,	 ///< IPv6 (reserved)
+			RawAscii = 0x05, ///< Raw ASCII (reserved)
+			N2kAscii = 0x06, ///< N2K ASCII (reserved)
+			NoChange = 0xFF	 ///< Do not change (keep current value)
 		};
 
 		/* Data Structures ------------------------------------------------------ */
@@ -52,12 +52,12 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Port P-Code request structure
 		 \details    Used for building Get/Set Port P-Code commands.
-		             For GET, pCodes vector should be empty.
-		             For SET, pCodes contains one byte per port.
+					 For GET, pCodes vector should be empty.
+					 For SET, pCodes contains one byte per port.
 		 *******************************************************************************/
 		struct PortPCodeRequest
 		{
-			std::vector<uint8_t> pCodes;  ///< P-Code per port (empty for GET)
+			std::vector<uint8_t> pCodes; ///< P-Code per port (empty for GET)
 		};
 
 		/**************************************************************************/ /**
@@ -66,7 +66,7 @@ namespace Actisense
 		 *******************************************************************************/
 		struct PortPCodeResponse
 		{
-			std::vector<uint8_t> pCodes;  ///< P-Code per port
+			std::vector<uint8_t> pCodes; ///< P-Code per port
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -78,11 +78,9 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodePortPCodeResponse(
-			std::span<const uint8_t> data,
-			PortPCodeResponse& response,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool decodePortPCodeResponse(std::span<const uint8_t> data,
+														  PortPCodeResponse& response,
+														  std::string& outError) {
 			if (data.empty()) {
 				outError = "Port P-Code response empty";
 				return false;
@@ -93,8 +91,8 @@ namespace Actisense
 
 			if (data.size() < static_cast<std::size_t>(1 + dataSize)) {
 				outError = "Port P-Code response truncated: expected " +
-				           std::to_string(1 + dataSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(1 + dataSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
@@ -112,8 +110,7 @@ namespace Actisense
 		 \brief      Encode Port P-Code GET request data
 		 \param[out] outData    Encoded request data (empty for GET)
 		 *******************************************************************************/
-		inline void encodePortPCodeGetRequest(std::vector<uint8_t>& outData)
-		{
+		inline void encodePortPCodeGetRequest(std::vector<uint8_t>& outData) {
 			outData.clear();
 			/* GET request has no data payload */
 		}
@@ -124,8 +121,7 @@ namespace Actisense
 		 \param[out] outData    Encoded request data
 		 *******************************************************************************/
 		inline void encodePortPCodeSetRequest(std::span<const uint8_t> pCodes,
-		                                      std::vector<uint8_t>& outData)
-		{
+											  std::vector<uint8_t>& outData) {
 			outData.clear();
 			outData.reserve(pCodes.size());
 			outData.assign(pCodes.begin(), pCodes.end());
@@ -136,8 +132,7 @@ namespace Actisense
 		 \param[in]  pCode      P-Code value
 		 \return     Human-readable protocol name
 		 *******************************************************************************/
-		[[nodiscard]] inline const char* pCodeToString(uint8_t pCode)
-		{
+		[[nodiscard]] inline const char* pCodeToString(uint8_t pCode) {
 			switch (pCode) {
 				case static_cast<uint8_t>(PCode::Bst):
 					return "BST";

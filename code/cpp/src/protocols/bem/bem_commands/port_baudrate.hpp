@@ -7,8 +7,8 @@
  \date       (Created) 27/01/2026
  \brief      Port Baudrate BEM command types and helpers
  \details    Structures and functions for encoding/decoding Port Baudrate
-             (0x17) BEM commands. Supports both Get and Set operations for
-             configuring serial port baudrates.
+			 (0x17) BEM commands. Supports both Get and Set operations for
+			 configuring serial port baudrates.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -49,13 +49,13 @@ namespace Actisense
 		 *******************************************************************************/
 		enum class HardwareProtocol : uint8_t
 		{
-			Bst = 0,       ///< BST (Binary Standard Transport) protocol
-			Nmea0183 = 1,  ///< NMEA 0183 protocol
-			Nmea2000 = 2,  ///< NMEA 2000 protocol
-			Ipv4 = 3,      ///< IPv4 (reserved)
-			Ipv6 = 4,      ///< IPv6 (reserved)
-			RawAscii = 5,  ///< Raw ASCII (reserved)
-			N2kAscii = 6   ///< N2K ASCII (reserved)
+			Bst = 0,	  ///< BST (Binary Standard Transport) protocol
+			Nmea0183 = 1, ///< NMEA 0183 protocol
+			Nmea2000 = 2, ///< NMEA 2000 protocol
+			Ipv4 = 3,	  ///< IPv4 (reserved)
+			Ipv6 = 4,	  ///< IPv6 (reserved)
+			RawAscii = 5, ///< Raw ASCII (reserved)
+			N2kAscii = 6  ///< N2K ASCII (reserved)
 		};
 
 		/* Data Structures ------------------------------------------------------ */
@@ -66,9 +66,9 @@ namespace Actisense
 		 *******************************************************************************/
 		struct PortBaudrateRequest
 		{
-			uint8_t portNumber = 0;                      ///< Port to configure (0-based)
-			std::optional<uint32_t> sessionBaud;         ///< Immediate baudrate (omit for GET)
-			std::optional<uint32_t> storeBaud;           ///< Persistent baudrate (omit for GET)
+			uint8_t portNumber = 0;				 ///< Port to configure (0-based)
+			std::optional<uint32_t> sessionBaud; ///< Immediate baudrate (omit for GET)
+			std::optional<uint32_t> storeBaud;	 ///< Persistent baudrate (omit for GET)
 		};
 
 		/**************************************************************************/ /**
@@ -77,11 +77,11 @@ namespace Actisense
 		 *******************************************************************************/
 		struct PortBaudrateResponse
 		{
-			uint8_t totalPorts = 0;                      ///< Total ports on device
-			uint8_t portNumber = 0;                      ///< Queried/configured port
-			HardwareProtocol protocol = HardwareProtocol::Bst;  ///< Protocol type on this port
-			uint32_t sessionBaud = 0;                    ///< Current session baudrate
-			uint32_t storeBaud = 0;                      ///< Stored (EEPROM) baudrate
+			uint8_t totalPorts = 0;							   ///< Total ports on device
+			uint8_t portNumber = 0;							   ///< Queried/configured port
+			HardwareProtocol protocol = HardwareProtocol::Bst; ///< Protocol type on this port
+			uint32_t sessionBaud = 0;						   ///< Current session baudrate
+			uint32_t storeBaud = 0;							   ///< Stored (EEPROM) baudrate
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -93,15 +93,13 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodePortBaudrateResponse(
-			std::span<const uint8_t> data,
-			PortBaudrateResponse& response,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool decodePortBaudrateResponse(std::span<const uint8_t> data,
+															 PortBaudrateResponse& response,
+															 std::string& outError) {
 			if (data.size() < kPortBaudrateResponseSize) {
 				outError = "Port Baudrate response too short: expected " +
-				           std::to_string(kPortBaudrateResponseSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(kPortBaudrateResponseSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
@@ -110,16 +108,14 @@ namespace Actisense
 			response.protocol = static_cast<HardwareProtocol>(data[2]);
 
 			/* Session baudrate: bytes 3-6, little-endian */
-			response.sessionBaud = static_cast<uint32_t>(data[3]) |
-			                       (static_cast<uint32_t>(data[4]) << 8) |
-			                       (static_cast<uint32_t>(data[5]) << 16) |
-			                       (static_cast<uint32_t>(data[6]) << 24);
+			response.sessionBaud =
+				static_cast<uint32_t>(data[3]) | (static_cast<uint32_t>(data[4]) << 8) |
+				(static_cast<uint32_t>(data[5]) << 16) | (static_cast<uint32_t>(data[6]) << 24);
 
 			/* Store baudrate: bytes 7-10, little-endian */
-			response.storeBaud = static_cast<uint32_t>(data[7]) |
-			                     (static_cast<uint32_t>(data[8]) << 8) |
-			                     (static_cast<uint32_t>(data[9]) << 16) |
-			                     (static_cast<uint32_t>(data[10]) << 24);
+			response.storeBaud =
+				static_cast<uint32_t>(data[7]) | (static_cast<uint32_t>(data[8]) << 8) |
+				(static_cast<uint32_t>(data[9]) << 16) | (static_cast<uint32_t>(data[10]) << 24);
 
 			return true;
 		}
@@ -130,8 +126,7 @@ namespace Actisense
 		 \param[out] outData     Encoded request data
 		 *******************************************************************************/
 		inline void encodePortBaudrateGetRequest(uint8_t portNumber,
-		                                         std::vector<uint8_t>& outData)
-		{
+												 std::vector<uint8_t>& outData) {
 			outData.clear();
 			outData.push_back(portNumber);
 		}
@@ -143,11 +138,9 @@ namespace Actisense
 		 \param[in]  storeBaud    Store baudrate (use kBaudRateNoChange to skip)
 		 \param[out] outData      Encoded request data
 		 *******************************************************************************/
-		inline void encodePortBaudrateSetRequest(uint8_t portNumber,
-		                                         uint32_t sessionBaud,
-		                                         uint32_t storeBaud,
-		                                         std::vector<uint8_t>& outData)
-		{
+		inline void encodePortBaudrateSetRequest(uint8_t portNumber, uint32_t sessionBaud,
+												 uint32_t storeBaud,
+												 std::vector<uint8_t>& outData) {
 			outData.clear();
 			outData.reserve(kPortBaudrateSetRequestSize);
 
@@ -171,8 +164,7 @@ namespace Actisense
 		 \param[in]  protocol  Hardware protocol value
 		 \return     Human-readable protocol name
 		 *******************************************************************************/
-		[[nodiscard]] inline const char* hardwareProtocolToString(HardwareProtocol protocol)
-		{
+		[[nodiscard]] inline const char* hardwareProtocolToString(HardwareProtocol protocol) {
 			switch (protocol) {
 				case HardwareProtocol::Bst:
 					return "BST";
@@ -198,8 +190,7 @@ namespace Actisense
 		 \param[in]  baudrate  Baudrate value
 		 \return     Human-readable baudrate string
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatBaudrate(uint32_t baudrate)
-		{
+		[[nodiscard]] inline std::string formatBaudrate(uint32_t baudrate) {
 			if (baudrate == kBaudRateNoChange) {
 				return "No Change";
 			}

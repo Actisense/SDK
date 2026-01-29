@@ -28,11 +28,11 @@ namespace Actisense
 		 *******************************************************************************/
 		struct TransportMetrics
 		{
-			uint64_t bytesSent = 0;		  ///< Total bytes written to transport
-			uint64_t bytesReceived = 0;	  ///< Total bytes read from transport
-			uint64_t writeCalls = 0;	  ///< Number of write operations
-			uint64_t readCalls = 0;		  ///< Number of read operations
-			uint32_t errorsCount = 0;	  ///< Total transport errors encountered
+			uint64_t bytesSent = 0;				 ///< Total bytes written to transport
+			uint64_t bytesReceived = 0;			 ///< Total bytes read from transport
+			uint64_t writeCalls = 0;			 ///< Number of write operations
+			uint64_t readCalls = 0;				 ///< Number of read operations
+			uint32_t errorsCount = 0;			 ///< Total transport errors encountered
 			ErrorCode lastError = ErrorCode::Ok; ///< Most recent error code
 
 			/**************************************************************************/ /**
@@ -94,8 +94,8 @@ namespace Actisense
 			uint32_t deviceErrors = 0;		///< Device-returned error responses
 
 			// Latency tracking (milliseconds)
-			uint64_t totalLatencyMs = 0;			  ///< Sum of all response latencies
-			uint32_t maxLatencyMs = 0;				  ///< Maximum observed latency
+			uint64_t totalLatencyMs = 0; ///< Sum of all response latencies
+			uint32_t maxLatencyMs = 0;	 ///< Maximum observed latency
 			uint32_t minLatencyMs = (std::numeric_limits<uint32_t>::max)(); ///< Minimum latency
 
 			/**************************************************************************/ /**
@@ -104,8 +104,8 @@ namespace Actisense
 			 *******************************************************************************/
 			[[nodiscard]] uint32_t avgLatencyMs() const noexcept {
 				return responsesReceived > 0
-					? static_cast<uint32_t>(totalLatencyMs / responsesReceived)
-					: 0;
+						   ? static_cast<uint32_t>(totalLatencyMs / responsesReceived)
+						   : 0;
 			}
 
 			/**************************************************************************/ /**
@@ -139,7 +139,7 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Aggregated session metrics
 		 \details    Contains all metrics for a session, including transport,
-		             protocol, and BEM statistics
+					 protocol, and BEM statistics
 		 *******************************************************************************/
 		struct SessionMetrics
 		{
@@ -181,7 +181,8 @@ namespace Actisense
 				if (total == 0) {
 					return 100.0;
 				}
-				return (static_cast<double>(protocol.framesReceived) / static_cast<double>(total)) * 100.0;
+				return (static_cast<double>(protocol.framesReceived) / static_cast<double>(total)) *
+					   100.0;
 			}
 
 			/**************************************************************************/ /**
@@ -193,7 +194,8 @@ namespace Actisense
 					return 100.0;
 				}
 				const auto successful = bem.responsesReceived - bem.deviceErrors;
-				return (static_cast<double>(successful) / static_cast<double>(bem.commandsSent)) * 100.0;
+				return (static_cast<double>(successful) / static_cast<double>(bem.commandsSent)) *
+					   100.0;
 			}
 		};
 

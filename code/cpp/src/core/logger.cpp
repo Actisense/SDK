@@ -57,25 +57,14 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Log level names
 			 *******************************************************************************/
-			constexpr std::array<std::string_view, 5> kLogLevelNames = {{
-				"ERROR",
-				"WARN",
-				"INFO",
-				"DEBUG",
-				"TRACE"
-			}};
+			constexpr std::array<std::string_view, 5> kLogLevelNames = {
+				{"ERROR", "WARN", "INFO", "DEBUG", "TRACE"}};
 
 			/**************************************************************************/ /**
 			 \brief      Log category names
 			 *******************************************************************************/
-			constexpr std::array<std::string_view, 6> kLogCategoryNames = {{
-				"General",
-				"Transport",
-				"Protocol",
-				"Bem",
-				"Session",
-				"Metrics"
-			}};
+			constexpr std::array<std::string_view, 6> kLogCategoryNames = {
+				{"General", "Transport", "Protocol", "Bem", "Session", "Metrics"}};
 
 		} /* anonymous namespace */
 

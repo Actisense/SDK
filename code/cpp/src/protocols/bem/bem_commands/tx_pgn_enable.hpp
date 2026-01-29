@@ -7,8 +7,8 @@
  \date       (Created) 27/01/2026
  \brief      Tx PGN Enable BEM command types and helpers
  \details    Structures and functions for encoding/decoding Tx PGN Enable
-             (0x47) BEM commands. Controls which PGNs are transmitted
-             on NMEA 2000 or J1939 interfaces, with configurable rate and priority.
+			 (0x47) BEM commands. Controls which PGNs are transmitted
+			 on NMEA 2000 or J1939 interfaces, with configurable rate and priority.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -52,9 +52,9 @@ namespace Actisense
 		 *******************************************************************************/
 		enum class TxPgnEnableFlag : uint8_t
 		{
-			Disabled = 0x00,    ///< PGN transmission disabled
-			Enabled = 0x01,     ///< PGN transmission enabled at configured rate
-			RespondMode = 0x02  ///< Transmit only when requested (ISO Request)
+			Disabled = 0x00,   ///< PGN transmission disabled
+			Enabled = 0x01,	   ///< PGN transmission enabled at configured rate
+			RespondMode = 0x02 ///< Transmit only when requested (ISO Request)
 		};
 
 		/* Data Structures ------------------------------------------------------ */
@@ -65,9 +65,9 @@ namespace Actisense
 		 *******************************************************************************/
 		struct TxPgnEnableRequest
 		{
-			uint32_t pgn = 0;                          ///< 24-bit PGN ID (stored in 32-bit)
-			std::optional<TxPgnEnableFlag> enable;     ///< Enable flag (omit for GET)
-			std::optional<uint32_t> txRate;            ///< TX rate in ms (optional for SET)
+			uint32_t pgn = 0;					   ///< 24-bit PGN ID (stored in 32-bit)
+			std::optional<TxPgnEnableFlag> enable; ///< Enable flag (omit for GET)
+			std::optional<uint32_t> txRate;		   ///< TX rate in ms (optional for SET)
 		};
 
 		/**************************************************************************/ /**
@@ -76,11 +76,11 @@ namespace Actisense
 		 *******************************************************************************/
 		struct TxPgnEnableResponse
 		{
-			uint32_t pgn = 0;                          ///< PGN ID
-			TxPgnEnableFlag enable = TxPgnEnableFlag::Disabled;  ///< Current enable state
-			uint32_t txRate = 0;                       ///< TX rate in milliseconds
-			uint32_t txTimeout = 0;                    ///< TX timeout (deprecated, usually 0)
-			uint8_t txPriority = 3;                    ///< CAN priority (0-7, default 3)
+			uint32_t pgn = 0;									///< PGN ID
+			TxPgnEnableFlag enable = TxPgnEnableFlag::Disabled; ///< Current enable state
+			uint32_t txRate = 0;								///< TX rate in milliseconds
+			uint32_t txTimeout = 0; ///< TX timeout (deprecated, usually 0)
+			uint8_t txPriority = 3; ///< CAN priority (0-7, default 3)
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -92,38 +92,33 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeTxPgnEnableResponse(
-			std::span<const uint8_t> data,
-			TxPgnEnableResponse& response,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool decodeTxPgnEnableResponse(std::span<const uint8_t> data,
+															TxPgnEnableResponse& response,
+															std::string& outError) {
 			if (data.size() < kTxPgnEnableResponseSize) {
 				outError = "Tx PGN Enable response too short: expected " +
-				           std::to_string(kTxPgnEnableResponseSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(kTxPgnEnableResponseSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
 			/* PGN ID: bytes 0-3, little-endian */
-			response.pgn = static_cast<uint32_t>(data[0]) |
-			               (static_cast<uint32_t>(data[1]) << 8) |
-			               (static_cast<uint32_t>(data[2]) << 16) |
-			               (static_cast<uint32_t>(data[3]) << 24);
+			response.pgn = static_cast<uint32_t>(data[0]) | (static_cast<uint32_t>(data[1]) << 8) |
+						   (static_cast<uint32_t>(data[2]) << 16) |
+						   (static_cast<uint32_t>(data[3]) << 24);
 
 			/* Enable flag: byte 4 */
 			response.enable = static_cast<TxPgnEnableFlag>(data[4]);
 
 			/* TX Rate: bytes 5-8, little-endian */
-			response.txRate = static_cast<uint32_t>(data[5]) |
-			                  (static_cast<uint32_t>(data[6]) << 8) |
-			                  (static_cast<uint32_t>(data[7]) << 16) |
-			                  (static_cast<uint32_t>(data[8]) << 24);
+			response.txRate =
+				static_cast<uint32_t>(data[5]) | (static_cast<uint32_t>(data[6]) << 8) |
+				(static_cast<uint32_t>(data[7]) << 16) | (static_cast<uint32_t>(data[8]) << 24);
 
 			/* TX Timeout (deprecated): bytes 9-12, little-endian */
-			response.txTimeout = static_cast<uint32_t>(data[9]) |
-			                     (static_cast<uint32_t>(data[10]) << 8) |
-			                     (static_cast<uint32_t>(data[11]) << 16) |
-			                     (static_cast<uint32_t>(data[12]) << 24);
+			response.txTimeout =
+				static_cast<uint32_t>(data[9]) | (static_cast<uint32_t>(data[10]) << 8) |
+				(static_cast<uint32_t>(data[11]) << 16) | (static_cast<uint32_t>(data[12]) << 24);
 
 			/* TX Priority: byte 13 */
 			response.txPriority = data[13];
@@ -136,9 +131,7 @@ namespace Actisense
 		 \param[in]  pgn        PGN ID to query
 		 \param[out] outData    Encoded request data
 		 *******************************************************************************/
-		inline void encodeTxPgnEnableGetRequest(uint32_t pgn,
-		                                        std::vector<uint8_t>& outData)
-		{
+		inline void encodeTxPgnEnableGetRequest(uint32_t pgn, std::vector<uint8_t>& outData) {
 			outData.clear();
 			outData.reserve(kTxPgnEnableGetRequestSize);
 
@@ -155,10 +148,8 @@ namespace Actisense
 		 \param[in]  enable     Enable flag
 		 \param[out] outData    Encoded request data
 		 *******************************************************************************/
-		inline void encodeTxPgnEnableSetRequest(uint32_t pgn,
-		                                        TxPgnEnableFlag enable,
-		                                        std::vector<uint8_t>& outData)
-		{
+		inline void encodeTxPgnEnableSetRequest(uint32_t pgn, TxPgnEnableFlag enable,
+												std::vector<uint8_t>& outData) {
 			outData.clear();
 			outData.reserve(kTxPgnEnableBasicSetRequestSize);
 
@@ -179,11 +170,9 @@ namespace Actisense
 		 \param[in]  txRate     Transmission rate in milliseconds
 		 \param[out] outData    Encoded request data
 		 *******************************************************************************/
-		inline void encodeTxPgnEnableSetRequestWithRate(uint32_t pgn,
-		                                                TxPgnEnableFlag enable,
-		                                                uint32_t txRate,
-		                                                std::vector<uint8_t>& outData)
-		{
+		inline void encodeTxPgnEnableSetRequestWithRate(uint32_t pgn, TxPgnEnableFlag enable,
+														uint32_t txRate,
+														std::vector<uint8_t>& outData) {
 			outData.clear();
 			outData.reserve(kTxPgnEnableExtendedSetRequestSize);
 
@@ -208,8 +197,7 @@ namespace Actisense
 		 \param[in]  flag       Enable flag value
 		 \return     Human-readable flag name
 		 *******************************************************************************/
-		[[nodiscard]] inline const char* txPgnEnableFlagToString(TxPgnEnableFlag flag)
-		{
+		[[nodiscard]] inline const char* txPgnEnableFlagToString(TxPgnEnableFlag flag) {
 			switch (flag) {
 				case TxPgnEnableFlag::Disabled:
 					return "Disabled";
@@ -227,8 +215,7 @@ namespace Actisense
 		 \param[in]  txRate     TX rate value in milliseconds
 		 \return     Human-readable rate string
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatTxRate(uint32_t txRate)
-		{
+		[[nodiscard]] inline std::string formatTxRate(uint32_t txRate) {
 			if (txRate == kTxRateDefault) {
 				return "Default";
 			}

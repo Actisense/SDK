@@ -2,17 +2,18 @@
 \file       bst_frame.cpp
 \brief      BstFrame class implementation
 \details    Implements unified access to BST-93, BST-94, BST-95, and BST-D0 frames
-            using raw byte storage with lazy decoding.
+			using raw byte storage with lazy decoding.
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
 #include "protocols/bst/bst_frame.hpp"
-#include "public/events.hpp"
 
 #include <iomanip>
 #include <sstream>
+
+#include "public/events.hpp"
 
 namespace Actisense
 {
@@ -66,42 +67,30 @@ namespace Actisense
 		/* Construction --------------------------------------------------------- */
 
 		BstFrame::BstFrame(std::vector<uint8_t>&& raw_data)
-			: raw_data_(std::move(raw_data))
-			, bst_id_(BstId::Nmea2000_GatewayToPC)
-			, valid_(false)
-		{
+			: raw_data_(std::move(raw_data)), bst_id_(BstId::Nmea2000_GatewayToPC), valid_(false) {
 			validate();
 		}
 
 		BstFrame::BstFrame(std::span<const uint8_t> raw_data)
-			: raw_data_(raw_data.begin(), raw_data.end())
-			, bst_id_(BstId::Nmea2000_GatewayToPC)
-			, valid_(false)
-		{
+			: raw_data_(raw_data.begin(), raw_data.end()), bst_id_(BstId::Nmea2000_GatewayToPC),
+			  valid_(false) {
 			validate();
 		}
 
-		BstFrame::BstFrame()
-			: bst_id_(BstId::Nmea2000_GatewayToPC)
-			, valid_(false)
-		{
-		}
+		BstFrame::BstFrame() : bst_id_(BstId::Nmea2000_GatewayToPC), valid_(false) {}
 
 		/* Factory Methods - Parsing -------------------------------------------- */
 
-		std::optional<BstFrame> BstFrame::fromParsedEvent(const ParsedMessageEvent& event)
-		{
+		std::optional<BstFrame> BstFrame::fromParsedEvent(const ParsedMessageEvent& event) {
 			/* Try to extract BstFrame directly */
 			try {
 				return std::any_cast<BstFrame>(event.payload);
-			}
-			catch (const std::bad_any_cast&) {}
+			} catch (const std::bad_any_cast&) {}
 
 			return std::nullopt;
 		}
 
-		std::optional<BstFrame> BstFrame::fromRawData(std::span<const uint8_t> data)
-		{
+		std::optional<BstFrame> BstFrame::fromRawData(std::span<const uint8_t> data) {
 			BstFrame frame(data);
 			if (frame.valid_) {
 				return frame;
@@ -112,9 +101,8 @@ namespace Actisense
 		/* Factory Methods - Frame Creation ------------------------------------- */
 
 		BstFrame BstFrame::create93(uint32_t pgn, uint8_t source, uint8_t destination,
-		                            std::span<const uint8_t> payload, uint32_t timestamp,
-		                            uint8_t priority)
-		{
+									std::span<const uint8_t> payload, uint32_t timestamp,
+									uint8_t priority) {
 			uint8_t pduf, pdus, dp;
 			extractPduFields(pgn, pduf, pdus, dp);
 
@@ -150,8 +138,7 @@ namespace Actisense
 		}
 
 		BstFrame BstFrame::create94(uint32_t pgn, uint8_t destination,
-		                            std::span<const uint8_t> payload, uint8_t priority)
-		{
+									std::span<const uint8_t> payload, uint8_t priority) {
 			uint8_t pduf, pdus, dp;
 			extractPduFields(pgn, pduf, pdus, dp);
 
@@ -179,11 +166,9 @@ namespace Actisense
 			return BstFrame(std::move(raw));
 		}
 
-		BstFrame BstFrame::create95(uint32_t pgn, uint8_t source,
-		                            std::span<const uint8_t> payload, uint16_t timestamp,
-		                            TimestampResolution resolution, MessageDirection direction,
-		                            uint8_t priority)
-		{
+		BstFrame BstFrame::create95(uint32_t pgn, uint8_t source, std::span<const uint8_t> payload,
+									uint16_t timestamp, TimestampResolution resolution,
+									MessageDirection direction, uint8_t priority) {
 			uint8_t pduf, pdus, dp;
 			extractPduFields(pgn, pduf, pdus, dp);
 
@@ -204,10 +189,9 @@ namespace Actisense
 			raw.push_back(pduf);
 
 			/* DPPC byte: bits 0-1 = DataPage, 2-4 = Priority, 5-6 = Resolution, 7 = Direction */
-			const uint8_t dppc = (dp & 0x03) |
-			                     ((priority & 0x07) << 2) |
-			                     ((static_cast<uint8_t>(resolution) & 0x03) << 5) |
-			                     ((static_cast<uint8_t>(direction) & 0x01) << 7);
+			const uint8_t dppc = (dp & 0x03) | ((priority & 0x07) << 2) |
+								 ((static_cast<uint8_t>(resolution) & 0x03) << 5) |
+								 ((static_cast<uint8_t>(direction) & 0x01) << 7);
 			raw.push_back(dppc);
 
 			raw.insert(raw.end(), payload.begin(), payload.end());
@@ -216,10 +200,9 @@ namespace Actisense
 		}
 
 		BstFrame BstFrame::createD0(uint32_t pgn, uint8_t source, uint8_t destination,
-		                            std::span<const uint8_t> payload, uint32_t timestamp,
-		                            D0MessageType msg_type, MessageDirection direction,
-		                            uint8_t priority, bool internal_src, uint8_t fp_seq_id)
-		{
+									std::span<const uint8_t> payload, uint32_t timestamp,
+									D0MessageType msg_type, MessageDirection direction,
+									uint8_t priority, bool internal_src, uint8_t fp_seq_id) {
 			uint8_t pduf, pdus, dp;
 			extractPduFields(pgn, pduf, pdus, dp);
 
@@ -251,9 +234,8 @@ namespace Actisense
 
 			/* Control byte: bits 0-1 = MsgType, 3 = Direction, 4 = InternalSrc, 5-7 = FP SeqId */
 			const uint8_t ctrl = (static_cast<uint8_t>(msg_type) & 0x03) |
-			                     ((static_cast<uint8_t>(direction) & 0x01) << 3) |
-			                     ((internal_src ? 1 : 0) << 4) |
-			                     ((fp_seq_id & 0x07) << 5);
+								 ((static_cast<uint8_t>(direction) & 0x01) << 3) |
+								 ((internal_src ? 1 : 0) << 4) | ((fp_seq_id & 0x07) << 5);
 			raw.push_back(ctrl);
 
 			/* Timestamp (4 bytes LE) */
@@ -268,53 +250,43 @@ namespace Actisense
 
 		/* Type Identification -------------------------------------------------- */
 
-		BstId BstFrame::bstId() const noexcept
-		{
+		BstId BstFrame::bstId() const noexcept {
 			return bst_id_;
 		}
 
-		bool BstFrame::isN2k() const noexcept
-		{
+		bool BstFrame::isN2k() const noexcept {
 			return bst_id_ == BstId::Nmea2000_GatewayToPC ||
-			       bst_id_ == BstId::Nmea2000_PCToGateway ||
-			       bst_id_ == BstId::CanFrame ||
-			       bst_id_ == BstId::Nmea2000_D0;
+				   bst_id_ == BstId::Nmea2000_PCToGateway || bst_id_ == BstId::CanFrame ||
+				   bst_id_ == BstId::Nmea2000_D0;
 		}
 
-		bool BstFrame::isBem() const noexcept
-		{
+		bool BstFrame::isBem() const noexcept {
 			return isBemResponse(bst_id_) || isBemCommand(bst_id_);
 		}
 
-		bool BstFrame::isType2() const noexcept
-		{
+		bool BstFrame::isType2() const noexcept {
 			return isBstType2(bst_id_);
 		}
 
-		bool BstFrame::is93() const noexcept
-		{
+		bool BstFrame::is93() const noexcept {
 			return bst_id_ == BstId::Nmea2000_GatewayToPC;
 		}
 
-		bool BstFrame::is94() const noexcept
-		{
+		bool BstFrame::is94() const noexcept {
 			return bst_id_ == BstId::Nmea2000_PCToGateway;
 		}
 
-		bool BstFrame::is95() const noexcept
-		{
+		bool BstFrame::is95() const noexcept {
 			return bst_id_ == BstId::CanFrame;
 		}
 
-		bool BstFrame::isD0() const noexcept
-		{
+		bool BstFrame::isD0() const noexcept {
 			return bst_id_ == BstId::Nmea2000_D0;
 		}
 
 		/* N2K Header Accessors (Unified) --------------------------------------- */
 
-		uint32_t BstFrame::pgn() const noexcept
-		{
+		uint32_t BstFrame::pgn() const noexcept {
 			if (!valid_) {
 				return 0;
 			}
@@ -354,8 +326,7 @@ namespace Actisense
 			}
 		}
 
-		uint8_t BstFrame::priority() const noexcept
-		{
+		uint8_t BstFrame::priority() const noexcept {
 			if (!valid_) {
 				return 0;
 			}
@@ -379,8 +350,7 @@ namespace Actisense
 			}
 		}
 
-		uint8_t BstFrame::source() const noexcept
-		{
+		uint8_t BstFrame::source() const noexcept {
 			if (!valid_) {
 				return 0;
 			}
@@ -404,8 +374,7 @@ namespace Actisense
 			}
 		}
 
-		uint8_t BstFrame::destination() const noexcept
-		{
+		uint8_t BstFrame::destination() const noexcept {
 			if (!valid_) {
 				return 0xFF;
 			}
@@ -437,8 +406,7 @@ namespace Actisense
 
 		/* Payload Access ------------------------------------------------------- */
 
-		std::span<const uint8_t> BstFrame::data() const noexcept
-		{
+		std::span<const uint8_t> BstFrame::data() const noexcept {
 			if (!valid_) {
 				return {};
 			}
@@ -490,15 +458,13 @@ namespace Actisense
 			}
 		}
 
-		std::size_t BstFrame::dataLength() const noexcept
-		{
+		std::size_t BstFrame::dataLength() const noexcept {
 			return data().size();
 		}
 
 		/* Timestamp Accessors -------------------------------------------------- */
 
-		uint32_t BstFrame::timestamp() const noexcept
-		{
+		uint32_t BstFrame::timestamp() const noexcept {
 			if (!valid_) {
 				return 0;
 			}
@@ -516,7 +482,8 @@ namespace Actisense
 				case BstId::CanFrame: {
 					/* Convert 16-bit timestamp to 32-bit based on resolution */
 					const uint16_t ts16 = readU16LE(p + kBst95OffTimeL);
-					const auto res = static_cast<TimestampResolution>((p[kBst95OffDppc] >> 5) & 0x03);
+					const auto res =
+						static_cast<TimestampResolution>((p[kBst95OffDppc] >> 5) & 0x03);
 					switch (res) {
 						case TimestampResolution::Millisecond_1ms:
 							return static_cast<uint32_t>(ts16);
@@ -537,13 +504,11 @@ namespace Actisense
 			}
 		}
 
-		bool BstFrame::hasTimestamp() const noexcept
-		{
+		bool BstFrame::hasTimestamp() const noexcept {
 			return valid_ && bst_id_ != BstId::Nmea2000_PCToGateway;
 		}
 
-		uint16_t BstFrame::timestamp16() const noexcept
-		{
+		uint16_t BstFrame::timestamp16() const noexcept {
 			if (!valid_ || bst_id_ != BstId::CanFrame) {
 				return 0;
 			}
@@ -556,8 +521,7 @@ namespace Actisense
 			return readU16LE(p + kBst95OffTimeL);
 		}
 
-		TimestampResolution BstFrame::timestampResolution() const noexcept
-		{
+		TimestampResolution BstFrame::timestampResolution() const noexcept {
 			if (!valid_ || bst_id_ != BstId::CanFrame) {
 				return TimestampResolution::Millisecond_1ms;
 			}
@@ -570,8 +534,7 @@ namespace Actisense
 			return static_cast<TimestampResolution>((p[kBst95OffDppc] >> 5) & 0x03);
 		}
 
-		uint64_t BstFrame::timestampMicroseconds() const noexcept
-		{
+		uint64_t BstFrame::timestampMicroseconds() const noexcept {
 			if (!valid_) {
 				return 0;
 			}
@@ -588,7 +551,8 @@ namespace Actisense
 					return 0;
 				case BstId::CanFrame: {
 					const uint16_t ts16 = readU16LE(p + kBst95OffTimeL);
-					const auto res = static_cast<TimestampResolution>((p[kBst95OffDppc] >> 5) & 0x03);
+					const auto res =
+						static_cast<TimestampResolution>((p[kBst95OffDppc] >> 5) & 0x03);
 					switch (res) {
 						case TimestampResolution::Millisecond_1ms:
 							return static_cast<uint64_t>(ts16) * 1000;
@@ -611,8 +575,7 @@ namespace Actisense
 
 		/* BST-D0 Extended Accessors -------------------------------------------- */
 
-		D0MessageType BstFrame::messageType() const noexcept
-		{
+		D0MessageType BstFrame::messageType() const noexcept {
 			if (!valid_ || bst_id_ != BstId::Nmea2000_D0) {
 				return D0MessageType::SinglePacket;
 			}
@@ -625,8 +588,7 @@ namespace Actisense
 			return static_cast<D0MessageType>(p[kBstD0OffControl] & 0x03);
 		}
 
-		MessageDirection BstFrame::direction() const noexcept
-		{
+		MessageDirection BstFrame::direction() const noexcept {
 			if (!valid_) {
 				return MessageDirection::Received;
 			}
@@ -655,8 +617,7 @@ namespace Actisense
 			}
 		}
 
-		bool BstFrame::internalSource() const noexcept
-		{
+		bool BstFrame::internalSource() const noexcept {
 			if (!valid_ || bst_id_ != BstId::Nmea2000_D0) {
 				return false;
 			}
@@ -669,8 +630,7 @@ namespace Actisense
 			return ((p[kBstD0OffControl] >> 4) & 0x01) != 0;
 		}
 
-		uint8_t BstFrame::fastPacketSeqId() const noexcept
-		{
+		uint8_t BstFrame::fastPacketSeqId() const noexcept {
 			if (!valid_ || bst_id_ != BstId::Nmea2000_D0) {
 				return 0;
 			}
@@ -683,35 +643,31 @@ namespace Actisense
 			return (p[kBstD0OffControl] >> 5) & 0x07;
 		}
 
-		bool BstFrame::hasExtendedFields() const noexcept
-		{
+		bool BstFrame::hasExtendedFields() const noexcept {
 			return valid_ && bst_id_ == BstId::Nmea2000_D0;
 		}
 
 		/* Checksum & Validation ------------------------------------------------ */
 
-		bool BstFrame::checksumValid() const noexcept
-		{
+		bool BstFrame::checksumValid() const noexcept {
 			return valid_;
 		}
 
-		bool BstFrame::isValid() const noexcept
-		{
+		bool BstFrame::isValid() const noexcept {
 			return valid_ && dataLength() > 0;
 		}
 
 		/* String Rendering ----------------------------------------------------- */
 
-		std::string BstFrame::toString() const
-		{
+		std::string BstFrame::toString() const {
 			std::ostringstream ss;
 
 			/* BST type name */
 			ss << bstIdToString(bst_id_);
 
 			/* PGN */
-			ss << " PGN:" << std::hex << std::uppercase << std::setw(5)
-			   << std::setfill('0') << pgn();
+			ss << " PGN:" << std::hex << std::uppercase << std::setw(5) << std::setfill('0')
+			   << pgn();
 
 			/* Source/Destination */
 			ss << " Src:0x" << std::setw(2) << static_cast<int>(source());
@@ -732,8 +688,7 @@ namespace Actisense
 				if (internalSource()) {
 					ss << " Int";
 				}
-			}
-			else if (is95()) {
+			} else if (is95()) {
 				ss << " Dir:" << (direction() == MessageDirection::Received ? "Rx" : "Tx");
 			}
 
@@ -743,21 +698,19 @@ namespace Actisense
 			return ss.str();
 		}
 
-		std::string BstFrame::toShortString() const
-		{
+		std::string BstFrame::toShortString() const {
 			std::ostringstream ss;
 
-			ss << "PGN:" << std::hex << std::uppercase << std::setw(5)
-			   << std::setfill('0') << pgn();
+			ss << "PGN:" << std::hex << std::uppercase << std::setw(5) << std::setfill('0')
+			   << pgn();
 
-			ss << " " << std::setw(2) << static_cast<int>(source())
-			   << "->" << std::setw(2) << static_cast<int>(destination());
+			ss << " " << std::setw(2) << static_cast<int>(source()) << "->" << std::setw(2)
+			   << static_cast<int>(destination());
 
 			return ss.str();
 		}
 
-		std::string BstFrame::toHexDump() const
-		{
+		std::string BstFrame::toHexDump() const {
 			std::ostringstream ss;
 			const auto payload = data();
 
@@ -765,8 +718,8 @@ namespace Actisense
 				if (i > 0) {
 					ss << " ";
 				}
-				ss << std::hex << std::uppercase << std::setw(2)
-				   << std::setfill('0') << static_cast<int>(payload[i]);
+				ss << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
+				   << static_cast<int>(payload[i]);
 			}
 
 			return ss.str();
@@ -774,15 +727,13 @@ namespace Actisense
 
 		/* Raw Access ----------------------------------------------------------- */
 
-		std::span<const uint8_t> BstFrame::rawData() const noexcept
-		{
+		std::span<const uint8_t> BstFrame::rawData() const noexcept {
 			return std::span<const uint8_t>(raw_data_.data(), raw_data_.size());
 		}
 
 		/* Private Helpers ------------------------------------------------------ */
 
-		void BstFrame::validate() noexcept
-		{
+		void BstFrame::validate() noexcept {
 			valid_ = false;
 
 			if (raw_data_.empty()) {
@@ -836,7 +787,8 @@ namespace Actisense
 					}
 					const uint16_t total_len = readU16LE(&raw_data_[1]);
 					/* total_len includes ID + Len bytes, so payload = total_len - 3 */
-					const auto payload_len = static_cast<std::size_t>((total_len >= 3) ? (total_len - 3) : 0);
+					const auto payload_len =
+						static_cast<std::size_t>((total_len >= 3) ? (total_len - 3) : 0);
 					if (raw_data_.size() < 3 + payload_len || payload_len < kBstD0MinPayload) {
 						return;
 					}
@@ -849,8 +801,7 @@ namespace Actisense
 			}
 		}
 
-		const uint8_t* BstFrame::payloadPtr() const noexcept
-		{
+		const uint8_t* BstFrame::payloadPtr() const noexcept {
 			if (raw_data_.empty()) {
 				return nullptr;
 			}
@@ -870,8 +821,7 @@ namespace Actisense
 			return raw_data_.data() + 2;
 		}
 
-		std::size_t BstFrame::payloadLength() const noexcept
-		{
+		std::size_t BstFrame::payloadLength() const noexcept {
 			if (raw_data_.empty()) {
 				return 0;
 			}
@@ -892,23 +842,20 @@ namespace Actisense
 			return raw_data_[1];
 		}
 
-		uint32_t BstFrame::calculatePgn(uint8_t pduf, uint8_t pdus, uint8_t data_page) noexcept
-		{
+		uint32_t BstFrame::calculatePgn(uint8_t pduf, uint8_t pdus, uint8_t data_page) noexcept {
 			/* PDU2 (PDUF >= 240): PGN = (DP << 16) | (PDUF << 8) | PDUS */
 			/* PDU1 (PDUF < 240):  PGN = (DP << 16) | (PDUF << 8) | 0x00 */
 			if (pduf >= 240) {
 				return (static_cast<uint32_t>(data_page) << 16) |
-				       (static_cast<uint32_t>(pduf) << 8) |
-				       static_cast<uint32_t>(pdus);
+					   (static_cast<uint32_t>(pduf) << 8) | static_cast<uint32_t>(pdus);
 			} else {
 				return (static_cast<uint32_t>(data_page) << 16) |
-				       (static_cast<uint32_t>(pduf) << 8);
+					   (static_cast<uint32_t>(pduf) << 8);
 			}
 		}
 
 		void BstFrame::extractPduFields(uint32_t pgn, uint8_t& pduf, uint8_t& pdus,
-		                                uint8_t& data_page) noexcept
-		{
+										uint8_t& data_page) noexcept {
 			data_page = static_cast<uint8_t>((pgn >> 16) & 0x03);
 			pduf = static_cast<uint8_t>((pgn >> 8) & 0xFF);
 
@@ -919,27 +866,21 @@ namespace Actisense
 			}
 		}
 
-		uint16_t BstFrame::readU16LE(const uint8_t* p) noexcept
-		{
+		uint16_t BstFrame::readU16LE(const uint8_t* p) noexcept {
 			return static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
 		}
 
-		uint32_t BstFrame::readU32LE(const uint8_t* p) noexcept
-		{
-			return static_cast<uint32_t>(p[0]) |
-			       (static_cast<uint32_t>(p[1]) << 8) |
-			       (static_cast<uint32_t>(p[2]) << 16) |
-			       (static_cast<uint32_t>(p[3]) << 24);
+		uint32_t BstFrame::readU32LE(const uint8_t* p) noexcept {
+			return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) |
+				   (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
 		}
 
-		void BstFrame::writeU16LE(uint8_t* p, uint16_t value) noexcept
-		{
+		void BstFrame::writeU16LE(uint8_t* p, uint16_t value) noexcept {
 			p[0] = static_cast<uint8_t>(value & 0xFF);
 			p[1] = static_cast<uint8_t>((value >> 8) & 0xFF);
 		}
 
-		void BstFrame::writeU32LE(uint8_t* p, uint32_t value) noexcept
-		{
+		void BstFrame::writeU32LE(uint8_t* p, uint32_t value) noexcept {
 			p[0] = static_cast<uint8_t>(value & 0xFF);
 			p[1] = static_cast<uint8_t>((value >> 8) & 0xFF);
 			p[2] = static_cast<uint8_t>((value >> 16) & 0xFF);

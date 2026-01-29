@@ -5,7 +5,7 @@
  \file       transport_error.hpp
  \brief      Transport layer error codes
  \details    Fine-grained error codes for transport operations (serial, TCP, UDP).
-             These provide detailed diagnostics while mapping to the public ErrorCode.
+			 These provide detailed diagnostics while mapping to the public ErrorCode.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/

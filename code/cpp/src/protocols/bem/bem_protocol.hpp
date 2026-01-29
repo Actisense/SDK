@@ -106,8 +106,7 @@ namespace Actisense
 			 \param[out] outError     Error message if encoding fails
 			 \return     True on success
 			 *******************************************************************************/
-			[[nodiscard]] bool buildSetPortBaudrate(uint8_t portNumber,
-													uint32_t sessionBaud,
+			[[nodiscard]] bool buildSetPortBaudrate(uint8_t portNumber, uint32_t sessionBaud,
 													uint32_t storeBaud,
 													std::vector<uint8_t>& outFrame,
 													std::string& outError);
@@ -139,8 +138,7 @@ namespace Actisense
 			 \param[out] outError    Error message if encoding fails
 			 \return     True on success
 			 *******************************************************************************/
-			[[nodiscard]] bool buildGetRxPgnEnable(uint32_t pgn,
-												   std::vector<uint8_t>& outFrame,
+			[[nodiscard]] bool buildGetRxPgnEnable(uint32_t pgn, std::vector<uint8_t>& outFrame,
 												   std::string& outError);
 
 			/**************************************************************************/ /**
@@ -176,8 +174,7 @@ namespace Actisense
 			 \param[out] outError    Error message if encoding fails
 			 \return     True on success
 			 *******************************************************************************/
-			[[nodiscard]] bool buildGetTxPgnEnable(uint32_t pgn,
-												   std::vector<uint8_t>& outFrame,
+			[[nodiscard]] bool buildGetTxPgnEnable(uint32_t pgn, std::vector<uint8_t>& outFrame,
 												   std::string& outError);
 
 			/**************************************************************************/ /**
@@ -267,8 +264,7 @@ namespace Actisense
 			 \return     True on success
 			 *******************************************************************************/
 			[[nodiscard]] bool buildEcho(std::span<const uint8_t> data,
-										 std::vector<uint8_t>& outFrame,
-										 std::string& outError);
+										 std::vector<uint8_t>& outFrame, std::string& outError);
 
 			/**************************************************************************/ /**
 			 \brief      Build Echo command (vector overload)
@@ -278,8 +274,7 @@ namespace Actisense
 			 \return     True on success
 			 *******************************************************************************/
 			[[nodiscard]] bool buildEcho(const std::vector<uint8_t>& data,
-										 std::vector<uint8_t>& outFrame,
-										 std::string& outError);
+										 std::vector<uint8_t>& outFrame, std::string& outError);
 
 			/* NMEA 2000 Product Information Commands ------------------------------- */
 

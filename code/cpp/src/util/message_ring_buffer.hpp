@@ -5,8 +5,8 @@
  \file       message_ring_buffer.hpp
  \brief      Message-oriented ring buffer implementation
  \details    Thread-safe ring buffer storing complete message blocks as vectors.
-             Designed for efficient zero-copy message passing between transport
-             threads and async consumers.
+			 Designed for efficient zero-copy message passing between transport
+			 threads and async consumers.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -29,8 +29,8 @@ namespace Actisense
 		 \brief      Message-oriented ring buffer
 		 \tparam     T  Message container type (default: std::vector<uint8_t>)
 		 \details    Thread-safe buffer storing complete messages rather than individual
-		             bytes. Supports efficient move semantics for zero-copy message
-		             transfer. Single producer / single consumer pattern.
+					 bytes. Supports efficient move semantics for zero-copy message
+					 transfer. Single producer / single consumer pattern.
 
 		 Key advantages over byte-oriented buffers:
 		 - Eliminates byte-at-a-time copying
@@ -178,8 +178,8 @@ namespace Actisense
 			 \return     Message if available within timeout, std::nullopt otherwise
 			 *******************************************************************************/
 			template <typename Rep, typename Period>
-			[[nodiscard]] std::optional<T> dequeueWait(
-				const std::chrono::duration<Rep, Period>& timeout) {
+			[[nodiscard]] std::optional<T>
+			dequeueWait(const std::chrono::duration<Rep, Period>& timeout) {
 				std::unique_lock<std::mutex> lock(mutex_);
 				if (!dataAvailable_.wait_for(lock, timeout,
 											 [this] { return !messages_.empty(); })) {

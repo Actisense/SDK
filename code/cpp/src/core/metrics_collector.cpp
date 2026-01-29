@@ -15,9 +15,7 @@ namespace Actisense
 	{
 		/* Public Method Definitions -------------------------------------------- */
 
-		MetricsCollector::MetricsCollector()
-			: startTime_(std::chrono::steady_clock::now()) {
-		}
+		MetricsCollector::MetricsCollector() : startTime_(std::chrono::steady_clock::now()) {}
 
 		/* Transport metrics ---------------------------------------------------- */
 
@@ -129,8 +127,8 @@ namespace Actisense
 			metrics.capturedAt = now;
 
 			// Calculate uptime
-			const auto uptime = std::chrono::duration_cast<std::chrono::milliseconds>(
-				now - startTime_);
+			const auto uptime =
+				std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime_);
 			metrics.uptimeMs = static_cast<uint64_t>(uptime.count());
 
 			// Transport metrics (relaxed loads are safe for counters)
@@ -139,8 +137,8 @@ namespace Actisense
 			metrics.transport.writeCalls = writeCalls_.load(std::memory_order_relaxed);
 			metrics.transport.readCalls = readCalls_.load(std::memory_order_relaxed);
 			metrics.transport.errorsCount = transportErrors_.load(std::memory_order_relaxed);
-			metrics.transport.lastError = static_cast<ErrorCode>(
-				lastTransportError_.load(std::memory_order_relaxed));
+			metrics.transport.lastError =
+				static_cast<ErrorCode>(lastTransportError_.load(std::memory_order_relaxed));
 
 			// Protocol metrics
 			metrics.protocol.framesReceived = framesReceived_.load(std::memory_order_relaxed);

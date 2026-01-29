@@ -53,46 +53,46 @@ namespace Actisense
 		enum class BemCommandId : uint8_t
 		{
 			/* Device Control Commands (Action Commands) */
-			ReInitMainApp = 0x00,    ///< Reinitialize main application (reboot)
-			CommitToEeprom = 0x01,   ///< Commit session settings to EEPROM
-			CommitToFlash = 0x02,    ///< Commit session settings to FLASH
+			ReInitMainApp = 0x00,  ///< Reinitialize main application (reboot)
+			CommitToEeprom = 0x01, ///< Commit session settings to EEPROM
+			CommitToFlash = 0x02,  ///< Commit session settings to FLASH
 
 			/* Device Information Commands */
 			GetSetOperatingMode = 0x11, ///< Get/Set operating mode (BST A1H→A0H)
-			GetSetTotalTime = 0x15,     ///< Get/Set device total operating time
-			Echo = 0x18,                ///< Echo test command
+			GetSetTotalTime = 0x15,		///< Get/Set device total operating time
+			Echo = 0x18,				///< Echo test command
 
 			/* Port Configuration Commands */
 			GetSetPortPCode = 0x13,	   ///< Get/Set port P-Code configuration
 			GetSetPortBaudrate = 0x17, ///< Get/Set port baudrate configuration
 
 			/* NMEA 2000 Product Information Commands */
-			GetSupportedPgnList = 0x40,  ///< Get list of supported PGNs
-			GetProductInfo = 0x41,       ///< Get product information
-			GetSetCanConfig = 0x42,      ///< Get/Set CAN configuration (NMEA NAME)
-			GetSetCanInfoField1 = 0x43,  ///< Get/Set CAN installation description 1
-			GetSetCanInfoField2 = 0x44,  ///< Get/Set CAN installation description 2
-			GetCanInfoField3 = 0x45,     ///< Get CAN manufacturer info (read-only)
+			GetSupportedPgnList = 0x40, ///< Get list of supported PGNs
+			GetProductInfo = 0x41,		///< Get product information
+			GetSetCanConfig = 0x42,		///< Get/Set CAN configuration (NMEA NAME)
+			GetSetCanInfoField1 = 0x43, ///< Get/Set CAN installation description 1
+			GetSetCanInfoField2 = 0x44, ///< Get/Set CAN installation description 2
+			GetCanInfoField3 = 0x45,	///< Get CAN manufacturer info (read-only)
 
 			/* PGN Enable Commands */
 			GetSetRxPgnEnable = 0x46, ///< Get/Set Rx PGN enable state
 			GetSetTxPgnEnable = 0x47, ///< Get/Set Tx PGN enable state
 
 			/* PGN List Management Commands */
-			GetSetRxPgnEnableListF1 = 0x48,  ///< Get/Set Rx PGN enable list (Format 1, legacy)
-			GetSetTxPgnEnableListF1 = 0x49,  ///< Get/Set Tx PGN enable list (Format 1, legacy)
-			DeletePgnEnableLists = 0x4A,     ///< Delete PGN enable lists from session
-			ActivatePgnEnableLists = 0x4B,   ///< Activate session PGN enable lists
-			DefaultPgnEnableList = 0x4C,     ///< Restore default PGN enable lists
-			ParamsPgnEnableLists = 0x4D,     ///< Get PGN enable list parameters/status
-			GetSetRxPgnEnableListF2 = 0x4E,  ///< Get/Set Rx PGN enable list (Format 2)
-			GetSetTxPgnEnableListF2 = 0x4F,  ///< Get/Set Tx PGN enable list (Format 2)
+			GetSetRxPgnEnableListF1 = 0x48, ///< Get/Set Rx PGN enable list (Format 1, legacy)
+			GetSetTxPgnEnableListF1 = 0x49, ///< Get/Set Tx PGN enable list (Format 1, legacy)
+			DeletePgnEnableLists = 0x4A,	///< Delete PGN enable lists from session
+			ActivatePgnEnableLists = 0x4B,	///< Activate session PGN enable lists
+			DefaultPgnEnableList = 0x4C,	///< Restore default PGN enable lists
+			ParamsPgnEnableLists = 0x4D,	///< Get PGN enable list parameters/status
+			GetSetRxPgnEnableListF2 = 0x4E, ///< Get/Set Rx PGN enable list (Format 2)
+			GetSetTxPgnEnableListF2 = 0x4F, ///< Get/Set Tx PGN enable list (Format 2)
 
 			/* Unsolicited Messages (no command, response only via BST A0H) */
 			StartupStatus = 0xF0, ///< (Unsolicited) startup status information
 			ErrorReport = 0xF1,	  ///< (Unsolicited) error report information
 			SystemStatus = 0xF2,  ///< (Unsolicited) System status information
-			NegativeAck = 0xF4,   ///< (Unsolicited) negative acknowledgement
+			NegativeAck = 0xF4,	  ///< (Unsolicited) negative acknowledgement
 		};
 
 		/**************************************************************************/ /**

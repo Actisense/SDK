@@ -7,11 +7,11 @@
  \date       (Created) 28/01/2026
  \brief      Default PGN Enable List BEM command types and helpers
  \details    Structures and functions for encoding/decoding Default PGN Enable
-             List (0x4C) BEM commands. This command restores factory default
-             PGN enable configuration and automatically activates it.
+			 List (0x4C) BEM commands. This command restores factory default
+			 PGN enable configuration and automatically activates it.
 
-             Note: This performs a factory reset of PGN filtering + auto-activate.
-             To persist changes, commit to EEPROM/FLASH after command.
+			 Note: This performs a factory reset of PGN filtering + auto-activate.
+			 To persist changes, commit to EEPROM/FLASH after command.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -43,10 +43,8 @@ namespace Actisense
 		 \return     True on success, false on error
 		 \details    Response has no data payload, success indicated by BEM header
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeDefaultPgnEnableListResponse(
-			std::span<const uint8_t> data,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool decodeDefaultPgnEnableListResponse(std::span<const uint8_t> data,
+																	 std::string& outError) {
 			/* No data payload expected - success indicated by BEM response header */
 			(void)data;
 			(void)outError;
@@ -57,8 +55,7 @@ namespace Actisense
 		 \brief      Encode Default PGN Enable List request data
 		 \param[out] outData    Encoded request data (empty)
 		 *******************************************************************************/
-		inline void encodeDefaultPgnEnableListRequest(std::vector<uint8_t>& outData)
-		{
+		inline void encodeDefaultPgnEnableListRequest(std::vector<uint8_t>& outData) {
 			outData.clear();
 			/* No payload for this command */
 		}

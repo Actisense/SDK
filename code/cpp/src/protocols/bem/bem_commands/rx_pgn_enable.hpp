@@ -7,8 +7,8 @@
  \date       (Created) 27/01/2026
  \brief      Rx PGN Enable BEM command types and helpers
  \details    Structures and functions for encoding/decoding Rx PGN Enable
-             (0x46) BEM commands. Controls which PGNs are received/filtered
-             on NMEA 2000 or J1939 interfaces.
+			 (0x46) BEM commands. Controls which PGNs are received/filtered
+			 on NMEA 2000 or J1939 interfaces.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -49,9 +49,9 @@ namespace Actisense
 		 *******************************************************************************/
 		enum class RxPgnEnableFlag : uint8_t
 		{
-			Disabled = 0x00,    ///< PGN reception disabled (filtered out)
-			Enabled = 0x01,     ///< PGN reception enabled (passed through)
-			RespondMode = 0x02  ///< Device-specific respond mode
+			Disabled = 0x00,   ///< PGN reception disabled (filtered out)
+			Enabled = 0x01,	   ///< PGN reception enabled (passed through)
+			RespondMode = 0x02 ///< Device-specific respond mode
 		};
 
 		/* Data Structures ------------------------------------------------------ */
@@ -62,9 +62,9 @@ namespace Actisense
 		 *******************************************************************************/
 		struct RxPgnEnableRequest
 		{
-			uint32_t pgn = 0;                          ///< 24-bit PGN ID (stored in 32-bit)
-			std::optional<RxPgnEnableFlag> enable;     ///< Enable flag (omit for GET)
-			std::optional<uint32_t> mask;              ///< PGN mask (optional for SET)
+			uint32_t pgn = 0;					   ///< 24-bit PGN ID (stored in 32-bit)
+			std::optional<RxPgnEnableFlag> enable; ///< Enable flag (omit for GET)
+			std::optional<uint32_t> mask;		   ///< PGN mask (optional for SET)
 		};
 
 		/**************************************************************************/ /**
@@ -73,9 +73,9 @@ namespace Actisense
 		 *******************************************************************************/
 		struct RxPgnEnableResponse
 		{
-			uint32_t pgn = 0;                          ///< PGN ID
-			RxPgnEnableFlag enable = RxPgnEnableFlag::Disabled;  ///< Current enable state
-			uint32_t mask = 0;                         ///< Current PGN mask
+			uint32_t pgn = 0;									///< PGN ID
+			RxPgnEnableFlag enable = RxPgnEnableFlag::Disabled; ///< Current enable state
+			uint32_t mask = 0;									///< Current PGN mask
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -87,32 +87,28 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeRxPgnEnableResponse(
-			std::span<const uint8_t> data,
-			RxPgnEnableResponse& response,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool decodeRxPgnEnableResponse(std::span<const uint8_t> data,
+															RxPgnEnableResponse& response,
+															std::string& outError) {
 			if (data.size() < kRxPgnEnableResponseSize) {
 				outError = "Rx PGN Enable response too short: expected " +
-				           std::to_string(kRxPgnEnableResponseSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(kRxPgnEnableResponseSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
 			/* PGN ID: bytes 0-3, little-endian */
-			response.pgn = static_cast<uint32_t>(data[0]) |
-			               (static_cast<uint32_t>(data[1]) << 8) |
-			               (static_cast<uint32_t>(data[2]) << 16) |
-			               (static_cast<uint32_t>(data[3]) << 24);
+			response.pgn = static_cast<uint32_t>(data[0]) | (static_cast<uint32_t>(data[1]) << 8) |
+						   (static_cast<uint32_t>(data[2]) << 16) |
+						   (static_cast<uint32_t>(data[3]) << 24);
 
 			/* Enable flag: byte 4 */
 			response.enable = static_cast<RxPgnEnableFlag>(data[4]);
 
 			/* Mask: bytes 5-8, little-endian */
-			response.mask = static_cast<uint32_t>(data[5]) |
-			                (static_cast<uint32_t>(data[6]) << 8) |
-			                (static_cast<uint32_t>(data[7]) << 16) |
-			                (static_cast<uint32_t>(data[8]) << 24);
+			response.mask = static_cast<uint32_t>(data[5]) | (static_cast<uint32_t>(data[6]) << 8) |
+							(static_cast<uint32_t>(data[7]) << 16) |
+							(static_cast<uint32_t>(data[8]) << 24);
 
 			return true;
 		}
@@ -122,9 +118,7 @@ namespace Actisense
 		 \param[in]  pgn        PGN ID to query
 		 \param[out] outData    Encoded request data
 		 *******************************************************************************/
-		inline void encodeRxPgnEnableGetRequest(uint32_t pgn,
-		                                        std::vector<uint8_t>& outData)
-		{
+		inline void encodeRxPgnEnableGetRequest(uint32_t pgn, std::vector<uint8_t>& outData) {
 			outData.clear();
 			outData.reserve(kRxPgnEnableGetRequestSize);
 
@@ -141,10 +135,8 @@ namespace Actisense
 		 \param[in]  enable     Enable flag
 		 \param[out] outData    Encoded request data
 		 *******************************************************************************/
-		inline void encodeRxPgnEnableSetRequest(uint32_t pgn,
-		                                        RxPgnEnableFlag enable,
-		                                        std::vector<uint8_t>& outData)
-		{
+		inline void encodeRxPgnEnableSetRequest(uint32_t pgn, RxPgnEnableFlag enable,
+												std::vector<uint8_t>& outData) {
 			outData.clear();
 			outData.reserve(kRxPgnEnableBasicSetRequestSize);
 
@@ -165,11 +157,9 @@ namespace Actisense
 		 \param[in]  mask       PGN mask for filtering
 		 \param[out] outData    Encoded request data
 		 *******************************************************************************/
-		inline void encodeRxPgnEnableSetRequestWithMask(uint32_t pgn,
-		                                                RxPgnEnableFlag enable,
-		                                                uint32_t mask,
-		                                                std::vector<uint8_t>& outData)
-		{
+		inline void encodeRxPgnEnableSetRequestWithMask(uint32_t pgn, RxPgnEnableFlag enable,
+														uint32_t mask,
+														std::vector<uint8_t>& outData) {
 			outData.clear();
 			outData.reserve(kRxPgnEnableExtendedSetRequestSize);
 
@@ -194,8 +184,7 @@ namespace Actisense
 		 \param[in]  flag       Enable flag value
 		 \return     Human-readable flag name
 		 *******************************************************************************/
-		[[nodiscard]] inline const char* rxPgnEnableFlagToString(RxPgnEnableFlag flag)
-		{
+		[[nodiscard]] inline const char* rxPgnEnableFlagToString(RxPgnEnableFlag flag) {
 			switch (flag) {
 				case RxPgnEnableFlag::Disabled:
 					return "Disabled";

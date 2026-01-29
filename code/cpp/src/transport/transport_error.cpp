@@ -7,9 +7,9 @@
  *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include <array>
-
 #include "transport/transport_error.hpp"
+
+#include <array>
 
 namespace Actisense
 {
@@ -23,23 +23,23 @@ namespace Actisense
 			 \brief      Error messages indexed by TransportErrorCode
 			 *******************************************************************************/
 			constexpr std::array<std::string_view, 17> kTransportErrorMessages = {{
-				"No error",								   // Ok
-				"Serial port not found",				   // PortNotFound
-				"Port in use by another process",		   // PortBusy
-				"Permission denied to access port",		   // PermissionDenied
-				"Failed to configure port settings",	   // ConfigurationFailed
-				"Internal buffer overflow",				   // BufferOverflow
-				"Read operation failed",				   // ReadFailed
-				"Write operation failed",				   // WriteFailed
-				"Connection lost (device disconnected)",   // Disconnected
-				"Invalid or closed handle",				   // InvalidHandle
-				"Operation timed out",					   // Timeout
-				"Host not found (DNS resolution failed)",  // HostNotFound
-				"Connection refused by remote host",	   // ConnectionRefused
-				"Network is unreachable",				   // NetworkUnreachable
-				"Address or port already in use",		   // AddressInUse
-				"Invalid IP address or hostname",		   // InvalidAddress
-				"Socket error"							   // SocketError
+				"No error",								  // Ok
+				"Serial port not found",				  // PortNotFound
+				"Port in use by another process",		  // PortBusy
+				"Permission denied to access port",		  // PermissionDenied
+				"Failed to configure port settings",	  // ConfigurationFailed
+				"Internal buffer overflow",				  // BufferOverflow
+				"Read operation failed",				  // ReadFailed
+				"Write operation failed",				  // WriteFailed
+				"Connection lost (device disconnected)",  // Disconnected
+				"Invalid or closed handle",				  // InvalidHandle
+				"Operation timed out",					  // Timeout
+				"Host not found (DNS resolution failed)", // HostNotFound
+				"Connection refused by remote host",	  // ConnectionRefused
+				"Network is unreachable",				  // NetworkUnreachable
+				"Address or port already in use",		  // AddressInUse
+				"Invalid IP address or hostname",		  // InvalidAddress
+				"Socket error"							  // SocketError
 			}};
 
 			/**************************************************************************/ /**

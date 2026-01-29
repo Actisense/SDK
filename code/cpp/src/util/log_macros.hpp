@@ -16,12 +16,12 @@
  \brief      Internal logging macro implementation
  \details    Checks isEnabled() before formatting to avoid overhead when disabled
  *******************************************************************************/
-#define SDK_LOG_IMPL(level, category, msg)                                    \
-	do {                                                                      \
-		auto& _sdk_log = ::Actisense::Sdk::logger();                          \
-		if (_sdk_log.isEnabled(level, category)) {                            \
-			_sdk_log.log(level, category, msg, __FILE__, __LINE__);           \
-		}                                                                     \
+#define SDK_LOG_IMPL(level, category, msg)                          \
+	do {                                                            \
+		auto& _sdk_log = ::Actisense::Sdk::logger();                \
+		if (_sdk_log.isEnabled(level, category)) {                  \
+			_sdk_log.log(level, category, msg, __FILE__, __LINE__); \
+		}                                                           \
 	} while (0)
 
 /**************************************************************************/ /**
@@ -29,32 +29,28 @@
  \param[in]  category  LogCategory enum value
  \param[in]  msg       Message string (string_view compatible)
  *******************************************************************************/
-#define SDK_LOG_ERROR(category, msg) \
-	SDK_LOG_IMPL(::Actisense::Sdk::LogLevel::Error, category, msg)
+#define SDK_LOG_ERROR(category, msg) SDK_LOG_IMPL(::Actisense::Sdk::LogLevel::Error, category, msg)
 
 /**************************************************************************/ /**
  \brief      Log a warning message
  \param[in]  category  LogCategory enum value
  \param[in]  msg       Message string (string_view compatible)
  *******************************************************************************/
-#define SDK_LOG_WARN(category, msg) \
-	SDK_LOG_IMPL(::Actisense::Sdk::LogLevel::Warn, category, msg)
+#define SDK_LOG_WARN(category, msg) SDK_LOG_IMPL(::Actisense::Sdk::LogLevel::Warn, category, msg)
 
 /**************************************************************************/ /**
  \brief      Log an info message
  \param[in]  category  LogCategory enum value
  \param[in]  msg       Message string (string_view compatible)
  *******************************************************************************/
-#define SDK_LOG_INFO(category, msg) \
-	SDK_LOG_IMPL(::Actisense::Sdk::LogLevel::Info, category, msg)
+#define SDK_LOG_INFO(category, msg) SDK_LOG_IMPL(::Actisense::Sdk::LogLevel::Info, category, msg)
 
 /**************************************************************************/ /**
  \brief      Log a debug message
  \param[in]  category  LogCategory enum value
  \param[in]  msg       Message string (string_view compatible)
  *******************************************************************************/
-#define SDK_LOG_DEBUG(category, msg) \
-	SDK_LOG_IMPL(::Actisense::Sdk::LogLevel::Debug, category, msg)
+#define SDK_LOG_DEBUG(category, msg) SDK_LOG_IMPL(::Actisense::Sdk::LogLevel::Debug, category, msg)
 
 /**************************************************************************/ /**
  \brief      Log a trace message
@@ -63,8 +59,7 @@
  \note       May be compiled out in release builds if ACTISENSE_SDK_NO_TRACE is defined
  *******************************************************************************/
 #ifndef ACTISENSE_SDK_NO_TRACE
-#define SDK_LOG_TRACE(category, msg) \
-	SDK_LOG_IMPL(::Actisense::Sdk::LogLevel::Trace, category, msg)
+#define SDK_LOG_TRACE(category, msg) SDK_LOG_IMPL(::Actisense::Sdk::LogLevel::Trace, category, msg)
 #else
 #define SDK_LOG_TRACE(category, msg) ((void)0)
 #endif
@@ -75,8 +70,8 @@
  \brief      Log to Transport category
  *******************************************************************************/
 #define SDK_LOG_TRANSPORT_ERROR(msg) SDK_LOG_ERROR(::Actisense::Sdk::LogCategory::Transport, msg)
-#define SDK_LOG_TRANSPORT_WARN(msg)  SDK_LOG_WARN(::Actisense::Sdk::LogCategory::Transport, msg)
-#define SDK_LOG_TRANSPORT_INFO(msg)  SDK_LOG_INFO(::Actisense::Sdk::LogCategory::Transport, msg)
+#define SDK_LOG_TRANSPORT_WARN(msg)	 SDK_LOG_WARN(::Actisense::Sdk::LogCategory::Transport, msg)
+#define SDK_LOG_TRANSPORT_INFO(msg)	 SDK_LOG_INFO(::Actisense::Sdk::LogCategory::Transport, msg)
 #define SDK_LOG_TRANSPORT_DEBUG(msg) SDK_LOG_DEBUG(::Actisense::Sdk::LogCategory::Transport, msg)
 #define SDK_LOG_TRANSPORT_TRACE(msg) SDK_LOG_TRACE(::Actisense::Sdk::LogCategory::Transport, msg)
 
@@ -84,8 +79,8 @@
  \brief      Log to Protocol category
  *******************************************************************************/
 #define SDK_LOG_PROTOCOL_ERROR(msg) SDK_LOG_ERROR(::Actisense::Sdk::LogCategory::Protocol, msg)
-#define SDK_LOG_PROTOCOL_WARN(msg)  SDK_LOG_WARN(::Actisense::Sdk::LogCategory::Protocol, msg)
-#define SDK_LOG_PROTOCOL_INFO(msg)  SDK_LOG_INFO(::Actisense::Sdk::LogCategory::Protocol, msg)
+#define SDK_LOG_PROTOCOL_WARN(msg)	SDK_LOG_WARN(::Actisense::Sdk::LogCategory::Protocol, msg)
+#define SDK_LOG_PROTOCOL_INFO(msg)	SDK_LOG_INFO(::Actisense::Sdk::LogCategory::Protocol, msg)
 #define SDK_LOG_PROTOCOL_DEBUG(msg) SDK_LOG_DEBUG(::Actisense::Sdk::LogCategory::Protocol, msg)
 #define SDK_LOG_PROTOCOL_TRACE(msg) SDK_LOG_TRACE(::Actisense::Sdk::LogCategory::Protocol, msg)
 

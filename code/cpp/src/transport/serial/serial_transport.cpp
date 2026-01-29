@@ -39,13 +39,12 @@ namespace Actisense
 		/* Public Function Definitions ------------------------------------------ */
 
 		SerialTransport::SerialTransport()
-			: messageBuffer_(kDefaultMaxPendingMessages), tempBufferSize_(kDefaultTempBufferSize) 
-		{
-			#if defined(_WIN32)
+			: messageBuffer_(kDefaultMaxPendingMessages), tempBufferSize_(kDefaultTempBufferSize) {
+#if defined(_WIN32)
 			/* Set up an unnamed handle to be used to signal from the main thread that
 			   the comms threads should be terminated.
 				args:
-					NULL	If this parameter is NULL, the handle cannot be 
+					NULL	If this parameter is NULL, the handle cannot be
 							inherited by child processes
 					FALSE	BOOL bManualReset  = FALSE : system automatically
 							resets the event state to nonsignaled after a
@@ -59,11 +58,10 @@ namespace Actisense
 				/* Error creating event handle */
 				rx_terminate_handle_ = INVALID_HANDLE_VALUE;
 			}
-			#endif
+#endif
 		}
 
-		SerialTransport::~SerialTransport() 
-		{
+		SerialTransport::~SerialTransport() {
 			close();
 #if defined(_WIN32)
 			if (rx_terminate_handle_ != INVALID_HANDLE_VALUE) {
@@ -73,8 +71,7 @@ namespace Actisense
 		}
 
 		void SerialTransport::asyncOpen(const TransportConfig& config,
-										std::function<void(ErrorCode)> completion) 
-		{
+										std::function<void(ErrorCode)> completion) {
 			if (config.kind != TransportKind::Serial) {
 				if (completion)
 					completion(ErrorCode::InvalidArgument);
@@ -93,8 +90,7 @@ namespace Actisense
 				completion(result);
 		}
 
-		void SerialTransport::close() 
-		{
+		void SerialTransport::close() {
 			if (!isOpen_.exchange(false)) {
 				return; /* Already closed */
 			}
@@ -202,8 +198,7 @@ namespace Actisense
 			return TransportKind::Serial;
 		}
 
-		ErrorCode SerialTransport::open(const SerialTransportConfig& config) 
-		{
+		ErrorCode SerialTransport::open(const SerialTransportConfig& config) {
 			if (isOpen()) {
 				return ErrorCode::AlreadyConnected;
 			}
@@ -522,15 +517,14 @@ namespace Actisense
 		}
 
 #if defined(_WIN32)
-		/**************************************************************************/ /**
-		 \brief     readThreadFunc (Windows)
-		 \details	Read thread function for Windows using overlapped I/O
-					Keeps running until flag is set to stop
-		 \return     .
-		 *******************************************************************************/
-		#define METHOD_IS_WaitForMultipleObjects
-		void SerialTransport::readThreadFunc() 
-		{
+/**************************************************************************/ /**
+ \brief     readThreadFunc (Windows)
+ \details	Read thread function for Windows using overlapped I/O
+			Keeps running until flag is set to stop
+ \return     .
+ *******************************************************************************/
+#define METHOD_IS_WaitForMultipleObjects
+		void SerialTransport::readThreadFunc() {
 			OVERLAPPED readOverlapped{};
 			readOverlapped.hEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 			if (!readOverlapped.hEvent) {
@@ -552,19 +546,18 @@ namespace Actisense
 			std::vector<uint8_t> tempBuffer(tempBufferSize_);
 			uint8_t* read_buffer = tempBuffer.data();
 			ACTISENSE_LOG_INFO("Serial", "Read thread started");
-			while (!stopRequested_ && isOpen()) 
-			{
+			while (!stopRequested_ && isOpen()) {
 				/* Read from port into temp buffer */
 				std::size_t bytes_read = 0;
 
-				#ifdef METHOD_IS_WaitForMultipleObjects
+#ifdef METHOD_IS_WaitForMultipleObjects
 				/* Alternative method using WaitForMultipleObjects */
 				{
 					DWORD dwBytesRead = 0;
 					if (!fWaitingOnRead) {
 						/* Issue read operation */
-						if (!ReadFile(handle_, read_buffer, static_cast<DWORD>(tempBufferSize_), &dwBytesRead,
-									  &readOverlapped)) {
+						if (!ReadFile(handle_, read_buffer, static_cast<DWORD>(tempBufferSize_),
+									  &dwBytesRead, &readOverlapped)) {
 							/* Error occurred - (IO PENDING error is ok) */
 							if (GetLastError() != ERROR_IO_PENDING) {
 								/* Error in communications; Stop the thread */
@@ -593,8 +586,8 @@ namespace Actisense
 						switch (dwRes) {
 							case WAIT_OBJECT_0:
 								/* Read completed */
-								if (!GetOverlappedResult(handle_, &readOverlapped,
-														 &dwBytesRead, FALSE)) {
+								if (!GetOverlappedResult(handle_, &readOverlapped, &dwBytesRead,
+														 FALSE)) {
 									/* Error in communications; Stop the thread */
 									stopRequested_ = true;
 								} else {
@@ -617,7 +610,7 @@ namespace Actisense
 									changed since last loop back around, and cannot
 									issue another read until the first one finishes.
 									This is a good time to do some background work. */
-								}break;
+							} break;
 							default:
 								/* Error in the WaitForSingleObject; abort. This indicates
 									a problem with the OVERLAPPED structure's event handle. */
@@ -631,8 +624,8 @@ namespace Actisense
 					DWORD dwBytesRead = 0;
 					ResetEvent(readOverlapped.hEvent);
 					BOOL readResult =
-						ReadFile(handle_, read_buffer, static_cast<DWORD>(tempBufferSize_),
-											   nullptr, &readOverlapped);
+						ReadFile(handle_, read_buffer, static_cast<DWORD>(tempBufferSize_), nullptr,
+								 &readOverlapped);
 					if (!readResult) {
 						if (GetLastError() == ERROR_IO_PENDING) {
 							DWORD waitResult = WaitForSingleObject(readOverlapped.hEvent, waitTime);
@@ -653,7 +646,7 @@ namespace Actisense
 					}
 					bytes_read = static_cast<std::size_t>(dwBytesRead);
 				}
-				#endif
+#endif
 				totalBytesReceived_ += bytes_read;
 				/* Process async operations */
 				processAsyncOperations(read_buffer, bytes_read);
@@ -663,55 +656,52 @@ namespace Actisense
 			ACTISENSE_LOG_INFO("Serial", "Read thread exiting");
 		}
 
-		#else /* POSIX */
+#else /* POSIX */
 
-			/**************************************************************************/ /**
-			 \brief      readThreadFunc (POSIX)
-			 \return     .
-			 *******************************************************************************/
-			void SerialTransport::readThreadFunc() 
-			{
-				std::vector<uint8_t> tempBuffer(tempBufferSize_);
-				ACTISENSE_LOG_INFO("Serial", "Read thread started");
-				while (!stopRequested_ && isOpen()) {
-					if (isOpen()) {
-						/* Read from port into temp buffer */
-						std::size_t bytes_read = 0;
-						uint8_t* buffer = tempBuffer.data();
-						std::size_t max_bytes = tempBuffer.size();
-						{
-							/* Set up for select/poll with timeout */
-							fd_set readSet;
-							FD_ZERO(&readSet);
-							FD_SET(fd_, &readSet);
+		/**************************************************************************/ /**
+		 \brief      readThreadFunc (POSIX)
+		 \return     .
+		 *******************************************************************************/
+		void SerialTransport::readThreadFunc() {
+			std::vector<uint8_t> tempBuffer(tempBufferSize_);
+			ACTISENSE_LOG_INFO("Serial", "Read thread started");
+			while (!stopRequested_ && isOpen()) {
+				if (isOpen()) {
+					/* Read from port into temp buffer */
+					std::size_t bytes_read = 0;
+					uint8_t* buffer = tempBuffer.data();
+					std::size_t max_bytes = tempBuffer.size();
+					{
+						/* Set up for select/poll with timeout */
+						fd_set readSet;
+						FD_ZERO(&readSet);
+						FD_SET(fd_, &readSet);
 
-							struct timeval tv;
-							struct timeval* pTv = nullptr;
-							if (readTimeoutMs_ > 0) {
-								tv.tv_sec = readTimeoutMs_ / 1000;
-								tv.tv_usec = (readTimeoutMs_ % 1000) * 1000;
-								pTv = &tv;
-							}
-							const int selectResult =
-								select(fd_ + 1, &readSet, nullptr, nullptr, pTv);
-							if (selectResult > 0) {
-								const ssize_t result = ::read(fd_, buffer, max_bytes);
-								if (result > 0) {
-									bytes_read = static_cast<std::size_t>(result);
-								}
-							}
-							totalBytesReceived_ += bytes_read;
+						struct timeval tv;
+						struct timeval* pTv = nullptr;
+						if (readTimeoutMs_ > 0) {
+							tv.tv_sec = readTimeoutMs_ / 1000;
+							tv.tv_usec = (readTimeoutMs_ % 1000) * 1000;
+							pTv = &tv;
 						}
-						/* Process async operations */
-						processAsyncOperations(buffer, bytes_read);
+						const int selectResult = select(fd_ + 1, &readSet, nullptr, nullptr, pTv);
+						if (selectResult > 0) {
+							const ssize_t result = ::read(fd_, buffer, max_bytes);
+							if (result > 0) {
+								bytes_read = static_cast<std::size_t>(result);
+							}
+						}
+						totalBytesReceived_ += bytes_read;
 					}
+					/* Process async operations */
+					processAsyncOperations(buffer, bytes_read);
 				}
-				ACTISENSE_LOG_INFO("Serial", "Read thread exiting");
 			}
+			ACTISENSE_LOG_INFO("Serial", "Read thread exiting");
+		}
 #endif
 
-		void SerialTransport::processAsyncOperations(uint8_t* buffer, std::size_t bytes_read) 
-		{
+		void SerialTransport::processAsyncOperations(uint8_t* buffer, std::size_t bytes_read) {
 			if (bytes_read == 0) {
 				return;
 			}
@@ -729,7 +719,7 @@ namespace Actisense
 				if (!messageBuffer_.enqueue(std::move(ring_message))) {
 					std::ostringstream ss;
 					ss << "Message buffer overflow! Dropped " << bytes_read << " bytes"
-						<< " (buffer has " << messageBuffer_.size() << " messages)";
+					   << " (buffer has " << messageBuffer_.size() << " messages)";
 					ACTISENSE_LOG_ERROR("Serial", ss.str());
 				} else {
 					++messagesReceived_;

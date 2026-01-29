@@ -37,15 +37,15 @@ namespace Actisense
 		 *******************************************************************************/
 		struct SerialTransportConfig
 		{
-			std::string port;					///< Port name (e.g., "COM7", "/dev/ttyUSB0")
-			unsigned baud = 115200;				///< Baud rate
-			unsigned dataBits = 8;				///< Data bits (5-8)
-			char parity = 'N';					///< Parity: 'N'=None, 'E'=Even, 'O'=Odd
-			unsigned stopBits = 1;				///< Stop bits (1 or 2)
-			std::size_t readBufferSize = 512;	///< Temp buffer size for serial reads
-			std::size_t writeBufferSize = 4096; ///< Write buffer size
-			unsigned readTimeoutMs = 10;		///< Read timeout/poll interval in milliseconds
-			std::size_t maxPendingMessages = 16;///< Max messages in ring buffer
+			std::string port;					 ///< Port name (e.g., "COM7", "/dev/ttyUSB0")
+			unsigned baud = 115200;				 ///< Baud rate
+			unsigned dataBits = 8;				 ///< Data bits (5-8)
+			char parity = 'N';					 ///< Parity: 'N'=None, 'E'=Even, 'O'=Odd
+			unsigned stopBits = 1;				 ///< Stop bits (1 or 2)
+			std::size_t readBufferSize = 512;	 ///< Temp buffer size for serial reads
+			std::size_t writeBufferSize = 4096;	 ///< Write buffer size
+			unsigned readTimeoutMs = 10;		 ///< Read timeout/poll interval in milliseconds
+			std::size_t maxPendingMessages = 16; ///< Max messages in ring buffer
 		};
 
 		/**************************************************************************/ /**
@@ -171,7 +171,7 @@ namespace Actisense
 			mutable std::mutex readMutex_;
 			MessageRingBuffer<std::vector<uint8_t>> messageBuffer_;
 			std::size_t tempBufferSize_ = 512; ///< Size of temp read buffer
-			unsigned readTimeoutMs_ = 10;      ///< Read timeout/poll interval
+			unsigned readTimeoutMs_ = 10;	   ///< Read timeout/poll interval
 
 			/* Async operation queues */
 			struct PendingRecv

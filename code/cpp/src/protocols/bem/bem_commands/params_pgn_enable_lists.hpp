@@ -7,8 +7,8 @@
  \date       (Created) 28/01/2026
  \brief      Params PGN Enable Lists BEM command types and helpers
  \details    Structures and functions for encoding/decoding Params PGN Enable
-             Lists (0x4D) BEM commands. This command retrieves the current
-             capacity and synchronization status of PGN enable lists.
+			 Lists (0x4D) BEM commands. This command retrieves the current
+			 capacity and synchronization status of PGN enable lists.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -40,33 +40,27 @@ namespace Actisense
 		struct ParamsPgnEnableListsResponse
 		{
 			/* Rx PGN Enable List parameters */
-			uint16_t rxListMaxCapacity = 0;    ///< Maximum Rx list entries
-			uint16_t rxListSessionCount = 0;   ///< Current Rx session entries
-			uint16_t rxListActiveCount = 0;    ///< Current Rx active entries
+			uint16_t rxListMaxCapacity = 0;	 ///< Maximum Rx list entries
+			uint16_t rxListSessionCount = 0; ///< Current Rx session entries
+			uint16_t rxListActiveCount = 0;	 ///< Current Rx active entries
 
 			/* Tx PGN Enable List parameters */
-			uint16_t txListMaxCapacity = 0;    ///< Maximum Tx list entries
-			uint16_t txListSessionCount = 0;   ///< Current Tx session entries
-			uint16_t txListActiveCount = 0;    ///< Current Tx active entries
+			uint16_t txListMaxCapacity = 0;	 ///< Maximum Tx list entries
+			uint16_t txListSessionCount = 0; ///< Current Tx session entries
+			uint16_t txListActiveCount = 0;	 ///< Current Tx active entries
 
 			/* Sync status flags */
-			uint8_t rxSyncStatus = 0;          ///< Rx list sync status (0=synced, 1=pending)
-			uint8_t txSyncStatus = 0;          ///< Tx list sync status (0=synced, 1=pending)
+			uint8_t rxSyncStatus = 0; ///< Rx list sync status (0=synced, 1=pending)
+			uint8_t txSyncStatus = 0; ///< Tx list sync status (0=synced, 1=pending)
 
 			/// Check if Rx list is in sync with hardware
-			[[nodiscard]] bool isRxSynced() const noexcept {
-				return rxSyncStatus == 0;
-			}
+			[[nodiscard]] bool isRxSynced() const noexcept { return rxSyncStatus == 0; }
 
 			/// Check if Tx list is in sync with hardware
-			[[nodiscard]] bool isTxSynced() const noexcept {
-				return txSyncStatus == 0;
-			}
+			[[nodiscard]] bool isTxSynced() const noexcept { return txSyncStatus == 0; }
 
 			/// Check if both lists are in sync
-			[[nodiscard]] bool isSynced() const noexcept {
-				return isRxSynced() && isTxSynced();
-			}
+			[[nodiscard]] bool isSynced() const noexcept { return isRxSynced() && isTxSynced(); }
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -78,42 +72,41 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 \details    Response format (14 bytes):
-		             - Bytes 0-1:  Rx max capacity (uint16_t LE)
-		             - Bytes 2-3:  Rx session count (uint16_t LE)
-		             - Bytes 4-5:  Rx active count (uint16_t LE)
-		             - Bytes 6-7:  Tx max capacity (uint16_t LE)
-		             - Bytes 8-9:  Tx session count (uint16_t LE)
-		             - Bytes 10-11: Tx active count (uint16_t LE)
-		             - Byte 12:   Rx sync status
-		             - Byte 13:   Tx sync status
+					 - Bytes 0-1:  Rx max capacity (uint16_t LE)
+					 - Bytes 2-3:  Rx session count (uint16_t LE)
+					 - Bytes 4-5:  Rx active count (uint16_t LE)
+					 - Bytes 6-7:  Tx max capacity (uint16_t LE)
+					 - Bytes 8-9:  Tx session count (uint16_t LE)
+					 - Bytes 10-11: Tx active count (uint16_t LE)
+					 - Byte 12:   Rx sync status
+					 - Byte 13:   Tx sync status
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeParamsPgnEnableListsResponse(
-			std::span<const uint8_t> data,
-			ParamsPgnEnableListsResponse& response,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool
+		decodeParamsPgnEnableListsResponse(std::span<const uint8_t> data,
+										   ParamsPgnEnableListsResponse& response,
+										   std::string& outError) {
 			if (data.size() < kParamsPgnEnableListsResponseSize) {
 				outError = "Params PGN Enable Lists response too short: expected " +
-				           std::to_string(kParamsPgnEnableListsResponseSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(kParamsPgnEnableListsResponseSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
 			/* Rx parameters */
-			response.rxListMaxCapacity = static_cast<uint16_t>(data[0]) |
-			                             (static_cast<uint16_t>(data[1]) << 8);
-			response.rxListSessionCount = static_cast<uint16_t>(data[2]) |
-			                              (static_cast<uint16_t>(data[3]) << 8);
-			response.rxListActiveCount = static_cast<uint16_t>(data[4]) |
-			                             (static_cast<uint16_t>(data[5]) << 8);
+			response.rxListMaxCapacity =
+				static_cast<uint16_t>(data[0]) | (static_cast<uint16_t>(data[1]) << 8);
+			response.rxListSessionCount =
+				static_cast<uint16_t>(data[2]) | (static_cast<uint16_t>(data[3]) << 8);
+			response.rxListActiveCount =
+				static_cast<uint16_t>(data[4]) | (static_cast<uint16_t>(data[5]) << 8);
 
 			/* Tx parameters */
-			response.txListMaxCapacity = static_cast<uint16_t>(data[6]) |
-			                             (static_cast<uint16_t>(data[7]) << 8);
-			response.txListSessionCount = static_cast<uint16_t>(data[8]) |
-			                              (static_cast<uint16_t>(data[9]) << 8);
-			response.txListActiveCount = static_cast<uint16_t>(data[10]) |
-			                             (static_cast<uint16_t>(data[11]) << 8);
+			response.txListMaxCapacity =
+				static_cast<uint16_t>(data[6]) | (static_cast<uint16_t>(data[7]) << 8);
+			response.txListSessionCount =
+				static_cast<uint16_t>(data[8]) | (static_cast<uint16_t>(data[9]) << 8);
+			response.txListActiveCount =
+				static_cast<uint16_t>(data[10]) | (static_cast<uint16_t>(data[11]) << 8);
 
 			/* Sync status */
 			response.rxSyncStatus = data[12];
@@ -126,8 +119,7 @@ namespace Actisense
 		 \brief      Encode Params PGN Enable Lists request data
 		 \param[out] outData    Encoded request data (empty)
 		 *******************************************************************************/
-		inline void encodeParamsPgnEnableListsRequest(std::vector<uint8_t>& outData)
-		{
+		inline void encodeParamsPgnEnableListsRequest(std::vector<uint8_t>& outData) {
 			outData.clear();
 			/* No payload for GET request */
 		}
@@ -137,9 +129,8 @@ namespace Actisense
 		 \param[in]  response  Decoded response
 		 \return     Formatted string representation
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatParamsPgnEnableLists(
-			const ParamsPgnEnableListsResponse& response)
-		{
+		[[nodiscard]] inline std::string
+		formatParamsPgnEnableLists(const ParamsPgnEnableListsResponse& response) {
 			std::string result;
 			result.reserve(256);
 
@@ -148,12 +139,16 @@ namespace Actisense
 			result += "    Max Capacity: " + std::to_string(response.rxListMaxCapacity) + "\n";
 			result += "    Session Count: " + std::to_string(response.rxListSessionCount) + "\n";
 			result += "    Active Count: " + std::to_string(response.rxListActiveCount) + "\n";
-			result += "    Sync Status: " + std::string(response.isRxSynced() ? "Synced" : "Pending") + "\n";
+			result +=
+				"    Sync Status: " + std::string(response.isRxSynced() ? "Synced" : "Pending") +
+				"\n";
 			result += "  Tx List:\n";
 			result += "    Max Capacity: " + std::to_string(response.txListMaxCapacity) + "\n";
 			result += "    Session Count: " + std::to_string(response.txListSessionCount) + "\n";
 			result += "    Active Count: " + std::to_string(response.txListActiveCount) + "\n";
-			result += "    Sync Status: " + std::string(response.isTxSynced() ? "Synced" : "Pending") + "\n";
+			result +=
+				"    Sync Status: " + std::string(response.isTxSynced() ? "Synced" : "Pending") +
+				"\n";
 
 			return result;
 		}

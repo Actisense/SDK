@@ -7,8 +7,8 @@
  \date       (Created) 28/01/2026
  \brief      Total Time BEM command types and helpers
  \details    Structures and functions for encoding/decoding Total Time
-             (0x15) BEM commands. This command gets or sets the device's
-             total operating time counter (in seconds).
+			 (0x15) BEM commands. This command gets or sets the device's
+			 total operating time counter (in seconds).
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -43,8 +43,8 @@ namespace Actisense
 		 *******************************************************************************/
 		struct TotalTimeRequest
 		{
-			std::optional<uint32_t> totalTime;  ///< Time to set in seconds (omit for GET)
-			std::optional<uint32_t> passkey;    ///< Security passkey (required for SET)
+			std::optional<uint32_t> totalTime; ///< Time to set in seconds (omit for GET)
+			std::optional<uint32_t> passkey;   ///< Security passkey (required for SET)
 		};
 
 		/**************************************************************************/ /**
@@ -53,7 +53,7 @@ namespace Actisense
 		 *******************************************************************************/
 		struct TotalTimeResponse
 		{
-			uint32_t totalTime = 0;  ///< Total operating time in seconds
+			uint32_t totalTime = 0; ///< Total operating time in seconds
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -65,23 +65,20 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeTotalTimeResponse(
-			std::span<const uint8_t> data,
-			TotalTimeResponse& response,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool decodeTotalTimeResponse(std::span<const uint8_t> data,
+														  TotalTimeResponse& response,
+														  std::string& outError) {
 			if (data.size() < kTotalTimeResponseSize) {
 				outError = "Total Time response too short: expected " +
-				           std::to_string(kTotalTimeResponseSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(kTotalTimeResponseSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
 			/* Total time: bytes 0-3, little-endian */
-			response.totalTime = static_cast<uint32_t>(data[0]) |
-			                     (static_cast<uint32_t>(data[1]) << 8) |
-			                     (static_cast<uint32_t>(data[2]) << 16) |
-			                     (static_cast<uint32_t>(data[3]) << 24);
+			response.totalTime =
+				static_cast<uint32_t>(data[0]) | (static_cast<uint32_t>(data[1]) << 8) |
+				(static_cast<uint32_t>(data[2]) << 16) | (static_cast<uint32_t>(data[3]) << 24);
 
 			return true;
 		}
@@ -90,8 +87,7 @@ namespace Actisense
 		 \brief      Encode Total Time GET request data
 		 \param[out] outData  Encoded request data (empty for GET)
 		 *******************************************************************************/
-		inline void encodeTotalTimeGetRequest(std::vector<uint8_t>& outData)
-		{
+		inline void encodeTotalTimeGetRequest(std::vector<uint8_t>& outData) {
 			outData.clear();
 			/* No payload for GET request */
 		}
@@ -102,10 +98,8 @@ namespace Actisense
 		 \param[in]  passkey    Security passkey for write access
 		 \param[out] outData    Encoded request data
 		 *******************************************************************************/
-		inline void encodeTotalTimeSetRequest(uint32_t totalTime,
-		                                      uint32_t passkey,
-		                                      std::vector<uint8_t>& outData)
-		{
+		inline void encodeTotalTimeSetRequest(uint32_t totalTime, uint32_t passkey,
+											  std::vector<uint8_t>& outData) {
 			outData.clear();
 			outData.reserve(kTotalTimeSetRequestSize);
 
@@ -127,8 +121,7 @@ namespace Actisense
 		 \param[in]  totalSeconds  Total time in seconds
 		 \return     Formatted string (e.g., "1d 2h 3m 4s" or "12345 seconds")
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatTotalTime(uint32_t totalSeconds)
-		{
+		[[nodiscard]] inline std::string formatTotalTime(uint32_t totalSeconds) {
 			if (totalSeconds < 60) {
 				return std::to_string(totalSeconds) + " seconds";
 			}
@@ -158,8 +151,7 @@ namespace Actisense
 		 \param[in]  totalSeconds  Total time in seconds
 		 \return     Formatted string with total hours (e.g., "1234.5 hours")
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatTotalTimeHours(uint32_t totalSeconds)
-		{
+		[[nodiscard]] inline std::string formatTotalTimeHours(uint32_t totalSeconds) {
 			const double hours = static_cast<double>(totalSeconds) / 3600.0;
 			char buffer[32];
 			std::snprintf(buffer, sizeof(buffer), "%.1f hours", hours);

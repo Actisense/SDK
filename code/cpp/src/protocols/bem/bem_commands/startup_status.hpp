@@ -7,13 +7,13 @@
  \date       (Created) 28/01/2026
  \brief      Startup Status unsolicited message types and helpers
  \details    Structures and functions for decoding Startup Status (0xF0)
-             BEM unsolicited messages. This message is sent by devices at
-             startup to indicate boot mode and any error conditions.
+			 BEM unsolicited messages. This message is sent by devices at
+			 startup to indicate boot mode and any error conditions.
 
-             Supports two formats:
-             - Modern format: 6 bytes (uint16_t mode + uint32_t error code)
-             - Legacy format: 3 bytes (uint8_t mode + uint16_t error code)
-             Format is auto-detected by payload length.
+			 Supports two formats:
+			 - Modern format: 6 bytes (uint16_t mode + uint32_t error code)
+			 - Legacy format: 3 bytes (uint8_t mode + uint16_t error code)
+			 Format is auto-detected by payload length.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -44,9 +44,9 @@ namespace Actisense
 		 *******************************************************************************/
 		enum class StartupStatusFormat : uint8_t
 		{
-			Unknown = 0,  ///< Could not determine format
-			Legacy = 1,   ///< 3-byte legacy format
-			Modern = 2    ///< 6-byte modern format
+			Unknown = 0, ///< Could not determine format
+			Legacy = 1,	 ///< 3-byte legacy format
+			Modern = 2	 ///< 6-byte modern format
 		};
 
 		/* Data Structures ------------------------------------------------------ */
@@ -58,8 +58,8 @@ namespace Actisense
 		struct StartupStatusData
 		{
 			StartupStatusFormat format = StartupStatusFormat::Unknown;
-			uint16_t startupMode = 0;    ///< Startup/boot mode value
-			uint32_t errorCode = 0;      ///< Error code (0 = no error)
+			uint16_t startupMode = 0; ///< Startup/boot mode value
+			uint32_t errorCode = 0;	  ///< Error code (0 = no error)
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -71,31 +71,27 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 \details    Auto-detects format based on payload length:
-		             - 6 bytes: Modern format (uint16_t mode + uint32_t error)
-		             - 3 bytes: Legacy format (uint8_t mode + uint16_t error)
+					 - 6 bytes: Modern format (uint16_t mode + uint32_t error)
+					 - 3 bytes: Legacy format (uint8_t mode + uint16_t error)
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeStartupStatus(
-			std::span<const uint8_t> data,
-			StartupStatusData& status,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool decodeStartupStatus(std::span<const uint8_t> data,
+													  StartupStatusData& status,
+													  std::string& outError) {
 			if (data.size() >= kStartupStatusModernSize) {
 				/* Modern format: 2-byte mode + 4-byte error code */
 				status.format = StartupStatusFormat::Modern;
 
 				/* Startup mode: bytes 0-1, little-endian */
-				status.startupMode = static_cast<uint16_t>(data[0]) |
-				                     (static_cast<uint16_t>(data[1]) << 8);
+				status.startupMode =
+					static_cast<uint16_t>(data[0]) | (static_cast<uint16_t>(data[1]) << 8);
 
 				/* Error code: bytes 2-5, little-endian */
-				status.errorCode = static_cast<uint32_t>(data[2]) |
-				                   (static_cast<uint32_t>(data[3]) << 8) |
-				                   (static_cast<uint32_t>(data[4]) << 16) |
-				                   (static_cast<uint32_t>(data[5]) << 24);
+				status.errorCode =
+					static_cast<uint32_t>(data[2]) | (static_cast<uint32_t>(data[3]) << 8) |
+					(static_cast<uint32_t>(data[4]) << 16) | (static_cast<uint32_t>(data[5]) << 24);
 
 				return true;
-			}
-			else if (data.size() >= kStartupStatusLegacySize) {
+			} else if (data.size() >= kStartupStatusLegacySize) {
 				/* Legacy format: 1-byte mode + 2-byte error code */
 				status.format = StartupStatusFormat::Legacy;
 
@@ -103,15 +99,14 @@ namespace Actisense
 				status.startupMode = static_cast<uint16_t>(data[0]);
 
 				/* Error code: bytes 1-2, little-endian */
-				status.errorCode = static_cast<uint32_t>(data[1]) |
-				                   (static_cast<uint32_t>(data[2]) << 8);
+				status.errorCode =
+					static_cast<uint32_t>(data[1]) | (static_cast<uint32_t>(data[2]) << 8);
 
 				return true;
-			}
-			else {
+			} else {
 				outError = "Startup Status data too short: expected at least " +
-				           std::to_string(kStartupStatusLegacySize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(kStartupStatusLegacySize) + " bytes, got " +
+						   std::to_string(data.size());
 				status.format = StartupStatusFormat::Unknown;
 				return false;
 			}
@@ -122,8 +117,7 @@ namespace Actisense
 		 \param[in]  format  Format value
 		 \return     Human-readable format name
 		 *******************************************************************************/
-		[[nodiscard]] inline const char* startupStatusFormatToString(StartupStatusFormat format)
-		{
+		[[nodiscard]] inline const char* startupStatusFormatToString(StartupStatusFormat format) {
 			switch (format) {
 				case StartupStatusFormat::Legacy:
 					return "Legacy (3-byte)";
@@ -140,8 +134,7 @@ namespace Actisense
 		 \param[in]  status  Decoded startup status
 		 \return     Formatted string representation
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatStartupStatus(const StartupStatusData& status)
-		{
+		[[nodiscard]] inline std::string formatStartupStatus(const StartupStatusData& status) {
 			std::string result;
 			result.reserve(128);
 
@@ -157,8 +150,7 @@ namespace Actisense
 				result += ", Error=0x";
 				std::snprintf(buffer, sizeof(buffer), "%08X", status.errorCode);
 				result += buffer;
-			}
-			else {
+			} else {
 				result += ", No Error";
 			}
 

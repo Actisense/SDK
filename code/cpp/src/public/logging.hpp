@@ -48,7 +48,7 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Abstract logger interface
 		 \details    Implement this interface to provide custom logging backend.
-		             SDK provides StderrLogger and NullLogger implementations.
+					 SDK provides StderrLogger and NullLogger implementations.
 		 *******************************************************************************/
 		class ILogger
 		{
@@ -69,7 +69,7 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Check if logging is enabled for level/category
 			 \details    Allows fast-path skip of expensive message formatting.
-			             Called before constructing log message.
+						 Called before constructing log message.
 			 \param[in]  level     Severity level to check
 			 \param[in]  category  Category to check
 			 \return     True if a message at this level/category would be logged
@@ -95,8 +95,8 @@ namespace Actisense
 		 \brief      Set the global logger instance
 		 \param[in]  logger  Logger to use (nullptr to reset to default NullLogger)
 		 \details    Not thread-safe; call before creating sessions or from main thread.
-		             The SDK does not take ownership - caller must ensure logger
-		             lifetime exceeds SDK usage.
+					 The SDK does not take ownership - caller must ensure logger
+					 lifetime exceeds SDK usage.
 		 *******************************************************************************/
 		void setLogger(ILogger* logger);
 

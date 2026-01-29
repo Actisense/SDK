@@ -5,8 +5,8 @@
  \file       protocol_error.hpp
  \brief      Protocol layer error codes
  \details    Fine-grained error codes for protocol parsing and encoding operations
-             (BDTP, BST, BEM). These provide detailed diagnostics while mapping
-             to the public ErrorCode.
+			 (BDTP, BST, BEM). These provide detailed diagnostics while mapping
+			 to the public ErrorCode.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -32,19 +32,19 @@ namespace Actisense
 			Ok = 0, ///< No error
 
 			// BDTP framing errors (10-19)
-			BdtpFrameCorrupted = 10,  ///< DLE/STX/ETX framing error
-			BdtpBufferOverrun,		  ///< Frame exceeds maximum size
-			BdtpIncompleteFrame,	  ///< Partial frame at end of stream
-			BdtpInvalidEscape,		  ///< Invalid DLE escape sequence
-			BdtpUnexpectedStart,	  ///< STX found mid-frame
+			BdtpFrameCorrupted = 10, ///< DLE/STX/ETX framing error
+			BdtpBufferOverrun,		 ///< Frame exceeds maximum size
+			BdtpIncompleteFrame,	 ///< Partial frame at end of stream
+			BdtpInvalidEscape,		 ///< Invalid DLE escape sequence
+			BdtpUnexpectedStart,	 ///< STX found mid-frame
 
 			// BST message errors (20-29)
-			BstUnknownType = 20,   ///< Unrecognized BST ID
-			BstInvalidLength,	   ///< Length field doesn't match payload
-			BstChecksumMismatch,   ///< Checksum validation failed
-			BstPayloadTooShort,	   ///< Payload shorter than minimum required
-			BstPayloadTooLong,	   ///< Payload exceeds maximum allowed
-			BstInvalidHeader,	   ///< Required header fields missing or invalid
+			BstUnknownType = 20, ///< Unrecognized BST ID
+			BstInvalidLength,	 ///< Length field doesn't match payload
+			BstChecksumMismatch, ///< Checksum validation failed
+			BstPayloadTooShort,	 ///< Payload shorter than minimum required
+			BstPayloadTooLong,	 ///< Payload exceeds maximum allowed
+			BstInvalidHeader,	 ///< Required header fields missing or invalid
 
 			// BEM command/response errors (30-49)
 			BemSequenceMismatch = 30, ///< Response sequence != request sequence

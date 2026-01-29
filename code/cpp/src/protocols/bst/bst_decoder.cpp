@@ -288,7 +288,8 @@ namespace Actisense
 			const uint16_t totalLen = readU16LE(&data[1]);
 			const auto payload = data.subspan(3);
 
-			/* totalLen includes ID(1) + L0(1) + L1(1) = 3 bytes, so payload length = totalLen - 3 */
+			/* totalLen includes ID(1) + L0(1) + L1(1) = 3 bytes, so payload length = totalLen - 3
+			 */
 			const uint16_t payloadLen = (totalLen >= 3) ? (totalLen - 3) : 0;
 
 			if (payload.size() < payloadLen) {

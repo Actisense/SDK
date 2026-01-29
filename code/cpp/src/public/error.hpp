@@ -66,22 +66,20 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Extended error information
 		 \details    Provides additional context for errors, especially device errors.
-		             Used when more detail is needed beyond the basic ErrorCode.
+					 Used when more detail is needed beyond the basic ErrorCode.
 		 *******************************************************************************/
 		struct ExtendedError
 		{
-			ErrorCode code = ErrorCode::Ok;	   ///< SDK-level error code
-			int32_t deviceErrorCode = 0;	   ///< Original device error code (if BemDeviceError)
-			std::string_view deviceMessage;	   ///< Device error description
-			std::string_view context;		   ///< Additional context (command name, etc.)
+			ErrorCode code = ErrorCode::Ok; ///< SDK-level error code
+			int32_t deviceErrorCode = 0;	///< Original device error code (if BemDeviceError)
+			std::string_view deviceMessage; ///< Device error description
+			std::string_view context;		///< Additional context (command name, etc.)
 
 			/**************************************************************************/ /**
 			 \brief      Check if this represents an error condition
 			 \return     True if code is not Ok
 			 *******************************************************************************/
-			[[nodiscard]] constexpr bool isError() const noexcept {
-				return code != ErrorCode::Ok;
-			}
+			[[nodiscard]] constexpr bool isError() const noexcept { return code != ErrorCode::Ok; }
 
 			/**************************************************************************/ /**
 			 \brief      Check if this is a device-reported error

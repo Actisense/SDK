@@ -7,11 +7,11 @@
  *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
+#include "util/stderr_logger.hpp"
+
 #include <cstdio>
 #include <iomanip>
 #include <sstream>
-
-#include "util/stderr_logger.hpp"
 
 namespace Actisense
 {
@@ -20,8 +20,7 @@ namespace Actisense
 		/* Public Method Definitions -------------------------------------------- */
 
 		StderrLogger::StderrLogger(LogLevel threshold)
-			: threshold_(threshold)
-			, startTime_(std::chrono::steady_clock::now()) {
+			: threshold_(threshold), startTime_(std::chrono::steady_clock::now()) {
 			// Initialize all category thresholds to the global threshold
 			categoryThresholds_.fill(threshold);
 		}
@@ -35,8 +34,8 @@ namespace Actisense
 
 			// Calculate elapsed time
 			const auto now = std::chrono::steady_clock::now();
-			const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-				now - startTime_);
+			const auto elapsed =
+				std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime_);
 
 			// Format timestamp as HH:MM:SS.mmm
 			const auto totalMs = elapsed.count();
@@ -47,17 +46,10 @@ namespace Actisense
 
 			// Build output string
 			std::ostringstream oss;
-			oss << '['
-				<< std::setfill('0') << std::setw(2) << hours << ':'
-				<< std::setfill('0') << std::setw(2) << minutes << ':'
-				<< std::setfill('0') << std::setw(2) << seconds << '.'
-				<< std::setfill('0') << std::setw(3) << millis
-				<< "] ["
-				<< logLevelName(level)
-				<< "] ["
-				<< logCategoryName(category)
-				<< "] "
-				<< message;
+			oss << '[' << std::setfill('0') << std::setw(2) << hours << ':' << std::setfill('0')
+				<< std::setw(2) << minutes << ':' << std::setfill('0') << std::setw(2) << seconds
+				<< '.' << std::setfill('0') << std::setw(3) << millis << "] ["
+				<< logLevelName(level) << "] [" << logCategoryName(category) << "] " << message;
 
 			if (showLocation_ && !file.empty()) {
 				oss << " (" << file << ':' << line << ')';

@@ -7,11 +7,11 @@
  \date       (Created) 28/01/2026
  \brief      Supported PGN List BEM command types and helpers
  \details    Structures and functions for encoding/decoding Supported PGN List
-             (0x40) BEM commands. This command retrieves the list of PGNs
-             supported by the device.
+			 (0x40) BEM commands. This command retrieves the list of PGNs
+			 supported by the device.
 
-             This is a multi-message response command. The session layer must
-             assemble multiple responses using Transfer ID and PGN Index fields.
+			 This is a multi-message response command. The session layer must
+			 assemble multiple responses using Transfer ID and PGN Index fields.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -51,21 +51,21 @@ namespace Actisense
 		 *******************************************************************************/
 		struct SupportedPgnListRequest
 		{
-			uint8_t pgnIndex = 0;     ///< Starting PGN index (0 for first request)
-			uint8_t transferId = 0;   ///< Transfer ID for multi-message tracking
+			uint8_t pgnIndex = 0;	///< Starting PGN index (0 for first request)
+			uint8_t transferId = 0; ///< Transfer ID for multi-message tracking
 		};
 
 		/**************************************************************************/ /**
 		 \brief      Supported PGN List response (single message)
 		 \details    Decoded response from a single Supported PGN List message.
-		             Multiple messages may be needed to get the complete list.
+					 Multiple messages may be needed to get the complete list.
 		 *******************************************************************************/
 		struct SupportedPgnListResponse
 		{
-			uint8_t pgnIndex = 0;        ///< Starting PGN index for this message
-			uint8_t transferId = 0;      ///< Transfer ID for multi-message tracking
-			uint8_t pgnCount = 0;        ///< Number of PGNs in this message
-			std::vector<uint32_t> pgns;  ///< List of PGNs (24-bit values)
+			uint8_t pgnIndex = 0;		///< Starting PGN index for this message
+			uint8_t transferId = 0;		///< Transfer ID for multi-message tracking
+			uint8_t pgnCount = 0;		///< Number of PGNs in this message
+			std::vector<uint32_t> pgns; ///< List of PGNs (24-bit values)
 
 			/// True if this is the last message (pgnCount < max)
 			[[nodiscard]] bool isLastMessage() const noexcept {
@@ -84,12 +84,12 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Complete Supported PGN List (assembled from multiple messages)
 		 \details    Contains the complete list of supported PGNs after
-		             assembling all response messages.
+					 assembling all response messages.
 		 *******************************************************************************/
 		struct SupportedPgnListComplete
 		{
-			std::vector<uint32_t> pgns;  ///< Complete list of supported PGNs
-			uint8_t transferId = 0;      ///< Transfer ID used for assembly
+			std::vector<uint32_t> pgns; ///< Complete list of supported PGNs
+			uint8_t transferId = 0;		///< Transfer ID used for assembly
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -101,20 +101,18 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 \details    Response format:
-		             - Byte 0: PGN Index (starting index for this message)
-		             - Byte 1: Transfer ID
-		             - Byte 2: PGN Count (number of PGNs in this message)
-		             - Bytes 3+: PGN list (4 bytes each, little-endian, only 24 bits used)
+					 - Byte 0: PGN Index (starting index for this message)
+					 - Byte 1: Transfer ID
+					 - Byte 2: PGN Count (number of PGNs in this message)
+					 - Bytes 3+: PGN list (4 bytes each, little-endian, only 24 bits used)
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeSupportedPgnListResponse(
-			std::span<const uint8_t> data,
-			SupportedPgnListResponse& response,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool decodeSupportedPgnListResponse(std::span<const uint8_t> data,
+																 SupportedPgnListResponse& response,
+																 std::string& outError) {
 			if (data.size() < kSupportedPgnListResponseHeaderSize) {
 				outError = "Supported PGN List response too short for header: expected " +
-				           std::to_string(kSupportedPgnListResponseHeaderSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(kSupportedPgnListResponseHeaderSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
@@ -124,13 +122,13 @@ namespace Actisense
 
 			/* Calculate expected data size */
 			const std::size_t expectedSize = kSupportedPgnListResponseHeaderSize +
-			                                  (static_cast<std::size_t>(response.pgnCount) * 4);
+											 (static_cast<std::size_t>(response.pgnCount) * 4);
 
 			if (data.size() < expectedSize) {
 				outError = "Supported PGN List response too short for " +
-				           std::to_string(response.pgnCount) + " PGNs: expected " +
-				           std::to_string(expectedSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(response.pgnCount) + " PGNs: expected " +
+						   std::to_string(expectedSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
@@ -142,11 +140,11 @@ namespace Actisense
 			for (uint8_t i = 0; i < response.pgnCount; ++i) {
 				/* PGN: 4 bytes, little-endian (only lower 24 bits are valid) */
 				const uint32_t pgn = static_cast<uint32_t>(data[offset]) |
-				                     (static_cast<uint32_t>(data[offset + 1]) << 8) |
-				                     (static_cast<uint32_t>(data[offset + 2]) << 16) |
-				                     (static_cast<uint32_t>(data[offset + 3]) << 24);
+									 (static_cast<uint32_t>(data[offset + 1]) << 8) |
+									 (static_cast<uint32_t>(data[offset + 2]) << 16) |
+									 (static_cast<uint32_t>(data[offset + 3]) << 24);
 
-				response.pgns.push_back(pgn & 0x00FFFFFF);  /* Mask to 24 bits */
+				response.pgns.push_back(pgn & 0x00FFFFFF); /* Mask to 24 bits */
 				offset += 4;
 			}
 
@@ -159,11 +157,8 @@ namespace Actisense
 		 \param[in]  transferId  Transfer ID for multi-message tracking
 		 \param[out] outData     Encoded request data
 		 *******************************************************************************/
-		inline void encodeSupportedPgnListGetRequest(
-			uint8_t pgnIndex,
-			uint8_t transferId,
-			std::vector<uint8_t>& outData)
-		{
+		inline void encodeSupportedPgnListGetRequest(uint8_t pgnIndex, uint8_t transferId,
+													 std::vector<uint8_t>& outData) {
 			outData.clear();
 			outData.reserve(kSupportedPgnListGetRequestSize);
 
@@ -176,8 +171,7 @@ namespace Actisense
 		 \param[in]  pgn  PGN value (24-bit)
 		 \return     Formatted PGN string (e.g., "126992")
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatPgn(uint32_t pgn)
-		{
+		[[nodiscard]] inline std::string formatPgn(uint32_t pgn) {
 			return std::to_string(pgn);
 		}
 
@@ -186,26 +180,26 @@ namespace Actisense
 		 \param[in]  response  Decoded response
 		 \return     Formatted string representation
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatSupportedPgnListResponse(
-			const SupportedPgnListResponse& response)
-		{
+		[[nodiscard]] inline std::string
+		formatSupportedPgnListResponse(const SupportedPgnListResponse& response) {
 			std::string result;
 			result.reserve(256);
 
 			result += "Supported PGN List (Index=" + std::to_string(response.pgnIndex) +
-			          ", TransferID=" + std::to_string(response.transferId) +
-			          ", Count=" + std::to_string(response.pgnCount) + "):\n";
+					  ", TransferID=" + std::to_string(response.transferId) +
+					  ", Count=" + std::to_string(response.pgnCount) + "):\n";
 
 			for (std::size_t i = 0; i < response.pgns.size(); ++i) {
 				result += "  [" + std::to_string(response.pgnIndex + i) + "] " +
-				          formatPgn(response.pgns[i]) + "\n";
+						  formatPgn(response.pgns[i]) + "\n";
 			}
 
 			if (response.isLastMessage()) {
 				result += "  (End of list)\n";
 			} else {
-				result += "  (More PGNs available, next index: " +
-				          std::to_string(response.nextIndex()) + ")\n";
+				result +=
+					"  (More PGNs available, next index: " + std::to_string(response.nextIndex()) +
+					")\n";
 			}
 
 			return result;
@@ -216,14 +210,13 @@ namespace Actisense
 		 \param[in]  list  Complete PGN list
 		 \return     Formatted string representation
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatSupportedPgnListComplete(
-			const SupportedPgnListComplete& list)
-		{
+		[[nodiscard]] inline std::string
+		formatSupportedPgnListComplete(const SupportedPgnListComplete& list) {
 			std::string result;
 			result.reserve(list.pgns.size() * 16 + 64);
 
-			result += "Complete Supported PGN List (" +
-			          std::to_string(list.pgns.size()) + " PGNs):\n";
+			result +=
+				"Complete Supported PGN List (" + std::to_string(list.pgns.size()) + " PGNs):\n";
 
 			for (std::size_t i = 0; i < list.pgns.size(); ++i) {
 				result += "  [" + std::to_string(i) + "] " + formatPgn(list.pgns[i]) + "\n";

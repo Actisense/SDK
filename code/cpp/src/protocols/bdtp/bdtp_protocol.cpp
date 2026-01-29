@@ -39,7 +39,7 @@ namespace Actisense
 										ErrorEmitter emitError) {
 			std::size_t bytesConsumed = 0;
 
-			//ACTISENSE_LOG_HEX(LogLevel::Trace, "BDTP", "Parse input", data.data(), data.size());
+			// ACTISENSE_LOG_HEX(LogLevel::Trace, "BDTP", "Parse input", data.data(), data.size());
 
 			for (const uint8_t byte : data) {
 				++bytesConsumed;
@@ -68,8 +68,8 @@ namespace Actisense
 							state_ = State::Idle;
 							{
 								std::ostringstream ss;
-								ss << "Invalid byte after DLE outside frame: 0x" 
-								   << std::hex << static_cast<int>(byte);
+								ss << "Invalid byte after DLE outside frame: 0x" << std::hex
+								   << static_cast<int>(byte);
 								ACTISENSE_LOG_WARN("BDTP", ss.str());
 							}
 						}
@@ -116,7 +116,7 @@ namespace Actisense
 							/* New frame start - abort current frame */
 							{
 								std::ostringstream ss;
-								ss << "Frame aborted by new DLE STX! Buffer had " 
+								ss << "Frame aborted by new DLE STX! Buffer had "
 								   << frame_buffer_.size() << " bytes";
 								ACTISENSE_LOG_ERROR("BDTP", ss.str());
 								ACTISENSE_LOG_HEX(LogLevel::Debug, "BDTP", "Aborted frame data",
@@ -133,8 +133,8 @@ namespace Actisense
 							/* Invalid escape sequence */
 							{
 								std::ostringstream ss;
-								ss << "Invalid escape sequence: DLE 0x" 
-								   << std::hex << static_cast<int>(byte);
+								ss << "Invalid escape sequence: DLE 0x" << std::hex
+								   << static_cast<int>(byte);
 								ACTISENSE_LOG_ERROR("BDTP", ss.str());
 							}
 							if (emitError) {
@@ -262,8 +262,7 @@ namespace Actisense
 				/* Empty frame - ignore */
 				return;
 			}
-			ACTISENSE_LOG_HEX(LogLevel::Trace, "BDTP::processCompletedFrame",
-							  "Frame data",
+			ACTISENSE_LOG_HEX(LogLevel::Trace, "BDTP::processCompletedFrame", "Frame data",
 							  frame_buffer_.data(), frame_buffer_.size());
 			BstDatagram datagram;
 			std::string parseError;
@@ -319,7 +318,7 @@ namespace Actisense
 			} else {
 				/* Type 1: 8-bit length field, length is payload only */
 				totalLen = static_cast<std::size_t>(frameData[1]) + 2; /* Add ID + length byte */
-				headerSize = 2; /* ID + L */
+				headerSize = 2;										   /* ID + L */
 			}
 
 			/* Expected total frame size: totalLen + 1 (checksum) */
@@ -346,16 +345,15 @@ namespace Actisense
 			/* Extract datagram */
 			outDatagram.bstId = bstId;
 			outDatagram.storeLength = static_cast<uint16_t>(totalLen - headerSize);
-			outDatagram.data.assign(frameData.begin() + headerSize,
-									frameData.begin() + totalLen);
+			outDatagram.data.assign(frameData.begin() + headerSize, frameData.begin() + totalLen);
 
 			return true;
 		}
-	ProtocolPtr createBdtpProtocol() {
-		return std::make_unique<BdtpProtocol>();
-	}
+		ProtocolPtr createBdtpProtocol() {
+			return std::make_unique<BdtpProtocol>();
+		}
 
-}; /* namespace Sdk */
+	}; /* namespace Sdk */
 }; /* namespace Actisense */
 
 /**************** (C) COPYRIGHT Active Research Limited  ** END OF FILE **/

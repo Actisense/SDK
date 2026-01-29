@@ -7,13 +7,13 @@
  \date       (Created) 28/01/2026
  \brief      Rx PGN Enable List Format 2 BEM command types and helpers
  \details    Structures and functions for encoding/decoding Rx PGN Enable List
-             Format 2 (0x4E) BEM commands. This is the current format supporting
-             up to 255 PGNs with PGN Index encoding.
+			 Format 2 (0x4E) BEM commands. This is the current format supporting
+			 up to 255 PGNs with PGN Index encoding.
 
-             PGN Index Encoding:
-             - Index 1-255: Standard PGNs 0-254
-             - Index 256-767: Proprietary PGNs 0xFF000000-0xFF0001FF
-             - Index 0: Reserved/invalid
+			 PGN Index Encoding:
+			 - Index 1-255: Standard PGNs 0-254
+			 - Index 256-767: Proprietary PGNs 0xFF000000-0xFF0001FF
+			 - Index 0: Reserved/invalid
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -56,8 +56,8 @@ namespace Actisense
 		 *******************************************************************************/
 		struct RxPgnEnableListF2Response
 		{
-			uint16_t pgnCount = 0;             ///< Number of enabled PGNs
-			std::vector<uint32_t> pgns;        ///< List of enabled PGNs (decoded from indices)
+			uint16_t pgnCount = 0;		///< Number of enabled PGNs
+			std::vector<uint32_t> pgns; ///< List of enabled PGNs (decoded from indices)
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -68,14 +68,12 @@ namespace Actisense
 		 \param[out] pgn        Decoded PGN value
 		 \return     True if valid index, false otherwise
 		 *******************************************************************************/
-		[[nodiscard]] inline bool pgnIndexToPgn(uint16_t index, uint32_t& pgn) noexcept
-		{
+		[[nodiscard]] inline bool pgnIndexToPgn(uint16_t index, uint32_t& pgn) noexcept {
 			if (index >= kPgnIndexMinStandard && index <= kPgnIndexMaxStandard) {
 				/* Standard PGN: index 1-255 -> PGN 0-254 */
 				pgn = static_cast<uint32_t>(index - 1);
 				return true;
-			}
-			else if (index >= kPgnIndexMinProprietary && index <= kPgnIndexMaxProprietary) {
+			} else if (index >= kPgnIndexMinProprietary && index <= kPgnIndexMaxProprietary) {
 				/* Proprietary PGN: index 256-767 -> PGN 0xFF000000-0xFF0001FF */
 				pgn = kProprietaryPgnBase + static_cast<uint32_t>(index - kPgnIndexMinProprietary);
 				return true;
@@ -89,16 +87,15 @@ namespace Actisense
 		 \param[out] index      Encoded PGN Index
 		 \return     True if valid PGN, false otherwise
 		 *******************************************************************************/
-		[[nodiscard]] inline bool pgnToPgnIndex(uint32_t pgn, uint16_t& index) noexcept
-		{
+		[[nodiscard]] inline bool pgnToPgnIndex(uint32_t pgn, uint16_t& index) noexcept {
 			if (pgn <= 254) {
 				/* Standard PGN: PGN 0-254 -> index 1-255 */
 				index = static_cast<uint16_t>(pgn + 1);
 				return true;
-			}
-			else if (pgn >= kProprietaryPgnBase && pgn <= (kProprietaryPgnBase + 0x1FF)) {
+			} else if (pgn >= kProprietaryPgnBase && pgn <= (kProprietaryPgnBase + 0x1FF)) {
 				/* Proprietary PGN: PGN 0xFF000000-0xFF0001FF -> index 256-767 */
-				index = static_cast<uint16_t>(kPgnIndexMinProprietary + (pgn - kProprietaryPgnBase));
+				index =
+					static_cast<uint16_t>(kPgnIndexMinProprietary + (pgn - kProprietaryPgnBase));
 				return true;
 			}
 			return false;
@@ -111,34 +108,33 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 \details    Response format:
-		             - Bytes 0-1: PGN count (uint16_t LE)
-		             - Bytes 2+: PGN indices (uint16_t LE each)
+					 - Bytes 0-1: PGN count (uint16_t LE)
+					 - Bytes 2+: PGN indices (uint16_t LE each)
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeRxPgnEnableListF2Response(
-			std::span<const uint8_t> data,
-			RxPgnEnableListF2Response& response,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool
+		decodeRxPgnEnableListF2Response(std::span<const uint8_t> data,
+										RxPgnEnableListF2Response& response,
+										std::string& outError) {
 			if (data.size() < kRxPgnEnableListF2ResponseHeaderSize) {
 				outError = "Rx PGN Enable List F2 response too short for header: expected " +
-				           std::to_string(kRxPgnEnableListF2ResponseHeaderSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(kRxPgnEnableListF2ResponseHeaderSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
 			/* PGN count: bytes 0-1, little-endian */
-			response.pgnCount = static_cast<uint16_t>(data[0]) |
-			                    (static_cast<uint16_t>(data[1]) << 8);
+			response.pgnCount =
+				static_cast<uint16_t>(data[0]) | (static_cast<uint16_t>(data[1]) << 8);
 
 			/* Calculate expected data size */
 			const std::size_t expectedSize = kRxPgnEnableListF2ResponseHeaderSize +
-			                                  (static_cast<std::size_t>(response.pgnCount) * 2);
+											 (static_cast<std::size_t>(response.pgnCount) * 2);
 
 			if (data.size() < expectedSize) {
 				outError = "Rx PGN Enable List F2 response too short for " +
-				           std::to_string(response.pgnCount) + " PGNs: expected " +
-				           std::to_string(expectedSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(response.pgnCount) + " PGNs: expected " +
+						   std::to_string(expectedSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
@@ -149,15 +145,15 @@ namespace Actisense
 			std::size_t offset = kRxPgnEnableListF2ResponseHeaderSize;
 			for (uint16_t i = 0; i < response.pgnCount; ++i) {
 				const uint16_t index = static_cast<uint16_t>(data[offset]) |
-				                       (static_cast<uint16_t>(data[offset + 1]) << 8);
+									   (static_cast<uint16_t>(data[offset + 1]) << 8);
 				offset += 2;
 
 				uint32_t pgn;
 				if (pgnIndexToPgn(index, pgn)) {
 					response.pgns.push_back(pgn);
 				} else {
-					outError = "Invalid PGN index " + std::to_string(index) +
-					           " at position " + std::to_string(i);
+					outError = "Invalid PGN index " + std::to_string(index) + " at position " +
+							   std::to_string(i);
 					return false;
 				}
 			}
@@ -169,8 +165,7 @@ namespace Actisense
 		 \brief      Encode Rx PGN Enable List F2 GET request data
 		 \param[out] outData    Encoded request data (empty)
 		 *******************************************************************************/
-		inline void encodeRxPgnEnableListF2GetRequest(std::vector<uint8_t>& outData)
-		{
+		inline void encodeRxPgnEnableListF2GetRequest(std::vector<uint8_t>& outData) {
 			outData.clear();
 			/* No payload for GET request */
 		}
@@ -182,14 +177,12 @@ namespace Actisense
 		 \param[out] outError   Error message if encoding fails
 		 \return     True on success, false on error
 		 *******************************************************************************/
-		[[nodiscard]] inline bool encodeRxPgnEnableListF2SetRequest(
-			const std::vector<uint32_t>& pgns,
-			std::vector<uint8_t>& outData,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool
+		encodeRxPgnEnableListF2SetRequest(const std::vector<uint32_t>& pgns,
+										  std::vector<uint8_t>& outData, std::string& outError) {
 			if (pgns.size() > kRxPgnEnableListF2MaxPgns) {
-				outError = "Too many PGNs: " + std::to_string(pgns.size()) +
-				           " exceeds max " + std::to_string(kRxPgnEnableListF2MaxPgns);
+				outError = "Too many PGNs: " + std::to_string(pgns.size()) + " exceeds max " +
+						   std::to_string(kRxPgnEnableListF2MaxPgns);
 				return false;
 			}
 
@@ -205,9 +198,8 @@ namespace Actisense
 			for (std::size_t i = 0; i < pgns.size(); ++i) {
 				uint16_t index;
 				if (!pgnToPgnIndex(pgns[i], index)) {
-					outError = "Invalid PGN 0x" + std::to_string(pgns[i]) +
-					           " at position " + std::to_string(i) +
-					           " - must be 0-254 or 0xFF000000-0xFF0001FF";
+					outError = "Invalid PGN 0x" + std::to_string(pgns[i]) + " at position " +
+							   std::to_string(i) + " - must be 0-254 or 0xFF000000-0xFF0001FF";
 					return false;
 				}
 				outData.push_back(static_cast<uint8_t>(index & 0xFF));
@@ -222,9 +214,8 @@ namespace Actisense
 		 \param[in]  response  Decoded response
 		 \return     Formatted string representation
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatRxPgnEnableListF2(
-			const RxPgnEnableListF2Response& response)
-		{
+		[[nodiscard]] inline std::string
+		formatRxPgnEnableListF2(const RxPgnEnableListF2Response& response) {
 			std::string result;
 			result.reserve(response.pgns.size() * 16 + 64);
 

@@ -26,7 +26,7 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Thread-safe metrics collector
 		 \details    Provides lock-free counter updates where possible, with mutex
-		             protection for snapshot operations. Used internally by Session.
+					 protection for snapshot operations. Used internally by Session.
 		 *******************************************************************************/
 		class MetricsCollector
 		{

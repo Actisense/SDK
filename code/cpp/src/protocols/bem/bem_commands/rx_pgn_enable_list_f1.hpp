@@ -7,10 +7,10 @@
  \date       (Created) 28/01/2026
  \brief      Rx PGN Enable List Format 1 (Legacy) BEM command types and helpers
  \details    Structures and functions for encoding/decoding Rx PGN Enable List
-             Format 1 (0x48) BEM commands. This is the legacy format using a
-             fixed 2-message sequence, supporting up to 50 PGNs.
+			 Format 1 (0x48) BEM commands. This is the legacy format using a
+			 fixed 2-message sequence, supporting up to 50 PGNs.
 
-             Note: Format 2 (0x4E) is preferred for new implementations.
+			 Note: Format 2 (0x4E) is preferred for new implementations.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -47,33 +47,29 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Rx PGN Enable List F1 response (single message)
 		 \details    Decoded response from a single Format 1 list message.
-		             Two messages required for complete list (message 0 and 1).
+					 Two messages required for complete list (message 0 and 1).
 		 *******************************************************************************/
 		struct RxPgnEnableListF1Response
 		{
-			uint8_t messageIndex = 0;          ///< Message index (0 or 1)
-			uint8_t pgnCount = 0;              ///< Number of PGNs in this message
-			std::vector<uint32_t> pgns;        ///< List of PGNs in this message
+			uint8_t messageIndex = 0;	///< Message index (0 or 1)
+			uint8_t pgnCount = 0;		///< Number of PGNs in this message
+			std::vector<uint32_t> pgns; ///< List of PGNs in this message
 
 			/// True if this is the first message
-			[[nodiscard]] bool isFirstMessage() const noexcept {
-				return messageIndex == 0;
-			}
+			[[nodiscard]] bool isFirstMessage() const noexcept { return messageIndex == 0; }
 
 			/// True if this is the last message
-			[[nodiscard]] bool isLastMessage() const noexcept {
-				return messageIndex == 1;
-			}
+			[[nodiscard]] bool isLastMessage() const noexcept { return messageIndex == 1; }
 		};
 
 		/**************************************************************************/ /**
 		 \brief      Complete Rx PGN Enable List F1 (assembled from 2 messages)
 		 \details    Contains the complete list of enabled Rx PGNs after
-		             assembling both response messages.
+					 assembling both response messages.
 		 *******************************************************************************/
 		struct RxPgnEnableListF1Complete
 		{
-			std::vector<uint32_t> pgns;        ///< Complete list of enabled PGNs
+			std::vector<uint32_t> pgns; ///< Complete list of enabled PGNs
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -85,19 +81,18 @@ namespace Actisense
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
 		 \details    Response format:
-		             - Byte 0: Message index (0 or 1)
-		             - Byte 1: PGN count in this message
-		             - Bytes 2+: PGNs (4 bytes each, little-endian)
+					 - Byte 0: Message index (0 or 1)
+					 - Byte 1: PGN count in this message
+					 - Bytes 2+: PGNs (4 bytes each, little-endian)
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeRxPgnEnableListF1Response(
-			std::span<const uint8_t> data,
-			RxPgnEnableListF1Response& response,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool
+		decodeRxPgnEnableListF1Response(std::span<const uint8_t> data,
+										RxPgnEnableListF1Response& response,
+										std::string& outError) {
 			if (data.size() < kRxPgnEnableListF1ResponseHeaderSize) {
 				outError = "Rx PGN Enable List F1 response too short for header: expected " +
-				           std::to_string(kRxPgnEnableListF1ResponseHeaderSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(kRxPgnEnableListF1ResponseHeaderSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
@@ -106,25 +101,26 @@ namespace Actisense
 
 			if (response.messageIndex >= kRxPgnEnableListF1MessageCount) {
 				outError = "Invalid message index " + std::to_string(response.messageIndex) +
-				           " (expected 0 or 1)";
+						   " (expected 0 or 1)";
 				return false;
 			}
 
 			if (response.pgnCount > kRxPgnEnableListF1PgnsPerMessage) {
 				outError = "PGN count " + std::to_string(response.pgnCount) +
-				           " exceeds max per message " + std::to_string(kRxPgnEnableListF1PgnsPerMessage);
+						   " exceeds max per message " +
+						   std::to_string(kRxPgnEnableListF1PgnsPerMessage);
 				return false;
 			}
 
 			/* Calculate expected data size */
 			const std::size_t expectedSize = kRxPgnEnableListF1ResponseHeaderSize +
-			                                  (static_cast<std::size_t>(response.pgnCount) * 4);
+											 (static_cast<std::size_t>(response.pgnCount) * 4);
 
 			if (data.size() < expectedSize) {
 				outError = "Rx PGN Enable List F1 response too short for " +
-				           std::to_string(response.pgnCount) + " PGNs: expected " +
-				           std::to_string(expectedSize) + " bytes, got " +
-				           std::to_string(data.size());
+						   std::to_string(response.pgnCount) + " PGNs: expected " +
+						   std::to_string(expectedSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
@@ -135,10 +131,10 @@ namespace Actisense
 			std::size_t offset = kRxPgnEnableListF1ResponseHeaderSize;
 			for (uint8_t i = 0; i < response.pgnCount; ++i) {
 				const uint32_t pgn = static_cast<uint32_t>(data[offset]) |
-				                     (static_cast<uint32_t>(data[offset + 1]) << 8) |
-				                     (static_cast<uint32_t>(data[offset + 2]) << 16) |
-				                     (static_cast<uint32_t>(data[offset + 3]) << 24);
-				response.pgns.push_back(pgn & 0x00FFFFFF);  /* Mask to 24 bits */
+									 (static_cast<uint32_t>(data[offset + 1]) << 8) |
+									 (static_cast<uint32_t>(data[offset + 2]) << 16) |
+									 (static_cast<uint32_t>(data[offset + 3]) << 24);
+				response.pgns.push_back(pgn & 0x00FFFFFF); /* Mask to 24 bits */
 				offset += 4;
 			}
 
@@ -150,10 +146,8 @@ namespace Actisense
 		 \param[in]  messageIndex  Message to request (0 or 1)
 		 \param[out] outData       Encoded request data
 		 *******************************************************************************/
-		inline void encodeRxPgnEnableListF1GetRequest(
-			uint8_t messageIndex,
-			std::vector<uint8_t>& outData)
-		{
+		inline void encodeRxPgnEnableListF1GetRequest(uint8_t messageIndex,
+													  std::vector<uint8_t>& outData) {
 			outData.clear();
 			outData.reserve(kRxPgnEnableListF1GetRequestSize);
 
@@ -168,21 +162,18 @@ namespace Actisense
 		 \param[out] outError      Error message if encoding fails
 		 \return     True on success, false on error
 		 *******************************************************************************/
-		[[nodiscard]] inline bool encodeRxPgnEnableListF1SetRequest(
-			uint8_t messageIndex,
-			const std::vector<uint32_t>& pgns,
-			std::vector<uint8_t>& outData,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool
+		encodeRxPgnEnableListF1SetRequest(uint8_t messageIndex, const std::vector<uint32_t>& pgns,
+										  std::vector<uint8_t>& outData, std::string& outError) {
 			if (messageIndex >= kRxPgnEnableListF1MessageCount) {
-				outError = "Invalid message index " + std::to_string(messageIndex) +
-				           " (expected 0 or 1)";
+				outError =
+					"Invalid message index " + std::to_string(messageIndex) + " (expected 0 or 1)";
 				return false;
 			}
 
 			if (pgns.size() > kRxPgnEnableListF1PgnsPerMessage) {
 				outError = "Too many PGNs for single message: " + std::to_string(pgns.size()) +
-				           " exceeds max " + std::to_string(kRxPgnEnableListF1PgnsPerMessage);
+						   " exceeds max " + std::to_string(kRxPgnEnableListF1PgnsPerMessage);
 				return false;
 			}
 
@@ -211,18 +202,17 @@ namespace Actisense
 		 \param[in]  response  Decoded response
 		 \return     Formatted string representation
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatRxPgnEnableListF1(
-			const RxPgnEnableListF1Response& response)
-		{
+		[[nodiscard]] inline std::string
+		formatRxPgnEnableListF1(const RxPgnEnableListF1Response& response) {
 			std::string result;
 			result.reserve(response.pgns.size() * 16 + 64);
 
 			result += "Rx PGN Enable List F1 (Message " + std::to_string(response.messageIndex) +
-			          ", " + std::to_string(response.pgnCount) + " PGNs):\n";
+					  ", " + std::to_string(response.pgnCount) + " PGNs):\n";
 
 			for (std::size_t i = 0; i < response.pgns.size(); ++i) {
-				result += "  [" + std::to_string(i) + "] " +
-				          std::to_string(response.pgns[i]) + "\n";
+				result +=
+					"  [" + std::to_string(i) + "] " + std::to_string(response.pgns[i]) + "\n";
 			}
 
 			return result;

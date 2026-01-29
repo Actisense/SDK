@@ -7,11 +7,11 @@
  \date       (Created) 28/01/2026
  \brief      Activate PGN Enable Lists BEM command types and helpers
  \details    Structures and functions for encoding/decoding Activate PGN Enable
-             Lists (0x4B) BEM commands. This command applies session PGN enable
-             lists to hardware, making them active.
+			 Lists (0x4B) BEM commands. This command applies session PGN enable
+			 lists to hardware, making them active.
 
-             Note: Session lists must be built with 0x4E/0x4F before activation.
-             To persist changes, commit to EEPROM/FLASH after activation.
+			 Note: Session lists must be built with 0x4E/0x4F before activation.
+			 To persist changes, commit to EEPROM/FLASH after activation.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -43,10 +43,8 @@ namespace Actisense
 		 \return     True on success, false on error
 		 \details    Response has no data payload, success indicated by BEM header
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeActivatePgnEnableListsResponse(
-			std::span<const uint8_t> data,
-			std::string& outError)
-		{
+		[[nodiscard]] inline bool
+		decodeActivatePgnEnableListsResponse(std::span<const uint8_t> data, std::string& outError) {
 			/* No data payload expected - success indicated by BEM response header */
 			(void)data;
 			(void)outError;
@@ -57,8 +55,7 @@ namespace Actisense
 		 \brief      Encode Activate PGN Enable Lists request data
 		 \param[out] outData    Encoded request data (empty)
 		 *******************************************************************************/
-		inline void encodeActivatePgnEnableListsRequest(std::vector<uint8_t>& outData)
-		{
+		inline void encodeActivatePgnEnableListsRequest(std::vector<uint8_t>& outData) {
 			outData.clear();
 			/* No payload for this command */
 		}

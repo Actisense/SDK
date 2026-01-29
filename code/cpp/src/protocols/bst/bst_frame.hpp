@@ -5,7 +5,7 @@
 \file       bst_frame.hpp
 \brief      BstFrame class for unified BST frame access
 \details    Provides a unified interface to access BST-93, BST-94, BST-95, and
-            BST-D0 frame data. Stores raw bytes and decodes fields on access.
+			BST-D0 frame data. Stores raw bytes and decodes fields on access.
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 *******************************************************************************/
@@ -30,31 +30,31 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Unified BST frame class
 		 \details    Provides type-safe access to BST frame data regardless of
-		             underlying format (BST-93, BST-94, BST-95, BST-D0). Stores raw
-		             bytes internally and decodes fields on access. Returns sensible
-		             defaults for fields not present in all formats.
+					 underlying format (BST-93, BST-94, BST-95, BST-D0). Stores raw
+					 bytes internally and decodes fields on access. Returns sensible
+					 defaults for fields not present in all formats.
 
 		 Example usage:
 		 \code
-		     // From received data
-		     auto frame = BstFrame::fromParsedEvent(event);
-		     if (frame && frame->isN2k()) {
-		         std::cout << "PGN: " << frame->pgn()
-		                   << " Src: " << frame->source()
-		                   << " Data: " << frame->toHexDump() << std::endl;
-		     }
+			 // From received data
+			 auto frame = BstFrame::fromParsedEvent(event);
+			 if (frame && frame->isN2k()) {
+				 std::cout << "PGN: " << frame->pgn()
+						   << " Src: " << frame->source()
+						   << " Data: " << frame->toHexDump() << std::endl;
+			 }
 
-		     // For transmission
-		     std::vector<uint8_t> payload = {0x01, 0x02, 0x03};
-		     auto txFrame = BstFrame::createD0(127250, 0x01, 0xFF, payload);
+			 // For transmission
+			 std::vector<uint8_t> payload = {0x01, 0x02, 0x03};
+			 auto txFrame = BstFrame::createD0(127250, 0x01, 0xFF, payload);
 		 \endcode
 		 *******************************************************************************/
 		class BstFrame
 		{
 		private:
 			std::vector<uint8_t> raw_data_; ///< Complete BST payload (ID + length + data)
-			BstId bst_id_;                  ///< Cached BST message type
-			bool valid_;                    ///< Whether frame passed validation
+			BstId bst_id_;					///< Cached BST message type
+			bool valid_;					///< Whether frame passed validation
 
 		public:
 			/* Construction --------------------------------------------------------- */
@@ -83,7 +83,8 @@ namespace Actisense
 			 \param[in]  event  Parsed message event (from SDK callback)
 			 \return     BstFrame if event contains a BST frame, nullopt otherwise
 			 *******************************************************************************/
-			[[nodiscard]] static std::optional<BstFrame> fromParsedEvent(const ParsedMessageEvent& event);
+			[[nodiscard]] static std::optional<BstFrame>
+			fromParsedEvent(const ParsedMessageEvent& event);
 
 			/**************************************************************************/ /**
 			 \brief      Create BstFrame from raw BST data
@@ -105,10 +106,9 @@ namespace Actisense
 			 \return     Constructed BstFrame
 			 *******************************************************************************/
 			[[nodiscard]] static BstFrame create93(uint32_t pgn, uint8_t source,
-			                                       uint8_t destination,
-			                                       std::span<const uint8_t> payload,
-			                                       uint32_t timestamp = 0,
-			                                       uint8_t priority = 6);
+												   uint8_t destination,
+												   std::span<const uint8_t> payload,
+												   uint32_t timestamp = 0, uint8_t priority = 6);
 
 			/**************************************************************************/ /**
 			 \brief      Create a BST-94 frame (PC→Gateway NMEA 2000)
@@ -120,8 +120,8 @@ namespace Actisense
 			 \note       BST-94 has no source or timestamp (gateway assigns these)
 			 *******************************************************************************/
 			[[nodiscard]] static BstFrame create94(uint32_t pgn, uint8_t destination,
-			                                       std::span<const uint8_t> payload,
-			                                       uint8_t priority = 6);
+												   std::span<const uint8_t> payload,
+												   uint8_t priority = 6);
 
 			/**************************************************************************/ /**
 			 \brief      Create a BST-95 frame (CAN Frame)
@@ -134,12 +134,11 @@ namespace Actisense
 			 \param[in]  priority     Message priority 0-7 (default 6)
 			 \return     Constructed BstFrame
 			 *******************************************************************************/
-			[[nodiscard]] static BstFrame create95(uint32_t pgn, uint8_t source,
-			                                       std::span<const uint8_t> payload,
-			                                       uint16_t timestamp = 0,
-			                                       TimestampResolution resolution = TimestampResolution::Millisecond_1ms,
-			                                       MessageDirection direction = MessageDirection::Received,
-			                                       uint8_t priority = 6);
+			[[nodiscard]] static BstFrame
+			create95(uint32_t pgn, uint8_t source, std::span<const uint8_t> payload,
+					 uint16_t timestamp = 0,
+					 TimestampResolution resolution = TimestampResolution::Millisecond_1ms,
+					 MessageDirection direction = MessageDirection::Received, uint8_t priority = 6);
 
 			/**************************************************************************/ /**
 			 \brief      Create a BST-D0 frame (Latest NMEA 2000)
@@ -155,15 +154,12 @@ namespace Actisense
 			 \param[in]  fp_seq_id      Fast-packet sequence ID 0-7 (default 0)
 			 \return     Constructed BstFrame
 			 *******************************************************************************/
-			[[nodiscard]] static BstFrame createD0(uint32_t pgn, uint8_t source,
-			                                       uint8_t destination,
-			                                       std::span<const uint8_t> payload,
-			                                       uint32_t timestamp = 0,
-			                                       D0MessageType msg_type = D0MessageType::SinglePacket,
-			                                       MessageDirection direction = MessageDirection::Received,
-			                                       uint8_t priority = 6,
-			                                       bool internal_src = false,
-			                                       uint8_t fp_seq_id = 0);
+			[[nodiscard]] static BstFrame
+			createD0(uint32_t pgn, uint8_t source, uint8_t destination,
+					 std::span<const uint8_t> payload, uint32_t timestamp = 0,
+					 D0MessageType msg_type = D0MessageType::SinglePacket,
+					 MessageDirection direction = MessageDirection::Received, uint8_t priority = 6,
+					 bool internal_src = false, uint8_t fp_seq_id = 0);
 
 			/* Type Identification -------------------------------------------------- */
 
@@ -286,8 +282,8 @@ namespace Actisense
 			 \brief      Get timestamp converted to microseconds
 			 \return     Timestamp in microseconds (handles all resolutions)
 			 \details    For BST-93/D0: timestamp * 1000
-			             For BST-95: depends on resolution setting
-			             For BST-94: 0
+						 For BST-95: depends on resolution setting
+						 For BST-94: 0
 			 *******************************************************************************/
 			[[nodiscard]] uint64_t timestampMicroseconds() const noexcept;
 
@@ -304,8 +300,8 @@ namespace Actisense
 			 \brief      Get message direction
 			 \return     Received or Transmitted
 			 \details    For BST-93: Received
-			             For BST-94: Transmitted
-			             For BST-95/D0: actual direction field
+						 For BST-94: Transmitted
+						 For BST-95/D0: actual direction field
 			 *******************************************************************************/
 			[[nodiscard]] MessageDirection direction() const noexcept;
 
@@ -398,13 +394,13 @@ namespace Actisense
 			 \brief      Calculate PGN from PDU fields
 			 *******************************************************************************/
 			[[nodiscard]] static uint32_t calculatePgn(uint8_t pduf, uint8_t pdus,
-			                                           uint8_t data_page) noexcept;
+													   uint8_t data_page) noexcept;
 
 			/**************************************************************************/ /**
 			 \brief      Extract PDU fields from PGN
 			 *******************************************************************************/
 			static void extractPduFields(uint32_t pgn, uint8_t& pduf, uint8_t& pdus,
-			                             uint8_t& data_page) noexcept;
+										 uint8_t& data_page) noexcept;
 
 			/**************************************************************************/ /**
 			 \brief      Read little-endian 16-bit value
