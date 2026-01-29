@@ -1,0 +1,20 @@
+{
+	"version": 6,
+	"configurePresets": [
+		{
+			"name": "default",
+			"displayName": "Visual Studio 18 2026 x64",
+			"generator": "Visual Studio 18 2026",
+			"architecture": {
+				"value": "x64",
+				"strategy": "set"
+			},
+			"binaryDir": "${sourceDir}/build",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release",
+				"ACTISENSE_BUILD_TESTS": "ON",
+				"ACTISENSE_BUILD_EXAMPLES": "ON"
+			}
+		}
+	]
+}

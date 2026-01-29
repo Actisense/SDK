@@ -798,7 +798,7 @@ namespace Actisense
 					if (raw_data_.size() < 2) {
 						return;
 					}
-					const uint8_t store_len = raw_data_[1];
+					const auto store_len = static_cast<std::size_t>(raw_data_[1]);
 					if (raw_data_.size() < 2 + store_len || store_len < kBst93MinPayload) {
 						return;
 					}
@@ -810,7 +810,7 @@ namespace Actisense
 					if (raw_data_.size() < 2) {
 						return;
 					}
-					const uint8_t store_len = raw_data_[1];
+					const auto store_len = static_cast<std::size_t>(raw_data_[1]);
 					if (raw_data_.size() < 2 + store_len || store_len < kBst94MinPayload) {
 						return;
 					}
@@ -822,7 +822,7 @@ namespace Actisense
 					if (raw_data_.size() < 2) {
 						return;
 					}
-					const uint8_t store_len = raw_data_[1];
+					const auto store_len = static_cast<std::size_t>(raw_data_[1]);
 					if (raw_data_.size() < 2 + store_len || store_len < kBst95MinPayload) {
 						return;
 					}
@@ -836,7 +836,7 @@ namespace Actisense
 					}
 					const uint16_t total_len = readU16LE(&raw_data_[1]);
 					/* total_len includes ID + Len bytes, so payload = total_len - 3 */
-					const uint16_t payload_len = (total_len >= 3) ? (total_len - 3) : 0;
+					const auto payload_len = static_cast<std::size_t>((total_len >= 3) ? (total_len - 3) : 0);
 					if (raw_data_.size() < 3 + payload_len || payload_len < kBstD0MinPayload) {
 						return;
 					}

@@ -77,7 +77,7 @@ namespace Actisense
 					 - POSIX:   getaddrinfo_a or thread pool
 		 *******************************************************************************/
 		void Api::resolveHostAsync(const std::string& host, HostResolutionCallback callback) {
-			host;
+			(void)host;
 			/* Stub implementation */
 			if (callback) {
 				/* Return unsupported operation error until implementation is complete */
