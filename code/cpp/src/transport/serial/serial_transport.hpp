@@ -158,7 +158,9 @@ namespace Actisense
 			OVERLAPPED writeOverlapped_{};
 #else
 			int fd_ = -1;
+			// clang-format off
 			struct termios originalTermios_{};
+			// clang-format on
 			bool termiosRestoreNeeded_ = false;
 #endif
 
