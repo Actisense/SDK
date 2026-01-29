@@ -284,7 +284,7 @@ TEST_F(ThreadSafetyTest, ConcurrentLogging)
 	threads.reserve(numThreads);
 
 	for (int t = 0; t < numThreads; ++t) {
-		threads.emplace_back([this, t, logsPerThread]() {
+		threads.emplace_back([this, t]() {
 			for (int i = 0; i < logsPerThread; ++i) {
 				testLogger_.log(LogLevel::Info, LogCategory::General,
 							   "Thread " + std::to_string(t) + " log " + std::to_string(i),

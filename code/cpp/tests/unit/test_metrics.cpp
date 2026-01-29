@@ -366,7 +366,7 @@ TEST_F(MetricsThreadSafetyTest, ConcurrentUpdates)
 	threads.reserve(numThreads);
 
 	for (int t = 0; t < numThreads; ++t) {
-		threads.emplace_back([this, incrementsPerThread]() {
+		threads.emplace_back([this]() {
 			for (int i = 0; i < incrementsPerThread; ++i) {
 				collector_.recordBytesSent(1);
 				collector_.recordFrameParsed(0x93);
@@ -397,7 +397,7 @@ TEST_F(MetricsThreadSafetyTest, ConcurrentLatencyRecording)
 	threads.reserve(numThreads);
 
 	for (int t = 0; t < numThreads; ++t) {
-		threads.emplace_back([this, recordsPerThread, latencyValue]() {
+		threads.emplace_back([this]() {
 			for (int i = 0; i < recordsPerThread; ++i) {
 				collector_.recordBemResponse(latencyValue);
 			}
