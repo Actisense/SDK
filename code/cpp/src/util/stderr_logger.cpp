@@ -73,20 +73,13 @@ namespace Actisense
 		}
 
 		bool StderrLogger::isEnabled(LogLevel level, LogCategory category) const noexcept {
-			// Check global threshold
-			if (level > threshold_) {
-				return false;
-			}
-
-			// Check category-specific threshold
+			// Use category-specific threshold if available, otherwise global
 			const auto categoryIndex = static_cast<std::size_t>(category);
 			if (categoryIndex < categoryThresholds_.size()) {
-				if (level > categoryThresholds_[categoryIndex]) {
-					return false;
-				}
+				return level <= categoryThresholds_[categoryIndex];
 			}
 
-			return true;
+			return level <= threshold_;
 		}
 
 		void StderrLogger::flush() {
@@ -96,12 +89,7 @@ namespace Actisense
 
 		void StderrLogger::setThreshold(LogLevel level) noexcept {
 			threshold_ = level;
-			// Also update category thresholds to at least the new global level
-			for (auto& categoryLevel : categoryThresholds_) {
-				if (categoryLevel < level) {
-					categoryLevel = level;
-				}
-			}
+			categoryThresholds_.fill(level);
 		}
 
 		void StderrLogger::setCategoryThreshold(LogCategory category, LogLevel level) noexcept {
