@@ -109,7 +109,7 @@ namespace Actisense
 			return "Unknown";
 		}
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 /**************** (C) COPYRIGHT Active Research Limited  ** END OF FILE **/

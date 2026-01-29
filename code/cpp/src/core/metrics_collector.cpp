@@ -209,7 +209,7 @@ namespace Actisense
 			reconnectCount_.store(0, std::memory_order_relaxed);
 		}
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 /**************** (C) COPYRIGHT Active Research Limited  ** END OF FILE **/

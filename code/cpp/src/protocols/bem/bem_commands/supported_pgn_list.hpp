@@ -225,8 +225,8 @@ namespace Actisense
 			return result;
 		}
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_BEM_SUPPORTED_PGN_LIST_HPP */
 

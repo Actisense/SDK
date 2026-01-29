@@ -608,8 +608,8 @@ namespace Actisense
 			std::size_t timeout_count_ = 0;
 		};
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_BEM_PROTOCOL_HPP */
 

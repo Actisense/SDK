@@ -83,8 +83,8 @@ namespace Actisense
 			return makeErrorCode(code);
 		}
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 /* Enable std::error_code integration --------------------------------------- */
 namespace std

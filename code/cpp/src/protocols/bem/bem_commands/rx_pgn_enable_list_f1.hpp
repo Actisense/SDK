@@ -218,8 +218,8 @@ namespace Actisense
 			return result;
 		}
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_BEM_RX_PGN_ENABLE_LIST_F1_HPP */
 

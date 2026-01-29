@@ -196,8 +196,8 @@ namespace Actisense
 			}
 		}
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_BST_TYPES_HPP */
 

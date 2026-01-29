@@ -60,8 +60,8 @@ namespace Actisense
 			/* No payload for this command */
 		}
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_BEM_DEFAULT_PGN_ENABLE_LIST_HPP */
 

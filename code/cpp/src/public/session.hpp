@@ -117,8 +117,8 @@ namespace Actisense
 			Session& operator=(const Session&) = delete;
 		};
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_SESSION_HPP */
 

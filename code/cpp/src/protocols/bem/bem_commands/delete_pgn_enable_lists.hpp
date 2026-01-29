@@ -93,8 +93,8 @@ namespace Actisense
 			}
 		}
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_BEM_DELETE_PGN_ENABLE_LISTS_HPP */
 

@@ -139,8 +139,8 @@ namespace Actisense
 		 *******************************************************************************/
 		[[nodiscard]] std::string_view logCategoryName(LogCategory category) noexcept;
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_LOGGING_HPP */
 

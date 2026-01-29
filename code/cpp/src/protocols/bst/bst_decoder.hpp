@@ -161,8 +161,8 @@ namespace Actisense
 			static void writeU32LE(uint8_t* p, uint32_t value) noexcept;
 		};
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_BST_DECODER_HPP */
 

@@ -113,8 +113,8 @@ namespace Actisense
 		 *******************************************************************************/
 		using ProtocolPtr = std::unique_ptr<IProtocol>;
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_PROTOCOL_HPP */
 

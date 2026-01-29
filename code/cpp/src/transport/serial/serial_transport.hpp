@@ -194,8 +194,8 @@ namespace Actisense
 			std::atomic<std::size_t> messagesReceived_{0};
 		};
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_SERIAL_TRANSPORT_HPP */
 

@@ -235,8 +235,8 @@ namespace Actisense
 			std::condition_variable dataAvailable_;
 		};
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_MESSAGE_RING_BUFFER_HPP */
 

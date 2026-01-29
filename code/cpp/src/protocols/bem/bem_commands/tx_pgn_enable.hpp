@@ -225,8 +225,8 @@ namespace Actisense
 			return std::to_string(txRate) + " ms";
 		}
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_BEM_TX_PGN_ENABLE_HPP */
 

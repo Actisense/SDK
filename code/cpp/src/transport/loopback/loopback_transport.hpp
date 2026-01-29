@@ -137,8 +137,8 @@ namespace Actisense
 		 *******************************************************************************/
 		[[nodiscard]] TransportPtr createLoopbackTransport();
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_LOOPBACK_TRANSPORT_HPP */
 

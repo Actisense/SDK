@@ -150,8 +150,8 @@ namespace Actisense
 		 *******************************************************************************/
 		[[nodiscard]] ProtocolPtr createBdtpProtocol();
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_BDTP_PROTOCOL_HPP */
 

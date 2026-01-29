@@ -47,8 +47,8 @@ namespace Actisense
 		 *******************************************************************************/
 		[[nodiscard]] Version version() noexcept;
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_VERSION_HPP */
 

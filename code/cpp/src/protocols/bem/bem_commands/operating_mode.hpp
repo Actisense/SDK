@@ -247,8 +247,8 @@ namespace Actisense
 		 *******************************************************************************/
 		const char* OperatingModeName(OperatingMode mode);
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_BEM_OPERATING_MODE_HPP */
 

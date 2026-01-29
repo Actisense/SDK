@@ -169,8 +169,8 @@ namespace Actisense
 			std::atomic<uint32_t> reconnectCount_{0};
 		};
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_METRICS_COLLECTOR_HPP */
 

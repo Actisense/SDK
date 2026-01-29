@@ -200,8 +200,8 @@ namespace Actisense
 			return std::to_string(baudrate) + " bps";
 		}
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_BEM_PORT_BAUDRATE_HPP */
 

@@ -287,8 +287,8 @@ namespace Actisense
 #define ACTISENSE_LOG_DEBUG(tag, msg) ACTISENSE_LOG(::Actisense::Sdk::LogLevel::Debug, tag, msg)
 #define ACTISENSE_LOG_TRACE(tag, msg) ACTISENSE_LOG(::Actisense::Sdk::LogLevel::Trace, tag, msg)
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_DEBUG_LOG_HPP */
 

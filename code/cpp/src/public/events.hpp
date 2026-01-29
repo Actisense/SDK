@@ -51,8 +51,8 @@ namespace Actisense
 		 *******************************************************************************/
 		using EventCallback = std::function<void(const EventVariant& event)>;
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_EVENTS_HPP */
 

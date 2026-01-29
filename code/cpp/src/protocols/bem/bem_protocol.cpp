@@ -752,7 +752,7 @@ namespace Actisense
 			p[3] = static_cast<uint8_t>((value >> 24) & 0xFF);
 		}
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 /**************** (C) COPYRIGHT Active Research Limited  ** END OF FILE **/

@@ -207,7 +207,7 @@ namespace Actisense
 			return std::make_unique<LoopbackTransport>();
 		}
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 /**************** (C) COPYRIGHT Active Research Limited  ** END OF FILE **/

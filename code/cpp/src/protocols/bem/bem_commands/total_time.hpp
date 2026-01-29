@@ -158,8 +158,8 @@ namespace Actisense
 			return std::string(buffer);
 		}
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_BEM_TOTAL_TIME_HPP */
 

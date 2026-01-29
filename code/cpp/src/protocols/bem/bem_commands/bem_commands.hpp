@@ -195,8 +195,8 @@ namespace Actisense
 		static constexpr std::size_t kBemPG_OffBemId = 0;
 		static constexpr std::size_t kBemPG_OffData = 1;
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_BEM_BEM_COMMANDS_BEM_COMMANDS_HPP */
 

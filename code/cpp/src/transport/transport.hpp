@@ -115,8 +115,8 @@ namespace Actisense
 		 *******************************************************************************/
 		using TransportPtr = std::unique_ptr<ITransport>;
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_TRANSPORT_HPP */
 

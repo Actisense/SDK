@@ -102,8 +102,8 @@ namespace Actisense
 				5000}; ///< Default request/response timeout
 		};
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_CONFIG_HPP */
 

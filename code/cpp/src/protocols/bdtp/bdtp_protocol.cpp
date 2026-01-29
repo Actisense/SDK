@@ -353,7 +353,7 @@ namespace Actisense
 			return std::make_unique<BdtpProtocol>();
 		}
 
-	}; /* namespace Sdk */
-}; /* namespace Actisense */
+	} /* namespace Sdk */
+} /* namespace Actisense */
 
 /**************** (C) COPYRIGHT Active Research Limited  ** END OF FILE **/
