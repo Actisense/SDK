@@ -295,7 +295,7 @@ All includes throughout the SDK use paths relative to `src/`:
 
 Ensure your compiler is in your PATH or specify it explicitly:
 ```powershell
-cmake -B build -S . -DCMAKE_CXX_COMPILER="C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.35.32215/bin/Hostx64/x64/cl.exe"
+cmake -B build -S . -DCMAKE_CXX_COMPILER="C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.43.34808/bin/Hostx64/x64/cl.exe"
 ```
 
 ### Tests Fail to Build
