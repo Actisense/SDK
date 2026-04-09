@@ -20,19 +20,18 @@ Use `BstFrame::create94()` to construct a PC-to-gateway N2K message (BST-94):
 ```cpp
 uint32_t pgn     = 127250;   // Vessel Heading
 uint8_t  dest    = 255;      // Broadcast
-uint8_t  source  = 0;        // Source address
 uint8_t  priority = 2;
 
 std::vector<uint8_t> payload = { /* PGN data bytes */ };
 
-auto frame = BstFrame::create94(pgn, dest, source, priority,
-                                std::span<const uint8_t>(payload));
+auto frame = BstFrame::create94(pgn, dest,
+                                std::span<const uint8_t>(payload), priority);
 ```
 
 For the extended D0 format, use `BstFrame::createD0()`:
 
 ```cpp
-auto frame = BstFrame::createD0(pgn, dest, source, priority,
+auto frame = BstFrame::createD0(pgn, source, dest,
                                  std::span<const uint8_t>(payload));
 ```
 
@@ -74,9 +73,8 @@ void sendHeading(Session& session, double headingDegrees)
     auto frame = BstFrame::create94(
         127250,     // PGN
         255,        // Destination (broadcast)
-        0,          // Source address
-        2,          // Priority
-        std::span<const uint8_t>(payload)
+        std::span<const uint8_t>(payload),
+        2           // Priority
     );
 
     session.asyncSend("bst", frame.rawData(),
