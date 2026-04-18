@@ -94,9 +94,10 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Set the global logger instance
 		 \param[in]  logger  Logger to use (nullptr to reset to default NullLogger)
-		 \details    Not thread-safe; call before creating sessions or from main thread.
-					 The SDK does not take ownership - caller must ensure logger
-					 lifetime exceeds SDK usage.
+		 \details    Thread-safe: the pointer swap is atomic with acquire/release
+					 ordering. The SDK does not take ownership - the caller must
+					 ensure the logger outlives all threads that may still be
+					 logging through it.
 		 *******************************************************************************/
 		void setLogger(ILogger* logger);
 

@@ -22,7 +22,9 @@ namespace Actisense
 		StderrLogger::StderrLogger(LogLevel threshold)
 			: threshold_(threshold), startTime_(std::chrono::steady_clock::now()) {
 			// Initialize all category thresholds to the global threshold
-			categoryThresholds_.fill(threshold);
+			for (auto& t : categoryThresholds_) {
+				t.store(threshold, std::memory_order_relaxed);
+			}
 		}
 
 		void StderrLogger::log(LogLevel level, LogCategory category, std::string_view message,
@@ -51,7 +53,7 @@ namespace Actisense
 				<< '.' << std::setfill('0') << std::setw(3) << millis << "] ["
 				<< logLevelName(level) << "] [" << logCategoryName(category) << "] " << message;
 
-			if (showLocation_ && !file.empty()) {
+			if (showLocation_.load(std::memory_order_relaxed) && !file.empty()) {
 				oss << " (" << file << ':' << line << ')';
 			}
 
@@ -68,10 +70,10 @@ namespace Actisense
 			// Use category-specific threshold if available, otherwise global
 			const auto categoryIndex = static_cast<std::size_t>(category);
 			if (categoryIndex < categoryThresholds_.size()) {
-				return level <= categoryThresholds_[categoryIndex];
+				return level <= categoryThresholds_[categoryIndex].load(std::memory_order_relaxed);
 			}
 
-			return level <= threshold_;
+			return level <= threshold_.load(std::memory_order_relaxed);
 		}
 
 		void StderrLogger::flush() {
@@ -80,19 +82,21 @@ namespace Actisense
 		}
 
 		void StderrLogger::setThreshold(LogLevel level) noexcept {
-			threshold_ = level;
-			categoryThresholds_.fill(level);
+			threshold_.store(level, std::memory_order_relaxed);
+			for (auto& t : categoryThresholds_) {
+				t.store(level, std::memory_order_relaxed);
+			}
 		}
 
 		void StderrLogger::setCategoryThreshold(LogCategory category, LogLevel level) noexcept {
 			const auto index = static_cast<std::size_t>(category);
 			if (index < categoryThresholds_.size()) {
-				categoryThresholds_[index] = level;
+				categoryThresholds_[index].store(level, std::memory_order_relaxed);
 			}
 		}
 
 		void StderrLogger::setShowLocation(bool enabled) noexcept {
-			showLocation_ = enabled;
+			showLocation_.store(enabled, std::memory_order_relaxed);
 		}
 
 	} /* namespace Sdk */

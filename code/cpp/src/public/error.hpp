@@ -11,6 +11,7 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include <functional>
+#include <string>
 #include <string_view>
 #include <system_error>
 
@@ -67,27 +68,29 @@ namespace Actisense
 		 \brief      Extended error information
 		 \details    Provides additional context for errors, especially device errors.
 					 Used when more detail is needed beyond the basic ErrorCode.
+					 The string fields own their storage so the error can be
+					 safely copied out of an ExtendedErrorCallback and stored for
+					 later inspection. Previously these were std::string_view,
+					 which made it easy to capture a dangling reference.
 		 *******************************************************************************/
 		struct ExtendedError
 		{
 			ErrorCode code = ErrorCode::Ok; ///< SDK-level error code
 			int32_t deviceErrorCode = 0;	///< Original device error code (if BemDeviceError)
-			std::string_view deviceMessage; ///< Device error description
-			std::string_view context;		///< Additional context (command name, etc.)
+			std::string deviceMessage;		///< Device error description
+			std::string context;			///< Additional context (command name, etc.)
 
 			/**************************************************************************/ /**
 			 \brief      Check if this represents an error condition
 			 \return     True if code is not Ok
 			 *******************************************************************************/
-			[[nodiscard]] constexpr bool isError() const noexcept { return code != ErrorCode::Ok; }
+			[[nodiscard]] bool isError() const noexcept { return code != ErrorCode::Ok; }
 
 			/**************************************************************************/ /**
 			 \brief      Check if this is a device-reported error
 			 \return     True if deviceErrorCode is non-zero
 			 *******************************************************************************/
-			[[nodiscard]] constexpr bool isDeviceError() const noexcept {
-				return deviceErrorCode != 0;
-			}
+			[[nodiscard]] bool isDeviceError() const noexcept { return deviceErrorCode != 0; }
 		};
 
 		/**************************************************************************/ /**

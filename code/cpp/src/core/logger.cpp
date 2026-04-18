@@ -8,6 +8,7 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include <array>
+#include <atomic>
 
 #include "public/logging.hpp"
 
@@ -41,17 +42,19 @@ namespace Actisense
 				}
 			};
 
-			/* Global state */
+			/* Global state. Atomic so setters/getters on different threads don't
+			   race; ordering is relaxed because log-level filtering tolerates
+			   brief staleness after a setter returns. */
 			NullLogger gNullLogger;
-			ILogger* gLogger = &gNullLogger;
-			LogLevel gGlobalLogLevel = LogLevel::Info;
-			std::array<LogLevel, 6> gCategoryLogLevels = {{
-				LogLevel::Info, // General
-				LogLevel::Info, // Transport
-				LogLevel::Info, // Protocol
-				LogLevel::Info, // Bem
-				LogLevel::Info, // Session
-				LogLevel::Info	// Metrics
+			std::atomic<ILogger*> gLogger{&gNullLogger};
+			std::atomic<LogLevel> gGlobalLogLevel{LogLevel::Info};
+			std::array<std::atomic<LogLevel>, 6> gCategoryLogLevels = {{
+				std::atomic<LogLevel>{LogLevel::Info}, // General
+				std::atomic<LogLevel>{LogLevel::Info}, // Transport
+				std::atomic<LogLevel>{LogLevel::Info}, // Protocol
+				std::atomic<LogLevel>{LogLevel::Info}, // Bem
+				std::atomic<LogLevel>{LogLevel::Info}, // Session
+				std::atomic<LogLevel>{LogLevel::Info}  // Metrics
 			}};
 
 			/**************************************************************************/ /**
@@ -71,26 +74,26 @@ namespace Actisense
 		/* Public Function Definitions ------------------------------------------ */
 
 		void setLogger(ILogger* logger) {
-			gLogger = logger ? logger : &gNullLogger;
+			gLogger.store(logger ? logger : &gNullLogger, std::memory_order_release);
 		}
 
 		ILogger& logger() noexcept {
-			return *gLogger;
+			return *gLogger.load(std::memory_order_acquire);
 		}
 
 		void setLogLevel(LogLevel level) {
-			gGlobalLogLevel = level;
+			gGlobalLogLevel.store(level, std::memory_order_relaxed);
 		}
 
 		void setLogLevel(LogCategory category, LogLevel level) {
 			const auto index = static_cast<std::size_t>(category);
 			if (index < gCategoryLogLevels.size()) {
-				gCategoryLogLevels[index] = level;
+				gCategoryLogLevels[index].store(level, std::memory_order_relaxed);
 			}
 		}
 
 		LogLevel logLevel() noexcept {
-			return gGlobalLogLevel;
+			return gGlobalLogLevel.load(std::memory_order_relaxed);
 		}
 
 		std::string_view logLevelName(LogLevel level) noexcept {

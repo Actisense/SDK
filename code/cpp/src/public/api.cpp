@@ -19,19 +19,18 @@ namespace Actisense
 {
 	namespace Sdk
 	{
-		/* Local definitions ---------------------------------------------------- */
-
-		/* Static version string buffer */
-		static char s_versionString[32] = {0};
-
 		/**************************************************************************/ /**
 		 \brief      Convert version to string
 		 \return     C-string representation of the version (e.g., "0.1.0")
+		 \details    Uses a thread-local buffer so concurrent calls from multiple
+					 threads don't clobber each other's return value. The returned
+					 pointer is valid until the next call to toString() on the same
+					 thread.
 		 *******************************************************************************/
 		const char* Version::toString() const noexcept {
-			std::snprintf(s_versionString, sizeof(s_versionString), "%d.%d.%d", major, minor,
-						  patch);
-			return s_versionString;
+			thread_local char buffer[32];
+			std::snprintf(buffer, sizeof(buffer), "%d.%d.%d", major, minor, patch);
+			return buffer;
 		}
 
 		/**************************************************************************/ /**

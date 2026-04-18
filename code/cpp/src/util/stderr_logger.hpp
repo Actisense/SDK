@@ -11,6 +11,7 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <mutex>
 
@@ -73,10 +74,12 @@ namespace Actisense
 			void setShowLocation(bool enabled) noexcept;
 
 		private:
+			/* mutex_ serializes writes to stderr (fputs) only. Thresholds are
+			   atomic so isEnabled() stays lock-free on the hot path. */
 			mutable std::mutex mutex_;
-			LogLevel threshold_;
-			std::array<LogLevel, 6> categoryThresholds_;
-			bool showLocation_ = false;
+			std::atomic<LogLevel> threshold_;
+			std::array<std::atomic<LogLevel>, 6> categoryThresholds_;
+			std::atomic<bool> showLocation_{false};
 			std::chrono::steady_clock::time_point startTime_;
 		};
 
