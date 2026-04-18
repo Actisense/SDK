@@ -10,6 +10,8 @@
 #include "transport/loopback/loopback_transport.hpp"
 
 #include <algorithm>
+#include <utility>
+#include <vector>
 
 namespace Actisense
 {
@@ -28,48 +30,45 @@ namespace Actisense
 
 		void LoopbackTransport::asyncOpen(const TransportConfig& config,
 										  std::function<void(ErrorCode)> completion) {
-			std::lock_guard<std::mutex> lock(mutex_);
-
-			if (is_open_) {
-				if (completion) {
-					completion(ErrorCode::AlreadyConnected);
+			ErrorCode result = ErrorCode::Ok;
+			{
+				std::lock_guard<std::mutex> lock(mutex_);
+				if (is_open_) {
+					result = ErrorCode::AlreadyConnected;
+				} else {
+					/* Loopback doesn't validate config - always succeeds */
+					(void)config;
+					is_open_ = true;
+					total_bytes_sent_ = 0;
+					total_messages_sent_ = 0;
+					messageBuffer_.clear();
 				}
-				return;
 			}
-
-			/* Loopback doesn't validate config - always succeeds */
-			(void)config;
-
-			is_open_ = true;
-			total_bytes_sent_ = 0;
-			total_messages_sent_ = 0;
-			messageBuffer_.clear();
-
 			if (completion) {
-				completion(ErrorCode::Ok);
+				completion(result);
 			}
 		}
 
 		void LoopbackTransport::close() {
-			std::lock_guard<std::mutex> lock(mutex_);
-
-			if (!is_open_) {
-				return;
+			std::queue<PendingRecv> canceled_recvs;
+			{
+				std::lock_guard<std::mutex> lock(mutex_);
+				if (!is_open_) {
+					return;
+				}
+				is_open_ = false;
+				canceled_recvs.swap(pending_recvs_);
+				messageBuffer_.clear();
 			}
-
-			is_open_ = false;
-
-			/* Cancel all pending receives */
-			while (!pending_recvs_.empty()) {
-				auto pending = std::move(pending_recvs_.front());
-				pending_recvs_.pop();
-
+			/* Invoke cancellation callbacks outside the lock to avoid deadlock if
+			   user re-enters the transport from the callback. */
+			while (!canceled_recvs.empty()) {
+				auto pending = std::move(canceled_recvs.front());
+				canceled_recvs.pop();
 				if (pending.completion) {
 					pending.completion(ErrorCode::Canceled, {});
 				}
 			}
-
-			messageBuffer_.clear();
 		}
 
 		bool LoopbackTransport::isOpen() const noexcept {
@@ -78,61 +77,66 @@ namespace Actisense
 		}
 
 		void LoopbackTransport::asyncSend(ConstByteSpan data, SendCompletionHandler completion) {
-			std::lock_guard<std::mutex> lock(mutex_);
+			ErrorCode send_result = ErrorCode::Ok;
+			std::size_t bytes_written = 0;
+			std::vector<CompletedRecv> completed;
 
-			if (!is_open_) {
-				if (completion) {
-					completion(ErrorCode::NotConnected, 0);
-				}
-				return;
-			}
-
-			std::size_t bytesWritten = data.size();
-
-			if (loopback_enabled_) {
-				/* Enqueue message as complete block (loopback to receive side) */
-				if (!messageBuffer_.enqueue(data)) {
-					/* Buffer full - rate limited */
-					if (completion) {
-						completion(ErrorCode::RateLimited, 0);
+			{
+				std::lock_guard<std::mutex> lock(mutex_);
+				if (!is_open_) {
+					send_result = ErrorCode::NotConnected;
+				} else {
+					bytes_written = data.size();
+					if (loopback_enabled_) {
+						if (!messageBuffer_.enqueue(data)) {
+							send_result = ErrorCode::RateLimited;
+							bytes_written = 0;
+						} else {
+							++total_messages_sent_;
+							drainPendingRecvs(completed);
+						}
 					}
-					return;
+					if (send_result == ErrorCode::Ok) {
+						total_bytes_sent_ += bytes_written;
+					}
 				}
-
-				++total_messages_sent_;
-
-				/* Try to complete any pending receives */
-				tryCompletePendingRecvs();
 			}
 
-			total_bytes_sent_ += bytesWritten;
-
+			/* Invoke completions outside the lock. */
+			for (auto& c : completed) {
+				if (c.completion) {
+					c.completion(ErrorCode::Ok, c.message);
+				}
+			}
 			if (completion) {
-				completion(ErrorCode::Ok, bytesWritten);
+				completion(send_result, bytes_written);
 			}
 		}
 
 		void LoopbackTransport::asyncRecv(RecvCompletionHandler completion) {
-			std::lock_guard<std::mutex> lock(mutex_);
+			ErrorCode immediate_ec = ErrorCode::Ok;
+			std::vector<uint8_t> immediate_data;
+			bool have_immediate = false;
 
-			if (!is_open_) {
-				if (completion) {
-					completion(ErrorCode::NotConnected, {});
+			{
+				std::lock_guard<std::mutex> lock(mutex_);
+				if (!is_open_) {
+					immediate_ec = ErrorCode::NotConnected;
+					have_immediate = true;
+				} else {
+					auto message = messageBuffer_.dequeue();
+					if (message) {
+						immediate_data = std::move(*message);
+						have_immediate = true;
+					} else {
+						pending_recvs_.push(PendingRecv{std::move(completion)});
+					}
 				}
-				return;
 			}
 
-			/* Try to read immediately if message available */
-			auto message = messageBuffer_.dequeue();
-			if (message) {
-				if (completion) {
-					completion(ErrorCode::Ok, *message);
-				}
-				return;
+			if (have_immediate && completion) {
+				completion(immediate_ec, immediate_data);
 			}
-
-			/* No message available - queue the receive request */
-			pending_recvs_.push(PendingRecv{std::move(completion)});
 		}
 
 		TransportKind LoopbackTransport::kind() const noexcept {
@@ -140,20 +144,26 @@ namespace Actisense
 		}
 
 		std::size_t LoopbackTransport::injectData(ConstByteSpan data) {
-			std::lock_guard<std::mutex> lock(mutex_);
-
-			if (!is_open_) {
-				return 0;
+			std::size_t injected = 0;
+			std::vector<CompletedRecv> completed;
+			{
+				std::lock_guard<std::mutex> lock(mutex_);
+				if (!is_open_) {
+					return 0;
+				}
+				if (!messageBuffer_.enqueue(data)) {
+					return 0; /* Buffer full */
+				}
+				injected = data.size();
+				drainPendingRecvs(completed);
 			}
-
-			if (!messageBuffer_.enqueue(data)) {
-				return 0; /* Buffer full */
+			/* Invoke completions outside the lock. */
+			for (auto& c : completed) {
+				if (c.completion) {
+					c.completion(ErrorCode::Ok, c.message);
+				}
 			}
-
-			/* Try to complete pending receives with injected data */
-			tryCompletePendingRecvs();
-
-			return data.size();
+			return injected;
 		}
 
 		std::size_t LoopbackTransport::bytesAvailable() const noexcept {
@@ -186,20 +196,18 @@ namespace Actisense
 			return loopback_enabled_;
 		}
 
-		void LoopbackTransport::tryCompletePendingRecvs() {
-			/* Called with lock held */
+		void LoopbackTransport::drainPendingRecvs(std::vector<CompletedRecv>& out) {
+			/* Called with mutex_ held. Pairs each pending receive with a dequeued
+			   message; caller invokes the collected completions after dropping the
+			   lock to avoid re-entrancy deadlocks. */
 			while (!pending_recvs_.empty()) {
 				auto message = messageBuffer_.dequeue();
 				if (!message) {
 					break;
 				}
-
 				auto pending = std::move(pending_recvs_.front());
 				pending_recvs_.pop();
-
-				if (pending.completion) {
-					pending.completion(ErrorCode::Ok, *message);
-				}
+				out.push_back(CompletedRecv{std::move(pending.completion), std::move(*message)});
 			}
 		}
 

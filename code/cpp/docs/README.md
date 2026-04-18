@@ -163,8 +163,9 @@ ctest -C Release -V
 
 The project automatically manages dependencies:
 
-1. **GoogleTest** (v1.14.0) - For unit testing
+1. **GoogleTest** (v1.17.0 or later) - For unit testing
    - Automatically fetched if not found via FetchContent
+   - v1.17.0+ is required for MSVC 19.50 (VS 2026) test registration
 
 2. **fmt** (optional) - Modern formatting library
    - Only fetched if `ACTISENSE_ENABLE_FMT=ON`

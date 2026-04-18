@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <cstring>
 #include <sstream>
+#include <utility>
+#include <vector>
 
 #include "util/debug_log.hpp"
 
@@ -129,26 +131,34 @@ namespace Actisense
 
 			portName_.clear();
 
-			/* Clear pending operations */
+			/* Drain pending operations under the lock; fire completions after
+			   releasing it so user callbacks can safely re-enter the transport. */
+			std::queue<PendingRecv> recvs_to_cancel;
+			std::queue<PendingSend> sends_to_cancel;
 			{
 				std::lock_guard<std::mutex> lock(asyncMutex_);
-				while (!pendingRecvs_.empty()) {
-					auto& op = pendingRecvs_.front();
-					if (op.completion)
-						op.completion(ErrorCode::TransportClosed, {});
-					pendingRecvs_.pop();
-				}
-				while (!pendingSends_.empty()) {
-					auto& op = pendingSends_.front();
-					if (op.completion)
-						op.completion(ErrorCode::TransportClosed, 0);
-					pendingSends_.pop();
-				}
+				recvs_to_cancel.swap(pendingRecvs_);
+				sends_to_cancel.swap(pendingSends_);
 			}
 
 			/* Clear message buffer and notify waiting threads */
 			messageBuffer_.clear();
 			messageBuffer_.notifyAll();
+
+			while (!recvs_to_cancel.empty()) {
+				auto op = std::move(recvs_to_cancel.front());
+				recvs_to_cancel.pop();
+				if (op.completion) {
+					op.completion(ErrorCode::TransportClosed, {});
+				}
+			}
+			while (!sends_to_cancel.empty()) {
+				auto op = std::move(sends_to_cancel.front());
+				sends_to_cancel.pop();
+				if (op.completion) {
+					op.completion(ErrorCode::TransportClosed, 0);
+				}
+			}
 		}
 
 		bool SerialTransport::isOpen() const noexcept {
@@ -245,10 +255,31 @@ namespace Actisense
 			}
 #endif
 
-			/* Configure port parameters */
+			/* Configure port parameters. On failure, tear the handle/event down
+			   directly: close() short-circuits because isOpen_ is still false,
+			   which would otherwise leak the platform handle. */
 			const auto configResult = configurePort(config);
 			if (configResult != ErrorCode::Ok) {
-				close();
+#if defined(_WIN32)
+				if (writeOverlapped_.hEvent) {
+					CloseHandle(writeOverlapped_.hEvent);
+					writeOverlapped_.hEvent = nullptr;
+				}
+				if (handle_ != INVALID_HANDLE_VALUE) {
+					CloseHandle(handle_);
+					handle_ = INVALID_HANDLE_VALUE;
+				}
+#else
+				if (fd_ >= 0) {
+					if (termiosRestoreNeeded_) {
+						tcsetattr(fd_, TCSANOW, &originalTermios_);
+						termiosRestoreNeeded_ = false;
+					}
+					::close(fd_);
+					fd_ = -1;
+				}
+#endif
+				portName_.clear();
 				return configResult;
 			}
 
@@ -651,6 +682,18 @@ namespace Actisense
 				/* Process async operations */
 				processAsyncOperations(read_buffer, bytes_read);
 			}
+
+#ifdef METHOD_IS_WaitForMultipleObjects
+			/* If we exit the loop with a read still in flight (e.g. close() was
+			   called during WAIT_TIMEOUT), cancel it and wait for the kernel to
+			   release its references to the OVERLAPPED + buffer before tearing
+			   them down. */
+			if (fWaitingOnRead) {
+				CancelIo(handle_);
+				DWORD dwBytesRead = 0;
+				GetOverlappedResult(handle_, &readOverlapped, &dwBytesRead, TRUE);
+			}
+#endif
 			CloseHandle(readOverlapped.hEvent);
 
 			ACTISENSE_LOG_INFO("Serial", "Read thread exiting");
@@ -663,39 +706,41 @@ namespace Actisense
 		 \return     .
 		 *******************************************************************************/
 		void SerialTransport::readThreadFunc() {
+			/* Cap the poll period so close() (which sets stopRequested_ then joins)
+			   has a bounded wait. Treat an unconfigured/zero timeout as the
+			   default poll interval rather than blocking indefinitely. */
+			static constexpr unsigned kMaxPollIntervalMs = 100;
+			const unsigned pollMs =
+				(readTimeoutMs_ == 0) ? kMaxPollIntervalMs
+									  : std::min(readTimeoutMs_, kMaxPollIntervalMs);
+
 			std::vector<uint8_t> tempBuffer(tempBufferSize_);
 			ACTISENSE_LOG_INFO("Serial", "Read thread started");
 			while (!stopRequested_ && isOpen()) {
-				if (isOpen()) {
-					/* Read from port into temp buffer */
-					std::size_t bytes_read = 0;
-					uint8_t* buffer = tempBuffer.data();
-					std::size_t max_bytes = tempBuffer.size();
-					{
-						/* Set up for select/poll with timeout */
-						fd_set readSet;
-						FD_ZERO(&readSet);
-						FD_SET(fd_, &readSet);
+				/* Read from port into temp buffer */
+				std::size_t bytes_read = 0;
+				uint8_t* buffer = tempBuffer.data();
+				std::size_t max_bytes = tempBuffer.size();
+				{
+					fd_set readSet;
+					FD_ZERO(&readSet);
+					FD_SET(fd_, &readSet);
 
-						struct timeval tv;
-						struct timeval* pTv = nullptr;
-						if (readTimeoutMs_ > 0) {
-							tv.tv_sec = readTimeoutMs_ / 1000;
-							tv.tv_usec = (readTimeoutMs_ % 1000) * 1000;
-							pTv = &tv;
+					struct timeval tv;
+					tv.tv_sec = pollMs / 1000;
+					tv.tv_usec = (pollMs % 1000) * 1000;
+
+					const int selectResult = select(fd_ + 1, &readSet, nullptr, nullptr, &tv);
+					if (selectResult > 0) {
+						const ssize_t result = ::read(fd_, buffer, max_bytes);
+						if (result > 0) {
+							bytes_read = static_cast<std::size_t>(result);
 						}
-						const int selectResult = select(fd_ + 1, &readSet, nullptr, nullptr, pTv);
-						if (selectResult > 0) {
-							const ssize_t result = ::read(fd_, buffer, max_bytes);
-							if (result > 0) {
-								bytes_read = static_cast<std::size_t>(result);
-							}
-						}
-						totalBytesReceived_ += bytes_read;
 					}
-					/* Process async operations */
-					processAsyncOperations(buffer, bytes_read);
+					totalBytesReceived_ += bytes_read;
 				}
+				/* Process async operations */
+				processAsyncOperations(buffer, bytes_read);
 			}
 			ACTISENSE_LOG_INFO("Serial", "Read thread exiting");
 		}
@@ -726,34 +771,47 @@ namespace Actisense
 				}
 			}
 
-			std::lock_guard<std::mutex> asyncLock(asyncMutex_);
+			/* Pair pending receives with available messages while holding both
+			   locks (asyncMutex_ outer, readMutex_ inner — consistent with the
+			   only other site that takes both). Then drop the locks before
+			   invoking user callbacks to avoid re-entrancy deadlocks. */
+			struct CompletedRecv
+			{
+				RecvCompletionHandler completion;
+				std::vector<uint8_t> message;
+			};
+			std::vector<CompletedRecv> completed;
+			{
+				std::lock_guard<std::mutex> asyncLock(asyncMutex_);
 
-			const auto pendingCount = pendingRecvs_.size();
-			if (pendingCount > 1) {
-				std::ostringstream ss;
-				ss << "WARNING: " << pendingCount << " pending recv operations queued!";
-				ACTISENSE_LOG_WARN("Serial", ss.str());
+				const auto pendingCount = pendingRecvs_.size();
+				if (pendingCount > 1) {
+					std::ostringstream ss;
+					ss << "WARNING: " << pendingCount << " pending recv operations queued!";
+					ACTISENSE_LOG_WARN("Serial", ss.str());
+				}
+
+				std::lock_guard<std::mutex> readLock(readMutex_);
+				while (!pendingRecvs_.empty()) {
+					auto message = messageBuffer_.dequeue();
+					if (!message) {
+						break;
+					}
+					auto op = std::move(pendingRecvs_.front());
+					pendingRecvs_.pop();
+					completed.push_back(
+						CompletedRecv{std::move(op.completion), std::move(*message)});
+				}
 			}
 
-			while (!pendingRecvs_.empty()) {
-				std::lock_guard<std::mutex> readLock(readMutex_);
-
-				auto message = messageBuffer_.dequeue();
-				if (!message) {
-					break;
-				}
-
-				auto op = std::move(pendingRecvs_.front());
-				pendingRecvs_.pop();
-
+			for (auto& c : completed) {
 				{
 					std::ostringstream ss;
-					ss << "Completing async recv: " << message->size() << " bytes";
+					ss << "Completing async recv: " << c.message.size() << " bytes";
 					ACTISENSE_LOG_TRACE("Serial", ss.str());
 				}
-
-				if (op.completion) {
-					op.completion(ErrorCode::Ok, *message);
+				if (c.completion) {
+					c.completion(ErrorCode::Ok, c.message);
 				}
 			}
 		}

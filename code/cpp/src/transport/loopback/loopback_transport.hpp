@@ -13,6 +13,7 @@
 /* Dependent includes ------------------------------------------------------- */
 #include <mutex>
 #include <queue>
+#include <vector>
 
 #include "transport/transport.hpp"
 #include "util/message_ring_buffer.hpp"
@@ -128,7 +129,16 @@ namespace Actisense
 			};
 			std::queue<PendingRecv> pending_recvs_;
 
-			void tryCompletePendingRecvs();
+			/* Receive completion paired with its message, ready to fire outside the lock. */
+			struct CompletedRecv
+			{
+				RecvCompletionHandler completion;
+				std::vector<uint8_t> message;
+			};
+
+			/* Pair pending receives with available messages. Must be called with
+			   mutex_ held; caller fires the returned completions after releasing it. */
+			void drainPendingRecvs(std::vector<CompletedRecv>& out);
 		};
 
 		/**************************************************************************/ /**
