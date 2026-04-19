@@ -5,6 +5,32 @@ All notable changes to the Actisense C++ SDK are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-04-19
+
+### Changed (potentially breaking)
+
+- **`ExtendedError::deviceMessage` and `ExtendedError::context` are now
+  `std::string` instead of `std::string_view`.** They own their storage, so an
+  `ExtendedError` can be safely copied out of an `ExtendedErrorCallback` and
+  retained for later inspection. Previously the views could dangle the moment
+  the callback returned. `ExtendedError::isError()` and `isDeviceError()` are
+  no longer `constexpr` (`std::string` is not yet a literal type).
+
+### Fixed (thread-safety)
+
+- **`Version::toString` no longer races between threads.** The shared static
+  output buffer was replaced with a `thread_local` buffer; the returned
+  `const char*` is valid until the next call on the same thread.
+- **Global logger state (`gLogger`, `gGlobalLogLevel`, `gCategoryLogLevels`)
+  is now atomic.** `setLogger` uses release ordering, `logger()` uses acquire,
+  and the level getters/setters use relaxed ordering. `setLogger` is now safe
+  to call concurrently with logging from other threads (previously documented
+  as not thread-safe). The supplied logger must still outlive any thread that
+  may still be logging through it.
+- **`StderrLogger` thresholds (`threshold_`, `categoryThresholds_[]`,
+  `showLocation_`) are atomic.** `isEnabled()` is now lock-free on the hot
+  path; the internal mutex is reduced to serialising the `fputs` write.
+
 ## [0.3.0] - 2026-04-18
 
 ### Build

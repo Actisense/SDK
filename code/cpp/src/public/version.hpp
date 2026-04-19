@@ -22,7 +22,7 @@ namespace Actisense
 		 \brief      SDK version numbers (compile-time constants)
 		 *******************************************************************************/
 		constexpr int VERSION_MAJOR = 0;
-		constexpr int VERSION_MINOR = 3;
+		constexpr int VERSION_MINOR = 4;
 		constexpr int VERSION_PATCH = 0;
 
 		/**************************************************************************/ /**

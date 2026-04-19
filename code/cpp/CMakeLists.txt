@@ -18,7 +18,7 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
 endif()
 
 project(ActisenseSDK
-    VERSION 0.3.0
+    VERSION 0.4.0
     DESCRIPTION "Modern C++20 SDK for Actisense device communication"
     LANGUAGES CXX
 )
