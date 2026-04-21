@@ -15,11 +15,11 @@ Here is the table of implemented BST-BEM encoders & decoders for the Actisense S
 | [Commit To EEPROM](commit-to-eeprom.md) | A1H | A0H | 01H |
 | [Commit To FLASH](commit-to-flash.md) | A1H | A0H | 02H |
 | [Operating mode](operating-mode.md) | A1H | A0H | 11H |
-| [Port Baud config](port-baud-config.md) | A1H | A0H | 12H |
+| [Port Baud config](Deprecated/port-baud-config.md) | A1H | A0H | 12H |
 | [Port 'P Code' config](port-pcode-config.md) | A1H | A0H | 13H |
 | [Port duplicate delete](port-duplicate-delete.md) | A1H | A0H | 14H |
 | [Total time](total-time.md) | A1H | A0H | 15H |
-| [Hardware baud](hardware-baud.md) | A1H | A0H | 16H |
+| [Hardware baud](Deprecated/hardware-baud.md) | A1H | A0H | 16H |
 | [Port baudrate](port-baudrate.md) | A1H | A0H | 17H |
 | [Echo](echo.md) | A1H | A0H | 18H |
 | [Supported PGN List](supported-pgn-list.md) | A1H | A0H | 40H |

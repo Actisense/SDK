@@ -31,33 +31,33 @@ To validate a received message:
 
 Using the BST 95 message from the example below:
 
-**Original data:** `95 1E 01 20 30 02 F8 09 FF FC 37 0A 00 10 FF FF`
+**Original data:** `95 0E 01 20 30 02 F8 09 FF FC 37 0A 00 10 FF FF`
 
 **Step-by-step calculation:**
 
 ```text
 Start:     checksum = 0x00
 Subtract:  0x00 - 0x95 = 0x6B  (using 8-bit arithmetic)
-Subtract:  0x6B - 0x1E = 0x4D
-Subtract:  0x4D - 0x01 = 0x4C
-Subtract:  0x4C - 0x20 = 0x2C
-Subtract:  0x2C - 0x30 = 0xFC
-Subtract:  0xFC - 0x02 = 0xFA
-Subtract:  0xFA - 0xF8 = 0x02
-Subtract:  0x02 - 0x09 = 0xF9
-Subtract:  0xF9 - 0xFF = 0xFA
-Subtract:  0xFA - 0xFC = 0xFE
-Subtract:  0xFE - 0x37 = 0xC7
-Subtract:  0xC7 - 0x0A = 0xBD
-Subtract:  0xBD - 0x00 = 0xBD
-Subtract:  0xBD - 0x10 = 0xAD
-Subtract:  0xAD - 0xFF = 0xAE
-Subtract:  0xAE - 0xFF = 0xAF
+Subtract:  0x6B - 0x0E = 0x5D
+Subtract:  0x5D - 0x01 = 0x5C
+Subtract:  0x5C - 0x20 = 0x3C
+Subtract:  0x3C - 0x30 = 0x0C
+Subtract:  0x0C - 0x02 = 0x0A
+Subtract:  0x0A - 0xF8 = 0x12
+Subtract:  0x12 - 0x09 = 0x09
+Subtract:  0x09 - 0xFF = 0x0A
+Subtract:  0x0A - 0xFC = 0x0E
+Subtract:  0x0E - 0x37 = 0xD7
+Subtract:  0xD7 - 0x0A = 0xCD
+Subtract:  0xCD - 0x00 = 0xCD
+Subtract:  0xCD - 0x10 = 0xBD
+Subtract:  0xBD - 0xFF = 0xBE
+Subtract:  0xBE - 0xFF = 0xBF
 
-Result: checksum = 0xAF
+Result: checksum = 0xBF
 ```
 
-**Verification:** Adding all data bytes plus checksum: `95 + 1E + 01 + 20 + 30 + 02 + F8 + 09 + FF + FC + 37 + 0A + 00 + 10 + FF + FF + AF = 0x00` (8-bit sum)
+**Verification:** Adding all data bytes plus checksum: `95 + 0E + 01 + 20 + 30 + 02 + F8 + 09 + FF + FC + 37 + 0A + 00 + 10 + FF + FF + BF = 0x00` (8-bit sum)
 
 ### Pseudo Code
 
@@ -88,14 +88,14 @@ end if
 
 ## Examples
 
-Here, a BST95 Can message is being encoded, and sent over a serial link as escaped data.  The exmple shows binary stream values.
+Here, a BST95 Can message is being encoded, and sent over a serial link as escaped data.  The example shows binary stream values.
 
 The original BST 95 message:
 
-95 1E 01 20 30 02 F8 09 FF FC 37 0A 00 10 FF FF
+95 0E 01 20 30 02 F8 09 FF FC 37 0A 00 10 FF FF
 
 Encoded as BDTP:
 
-`10 02` 95 1E 01 20 30 02 F8 09 FF FC 37 0A 00 `10 10` FF FF `AF` `10 03`
+`10 02` 95 0E 01 20 30 02 F8 09 FF FC 37 0A 00 `10 10` FF FF `BF` `10 03`
 
-Note the checksum AF Hex has been added, which gives an 8 bit sum of zero in the non-escaped message data.
+Note the checksum BF Hex has been added, which gives an 8 bit sum of zero in the non-escaped message data.

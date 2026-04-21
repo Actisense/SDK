@@ -46,12 +46,12 @@ To handle messages and their decode in an actisense BST binary formatted stream,
 
 Items in the BEM table are decoded as a 16-bit number, or **BEM id** that uniquely identifies the code.
 
-BST messages that a re using 8-bit BST id only endoe into the 16-bit space using a lower value of FF Hex. FF is always an invalid bem lower byte,so this identified the message as BST only.  So a BST-93 message would decode as BEM Id = 93FF.
+BST messages that are using 8-bit BST id only encode into the 16-bit space using a lower value of FF Hex. FF is always an invalid bem lower byte,so this identifies the message as BST only.  So a BST-93 message would decode as BEM Id = 93FF.
 
 ## BEM Commands
 
-BEM Commands have a simplified encoding scheme, and are used to taregt a device with new settings. See [BEM Command](bst-bem-command.md)
+BEM Commands have a simplified encoding scheme, and are used to target a device with new settings. See [BEM Command](bst-bem-command.md)
 
-## BEM Reponses
+## BEM Responses
 
-BEM Reponses include data about the device along with error codes and other information. See [BEM Response](bst-bem-response.md)
+BEM Responses include data about the device along with error codes and other information. See [BEM Response](bst-bem-response.md)

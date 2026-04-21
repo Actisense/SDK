@@ -70,4 +70,4 @@ Note also that for BST type 2, the length is the total message length, **includi
 
 ## BST-BEM
 
-There are only 255 possible valid BST ID codes as the BST Id is an 8-bit number. To extend this, BST-BEM format was created to make a 16-bit command space. See [BST-BEM](BEM.md) for details.
+There are only 255 possible valid BST ID codes as the BST Id is an 8-bit number. To extend this, BST-BEM format was created to make a 16-bit command space. See [BST-BEM](bst-bem.md) for details.

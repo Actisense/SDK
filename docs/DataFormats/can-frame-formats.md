@@ -4,9 +4,9 @@ CAN frames are the fundamental data transfer medium of a CAN bus protocol such a
 
 ## Available formats
 
-- [1] [CAN Binary](Binary/BST-95-can-frame.md)
+- [1] [CAN Binary](Binary/bst-detail/BST-95-can-frame.md)
 - [2] [CAN Ascii](Ascii/can-frame-ascii-A.md)
-- [3] [0183 MXPGN](NMEA0183/mxpgn-0183.md)
+- [3] [0183 MXPGN](NMEA0183/nmea-0183-mxpgn.md)
 
 ## Description
 
@@ -47,3 +47,11 @@ Each observed CAN frame provides:
 How these appear depends on the chosen format (see below).
 
 ## Choosing a Format
+
+| Format | Human Readable | Bandwidth | Parsing Effort | Typical Use |
+|--------|----------------|-----------|----------------|-------------|
+| [CAN ASCII](Ascii/can-frame-ascii-A.md) | Excellent | High (~2× binary) | Low | Quick diagnostics, terminal logging |
+| [BST-95 Binary](Binary/bst-detail/BST-95-can-frame.md) | None (raw) | Low (best) | Higher | High-volume capture, machine-to-machine |
+| [MXPGN (NMEA 0183)](NMEA0183/nmea-0183-mxpgn.md) | Good | High | Medium | Mixed NMEA 0183 / NMEA 2000 streams |
+
+**Recommendation:** Use CAN ASCII for development and debugging. Use BST-95 binary for production or cloud-forwarding scenarios where bandwidth matters.
