@@ -11,13 +11,9 @@
 #include "public/api.hpp"
 
 #include <cstdio>
-#include <utility>
 
-#include "core/session_impl.hpp"
 #include "platform/linux/enumerate_serial_devices_linux.hpp"
 #include "platform/windows/enumerate_serial_devices_windows.hpp"
-#include "transport/loopback/loopback_transport.hpp"
-#include "transport/serial/serial_transport.hpp"
 
 namespace Actisense
 {
@@ -88,68 +84,11 @@ namespace Actisense
 			}
 		}
 
-		/**************************************************************************/ /**
-		 \brief      Open a session to a device
-		 \param[in]  options   Transport and protocol configuration
-		 \param[in]  onEvent   Callback for parsed messages and status events
-		 \param[in]  onError   Callback for errors
-		 \param[in]  onOpened  Callback when session is opened (or failed)
-		 \details    Constructs a transport for the requested kind, opens it, and
-					 hands the user a SessionImpl wired to BDTP/BST/BEM. TCP and
-					 UDP transports are not yet implemented and return
-					 ErrorCode::UnsupportedOperation. If onOpened is null the call
-					 is a no-op (no path to return a session) and onError is
-					 invoked with InvalidArgument when available.
-		 *******************************************************************************/
-		void Api::open(const OpenOptions& options, EventCallback onEvent, ErrorCallback onError,
-					   SessionOpenedCallback onOpened) {
-			if (!onOpened) {
-				if (onError) {
-					onError(ErrorCode::InvalidArgument, "Api::open requires a non-null onOpened");
-				}
-				return;
-			}
-
-			TransportPtr transport;
-			switch (options.transport.kind) {
-				case TransportKind::Serial:
-					transport = std::make_unique<SerialTransport>();
-					break;
-
-				case TransportKind::Loopback:
-					transport = createLoopbackTransport();
-					break;
-
-				case TransportKind::TcpClient:
-				case TransportKind::Udp: {
-					const auto* kindName =
-						(options.transport.kind == TransportKind::TcpClient) ? "TCP" : "UDP";
-					if (onError) {
-						onError(ErrorCode::UnsupportedOperation,
-								std::string{kindName} + " transport is not yet implemented");
-					}
-					onOpened(ErrorCode::UnsupportedOperation, nullptr);
-					return;
-				}
-			}
-
-			ErrorCode openResult = ErrorCode::Internal;
-			transport->asyncOpen(options.transport,
-								 [&openResult](ErrorCode code) { openResult = code; });
-
-			if (openResult != ErrorCode::Ok) {
-				if (onError) {
-					onError(openResult, "Failed to open transport");
-				}
-				onOpened(openResult, nullptr);
-				return;
-			}
-
-			auto session = std::make_unique<SessionImpl>(std::move(transport), std::move(onEvent),
-														 std::move(onError));
-			session->startReceiving();
-			onOpened(ErrorCode::Ok, std::move(session));
-		}
+		/* Api::open() is implemented in api_session.cpp so that this translation
+		 * unit stays free of dependencies on SessionImpl and the transport
+		 * library. Some downstream consumers (notably Actisense DeviceLib)
+		 * compile api.cpp directly without linking the rest of the SDK, and
+		 * only need version()/enumerateSerialDevices()/resolveHostAsync(). */
 
 	} /* namespace Sdk */
 } /* namespace Actisense */

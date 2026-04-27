@@ -56,6 +56,7 @@ set(SDK_SOURCES
 
     # Public API implementation
     public/api.cpp
+    public/api_session.cpp
 
     # Platform-specific
     $<$<PLATFORM_ID:Windows>:platform/windows/enumerate_serial_devices_windows.cpp>
