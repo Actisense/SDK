@@ -39,3 +39,6 @@ add_sdk_test(test_pgn_list_management test_pgn_list_management.cpp)
 
 # API entry point tests
 add_sdk_test(test_api_open test_api_open.cpp)
+
+# Session cancel / asyncRequestResponse tests
+add_sdk_test(test_session_cancel test_session_cancel.cpp)

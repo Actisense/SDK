@@ -11,6 +11,7 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include <atomic>
+#include <map>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -286,6 +287,7 @@ namespace Actisense
 
 			mutable std::mutex mutex_;
 			uint64_t nextRequestId_ = 1;
+			std::map<uint64_t, RequestCompletion> pending_requests_;
 
 			/* Statistics */
 			std::atomic<std::size_t> frames_received_{0};
