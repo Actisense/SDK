@@ -433,35 +433,25 @@ namespace Actisense
 			}
 			rawBst.insert(rawBst.end(), datagram.data.begin(), datagram.data.end());
 
-			auto result = bstDecoder_.decode(rawBst);
-			if (result.success) {
+			std::string decodeError;
+			auto frame = bstDecoder_.decode(rawBst, decodeError);
+			if (frame) {
 				++frames_received_;
-				handleBstFrame(rawBst, result.frame);
+				handleBstFrame(*frame);
 			} else if (errorCallback_) {
-				errorCallback_(ErrorCode::MalformedFrame, result.error);
+				errorCallback_(ErrorCode::MalformedFrame, decodeError);
 			}
 		}
 
-		void SessionImpl::handleBstFrame(std::span<const uint8_t> rawData,
-		                                  const BstFrameVariant& frame) {
+		void SessionImpl::handleBstFrame(const BstFrame& frame) {
 			if (!eventCallback_) {
 				return;
 			}
 
-			/* Create BstFrame from raw data for unified access */
-			BstFrame bstFrame(rawData);
-
-			/* Emit event to user callback */
 			ParsedMessageEvent event;
 			event.protocol = "bst";
-
-			std::visit(
-				[&event](const auto& f) {
-					event.messageType = bstIdToString(f.bstId);
-				},
-				frame);
-
-			event.payload = std::move(bstFrame);
+			event.messageType = bstIdToString(frame.bstId());
+			event.payload = frame;
 
 			eventCallback_(EventVariant{event});
 		}
