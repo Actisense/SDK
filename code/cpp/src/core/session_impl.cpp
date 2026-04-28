@@ -367,6 +367,78 @@ namespace Actisense
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
+		/* Device Control & Information Commands -------------------------------- */
+
+		void SessionImpl::commitToEeprom(std::chrono::milliseconds timeout,
+										 BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::CommitToEeprom;
+			/* No data payload */
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::commitToFlash(std::chrono::milliseconds timeout,
+										BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::CommitToFlash;
+			/* No data payload */
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::getTotalTime(std::chrono::milliseconds timeout,
+									   BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetTotalTime;
+			/* GET request has no data payload */
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::setTotalTime(uint32_t totalTime, uint32_t passkey,
+									   std::chrono::milliseconds timeout,
+									   BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetTotalTime;
+			cmd.data.resize(8);
+			/* Total time: 4 bytes, little-endian */
+			cmd.data[0] = static_cast<uint8_t>(totalTime & 0xFF);
+			cmd.data[1] = static_cast<uint8_t>((totalTime >> 8) & 0xFF);
+			cmd.data[2] = static_cast<uint8_t>((totalTime >> 16) & 0xFF);
+			cmd.data[3] = static_cast<uint8_t>((totalTime >> 24) & 0xFF);
+			/* Passkey: 4 bytes, little-endian */
+			cmd.data[4] = static_cast<uint8_t>(passkey & 0xFF);
+			cmd.data[5] = static_cast<uint8_t>((passkey >> 8) & 0xFF);
+			cmd.data[6] = static_cast<uint8_t>((passkey >> 16) & 0xFF);
+			cmd.data[7] = static_cast<uint8_t>((passkey >> 24) & 0xFF);
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::echo(std::span<const uint8_t> data, std::chrono::milliseconds timeout,
+							   BemResponseCallback callback) {
+			if (data.size() > kEchoMaxPayloadSize) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument,
+							 "Echo data too large: max " + std::to_string(kEchoMaxPayloadSize) +
+								 " bytes, got " + std::to_string(data.size()));
+				}
+				return;
+			}
+
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::Echo;
+			cmd.data.assign(data.begin(), data.end());
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
 		void SessionImpl::startReceiving() {
 			if (running_.exchange(true)) {
 				return; /* Already running */

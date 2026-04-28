@@ -220,6 +220,48 @@ namespace Actisense
 										std::chrono::milliseconds timeout,
 										BemResponseCallback callback);
 
+			/* Device Control & Information Commands -------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Send Commit To EEPROM command (save settings)
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void commitToEeprom(std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Commit To FLASH command (save settings)
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void commitToFlash(std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Get Total Time command
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void getTotalTime(std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Set Total Time command
+			 \param[in]  totalTime  Total operating time to set (seconds)
+			 \param[in]  passkey    Security passkey for write access
+			 \param[in]  timeout    Timeout for response
+			 \param[in]  callback   Callback invoked on response or timeout
+			 *******************************************************************************/
+			void setTotalTime(uint32_t totalTime, uint32_t passkey,
+							  std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Echo command
+			 \param[in]  data      Data to echo (0-252 bytes); response should match
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void echo(std::span<const uint8_t> data, std::chrono::milliseconds timeout,
+					  BemResponseCallback callback);
+
 			/**************************************************************************/ /**
 			 \brief      Start the receive loop (non-blocking)
 			 *******************************************************************************/
