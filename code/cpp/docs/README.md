@@ -316,6 +316,14 @@ cmake --build build
   ```
   Then log out and back in.
 
+## Further Reading
+
+- [Getting Started](getting-started.md) — quick setup walkthrough
+- [Message Flow](message-flow.md) — protocol stack, framing, end-to-end byte trace
+- [Receiving NMEA 2000](receiving-nmea2000.md) — Rx-path patterns
+- [Sending NMEA 2000](sending-nmea2000.md) — Tx-path patterns
+- **[BEM Commands](bem-commands/README.md) — C++ API reference for every public BEM command**
+
 ## Getting Help
 
 For issues, questions, or contributions, please refer to the main [SDK Documentation](../../../docs/README.md) or contact Actisense support.
