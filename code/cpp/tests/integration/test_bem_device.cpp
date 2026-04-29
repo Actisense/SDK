@@ -60,6 +60,7 @@ protected:
 	std::unique_ptr<SessionImpl> session_;
 	std::string portName_;
 	unsigned baudRate_ = 115200;
+	uint16_t modelId_ = 0;
 
 	void SetUp() override
 	{
@@ -93,6 +94,34 @@ protected:
 
 		/* Brief delay for connection to stabilise */
 		std::this_thread::sleep_for(kSetupDelay);
+
+		/* Probe the device model so per-test compatibility gates can decide
+		   whether to run. Use Get Operating Mode since every supported
+		   gateway answers it. */
+		std::promise<uint16_t> modelPromise;
+		auto modelFuture = modelPromise.get_future();
+		bool fulfilled = false;
+		session_->getOperatingMode(kDefaultTimeout,
+			[&modelPromise, &fulfilled](const std::optional<BemResponse>& resp, ErrorCode ec,
+			                            std::string_view) {
+				if (fulfilled) return;
+				fulfilled = true;
+				if (ec == ErrorCode::Ok && resp.has_value()) {
+					modelPromise.set_value(resp->header.modelId);
+				} else {
+					modelPromise.set_value(0);
+				}
+			});
+		modelId_ = modelFuture.get();
+		std::cout << "  Detected device model: " << modelIdToString(modelId_)
+		          << " (0x" << std::hex << modelId_ << std::dec << ")" << std::endl;
+	}
+
+	/* True for devices that pre-date PGN List F2; F1 (0x48/0x49) is supported
+	   on NGT/NGW-class but explicitly NOT on NGX-1 (0x003B). */
+	bool deviceSupportsPgnListF1() const noexcept
+	{
+		return static_cast<ArlModelId>(modelId_) != ArlModelId::NGX1;
 	}
 
 	void TearDown() override
@@ -507,6 +536,10 @@ TEST_F(BemDeviceTest, GetTxPgnEnableListF2)
 
 TEST_F(BemDeviceTest, GetRxPgnEnableListF1_Message0)
 {
+	if (!deviceSupportsPgnListF1()) {
+		GTEST_SKIP() << "PGN List F1 not supported on " << modelIdToString(modelId_)
+		             << " (use F2)";
+	}
 	/* Legacy format: request message 0 (first 25 PGNs) */
 	auto cmd = makeCommand(BemCommandId::GetSetRxPgnEnableListF1, {0x00});
 	auto result = sendSync(cmd);
@@ -528,6 +561,10 @@ TEST_F(BemDeviceTest, GetRxPgnEnableListF1_Message0)
 
 TEST_F(BemDeviceTest, GetRxPgnEnableListF1_Message1)
 {
+	if (!deviceSupportsPgnListF1()) {
+		GTEST_SKIP() << "PGN List F1 not supported on " << modelIdToString(modelId_)
+		             << " (use F2)";
+	}
 	/* Legacy format: request message 1 (next 25 PGNs) */
 	auto cmd = makeCommand(BemCommandId::GetSetRxPgnEnableListF1, {0x01});
 	auto result = sendSync(cmd);
@@ -549,6 +586,10 @@ TEST_F(BemDeviceTest, GetRxPgnEnableListF1_Message1)
 
 TEST_F(BemDeviceTest, GetTxPgnEnableListF1_Message0)
 {
+	if (!deviceSupportsPgnListF1()) {
+		GTEST_SKIP() << "PGN List F1 not supported on " << modelIdToString(modelId_)
+		             << " (use F2)";
+	}
 	auto cmd = makeCommand(BemCommandId::GetSetTxPgnEnableListF1, {0x00});
 	auto result = sendSync(cmd);
 
@@ -569,6 +610,10 @@ TEST_F(BemDeviceTest, GetTxPgnEnableListF1_Message0)
 
 TEST_F(BemDeviceTest, GetTxPgnEnableListF1_Message1)
 {
+	if (!deviceSupportsPgnListF1()) {
+		GTEST_SKIP() << "PGN List F1 not supported on " << modelIdToString(modelId_)
+		             << " (use F2)";
+	}
 	auto cmd = makeCommand(BemCommandId::GetSetTxPgnEnableListF1, {0x01});
 	auto result = sendSync(cmd);
 
@@ -589,6 +634,10 @@ TEST_F(BemDeviceTest, GetTxPgnEnableListF1_Message1)
 
 TEST_F(BemDeviceTest, GetTxPgnEnableListF1_Message2)
 {
+	if (!deviceSupportsPgnListF1()) {
+		GTEST_SKIP() << "PGN List F1 not supported on " << modelIdToString(modelId_)
+		             << " (use F2)";
+	}
 	auto cmd = makeCommand(BemCommandId::GetSetTxPgnEnableListF1, {0x02});
 	auto result = sendSync(cmd);
 
@@ -609,6 +658,10 @@ TEST_F(BemDeviceTest, GetTxPgnEnableListF1_Message2)
 
 TEST_F(BemDeviceTest, GetTxPgnEnableListF1_Message3)
 {
+	if (!deviceSupportsPgnListF1()) {
+		GTEST_SKIP() << "PGN List F1 not supported on " << modelIdToString(modelId_)
+		             << " (use F2)";
+	}
 	auto cmd = makeCommand(BemCommandId::GetSetTxPgnEnableListF1, {0x03});
 	auto result = sendSync(cmd);
 

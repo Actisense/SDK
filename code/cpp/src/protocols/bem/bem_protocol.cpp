@@ -477,6 +477,24 @@ namespace Actisense
 									   outFrame, outError);
 		}
 
+		bool BemProtocol::buildSetTxPgnEnableListF2(const std::vector<TxPgnEnableEntry>& entries,
+													std::vector<uint8_t>& outFrame,
+													std::string& outError) {
+			std::string encodeError;
+			std::vector<uint8_t> data;
+			if (!encodeTxPgnEnableListF2SetRequest(entries, data, encodeError)) {
+				outError = encodeError;
+				return false;
+			}
+
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetTxPgnEnableListF2;
+			cmd.data = std::move(data);
+
+			return encodeCommand(cmd, outFrame, outError);
+		}
+
 		bool BemProtocol::buildGetRxPgnEnableListF1(uint8_t messageIndex,
 													std::vector<uint8_t>& outFrame,
 													std::string& outError) {

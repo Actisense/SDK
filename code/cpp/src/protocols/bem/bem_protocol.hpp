@@ -439,6 +439,17 @@ namespace Actisense
 														 std::string& outError);
 
 			/**************************************************************************/ /**
+			 \brief      Build Set Tx PGN Enable List F2 command
+			 \param[in]  entries    PGN entries (PGN + rate + priority) to enable
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildSetTxPgnEnableListF2(
+				const std::vector<TxPgnEnableEntry>& entries, std::vector<uint8_t>& outFrame,
+				std::string& outError);
+
+			/**************************************************************************/ /**
 			 \brief      Build Get Rx PGN Enable List F1 command (legacy)
 			 \param[in]  messageIndex  Message to request (0 or 1)
 			 \param[out] outFrame      Complete BDTP-framed message

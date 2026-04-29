@@ -262,6 +262,178 @@ namespace Actisense
 			void echo(std::span<const uint8_t> data, std::chrono::milliseconds timeout,
 					  BemResponseCallback callback);
 
+			/* NMEA 2000 Product Information Commands ------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Send Get Supported PGN List command (single message)
+			 \param[in]  pgnIndex    Starting PGN index (0 for first request)
+			 \param[in]  transferId  Transfer ID for multi-message tracking
+			 \param[in]  timeout     Timeout for response
+			 \param[in]  callback    Callback invoked on response or timeout
+			 \details    The full PGN list may span multiple messages; the caller is
+						 responsible for re-issuing this command with the next index
+						 (see SupportedPgnListResponse::nextIndex()) until the list ends.
+			 *******************************************************************************/
+			void getSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
+									 std::chrono::milliseconds timeout,
+									 BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Get Product Info command
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void getProductInfo(std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Get CAN Config command (NMEA 2000 NAME)
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void getCanConfig(std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Set CAN Config command (NMEA 2000 NAME + source address)
+			 \param[in]  name           64-bit NMEA 2000 NAME to set
+			 \param[in]  sourceAddress  Preferred source address
+			 \param[in]  timeout        Timeout for response
+			 \param[in]  callback       Callback invoked on response or timeout
+			 *******************************************************************************/
+			void setCanConfig(uint64_t name, uint8_t sourceAddress,
+							  std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Get CAN Info Field 1 command (Installation Description 1)
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void getCanInfoField1(std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Set CAN Info Field 1 command (Installation Description 1)
+			 \param[in]  text      Text to set (max 70 characters)
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void setCanInfoField1(const std::string& text, std::chrono::milliseconds timeout,
+								  BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Get CAN Info Field 2 command (Installation Description 2)
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void getCanInfoField2(std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Set CAN Info Field 2 command (Installation Description 2)
+			 \param[in]  text      Text to set (max 70 characters)
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void setCanInfoField2(const std::string& text, std::chrono::milliseconds timeout,
+								  BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Get CAN Info Field 3 command (Manufacturer Info, read-only)
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void getCanInfoField3(std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/* PGN List Management Commands ----------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Send Get Rx PGN Enable List F1 command (legacy, NGT/NGW)
+			 \param[in]  messageIndex  Message segment to request (0 or 1)
+			 \param[in]  timeout       Timeout for response
+			 \param[in]  callback      Callback invoked on response or timeout
+			 \note       Legacy F1 protocol; not supported by NGX. Prefer F2 for
+						 new code.
+			 *******************************************************************************/
+			void getRxPgnEnableListF1(uint8_t messageIndex, std::chrono::milliseconds timeout,
+									  BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Get Tx PGN Enable List F1 command (legacy, NGT/NGW)
+			 \param[in]  messageIndex  Message segment to request (0-3)
+			 \param[in]  timeout       Timeout for response
+			 \param[in]  callback      Callback invoked on response or timeout
+			 \note       Legacy F1 protocol; not supported by NGX. Prefer F2 for
+						 new code.
+			 *******************************************************************************/
+			void getTxPgnEnableListF1(uint8_t messageIndex, std::chrono::milliseconds timeout,
+									  BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Get Rx PGN Enable List F2 command
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void getRxPgnEnableListF2(std::chrono::milliseconds timeout,
+									  BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Set Rx PGN Enable List F2 command
+			 \param[in]  pgns      List of PGNs to enable (max 255)
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void setRxPgnEnableListF2(const std::vector<uint32_t>& pgns,
+									  std::chrono::milliseconds timeout,
+									  BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Get Tx PGN Enable List F2 command
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void getTxPgnEnableListF2(std::chrono::milliseconds timeout,
+									  BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Set Tx PGN Enable List F2 command
+			 \param[in]  entries   PGN entries (PGN + rate + priority) to enable (max 767)
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void setTxPgnEnableListF2(const std::vector<TxPgnEnableEntry>& entries,
+									  std::chrono::milliseconds timeout,
+									  BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Delete PGN Enable Lists command
+			 \param[in]  selector  0=Rx, 1=Tx, 2=Both
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void deletePgnEnableLists(uint8_t selector, std::chrono::milliseconds timeout,
+									  BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Activate PGN Enable Lists command (apply session lists)
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void activatePgnEnableLists(std::chrono::milliseconds timeout,
+										BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Default PGN Enable List command (restore factory defaults)
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void defaultPgnEnableList(std::chrono::milliseconds timeout,
+									  BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Get Params PGN Enable Lists command (status query)
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 *******************************************************************************/
+			void getParamsPgnEnableLists(std::chrono::milliseconds timeout,
+										 BemResponseCallback callback);
+
 			/**************************************************************************/ /**
 			 \brief      Start the receive loop (non-blocking)
 			 *******************************************************************************/

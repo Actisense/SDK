@@ -37,6 +37,7 @@ add_sdk_test(test_nmea2000_product_info test_nmea2000_product_info.cpp)
 
 # Phase 2d PGN List Management tests
 add_sdk_test(test_pgn_list_management test_pgn_list_management.cpp)
+add_sdk_test(test_session_pgn_list_management test_session_pgn_list_management.cpp)
 
 # API entry point tests
 add_sdk_test(test_api_open test_api_open.cpp)

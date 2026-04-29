@@ -107,7 +107,8 @@ namespace Actisense
 			NGW1 = 0x0010,	   ///< NGW-1 WiFi Gateway
 			EMU1 = 0x0011,	   ///< EMU-1 Engine Monitor
 			PRO_NDC1 = 0x0020, ///< PRO-NDC-1-E2K
-			WGX1 = 0x0030	   ///< WGX Wireless Gateway
+			WGX1 = 0x0030,	   ///< WGX Wireless Gateway
+			NGX1 = 0x003B	   ///< NGX-1 NMEA 2000 X-over Gateway (does not support PGN list F1)
 		};
 
 		/**************************************************************************/ /**
@@ -127,6 +128,8 @@ namespace Actisense
 					return "PRO-NDC-1-E2K";
 				case ArlModelId::WGX1:
 					return "WGX";
+				case ArlModelId::NGX1:
+					return "NGX-1";
 				default:
 					return "Model-0x" + std::to_string(modelId);
 			}

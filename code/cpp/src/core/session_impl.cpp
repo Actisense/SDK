@@ -439,6 +439,285 @@ namespace Actisense
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
+		/* NMEA 2000 Product Information Commands ------------------------------- */
+
+		void SessionImpl::getSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
+											  std::chrono::milliseconds timeout,
+											  BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSupportedPgnList;
+			cmd.data.resize(2);
+			cmd.data[0] = pgnIndex;
+			cmd.data[1] = transferId;
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::getProductInfo(std::chrono::milliseconds timeout,
+										 BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetProductInfo;
+			/* GET request has no data payload */
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::getCanConfig(std::chrono::milliseconds timeout,
+									   BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetCanConfig;
+			/* GET request has no data payload */
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::setCanConfig(uint64_t name, uint8_t sourceAddress,
+									   std::chrono::milliseconds timeout,
+									   BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetCanConfig;
+			cmd.data.resize(9);
+			/* NAME: 8 bytes, little-endian */
+			cmd.data[0] = static_cast<uint8_t>(name & 0xFF);
+			cmd.data[1] = static_cast<uint8_t>((name >> 8) & 0xFF);
+			cmd.data[2] = static_cast<uint8_t>((name >> 16) & 0xFF);
+			cmd.data[3] = static_cast<uint8_t>((name >> 24) & 0xFF);
+			cmd.data[4] = static_cast<uint8_t>((name >> 32) & 0xFF);
+			cmd.data[5] = static_cast<uint8_t>((name >> 40) & 0xFF);
+			cmd.data[6] = static_cast<uint8_t>((name >> 48) & 0xFF);
+			cmd.data[7] = static_cast<uint8_t>((name >> 56) & 0xFF);
+			cmd.data[8] = sourceAddress;
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		namespace
+		{
+			void buildCanInfoFieldSet(const std::string& text, BemCommandId bemId,
+									  BemCommand& cmd) {
+				cmd.bstId = BstId::Bem_PG_A1;
+				cmd.bemId = bemId;
+				cmd.data.assign(kCanInfoFieldMaxLen, 0xFF);
+				for (std::size_t i = 0; i < text.length(); ++i) {
+					cmd.data[i] = static_cast<uint8_t>(text[i]);
+				}
+			}
+		} /* namespace */
+
+		void SessionImpl::getCanInfoField1(std::chrono::milliseconds timeout,
+										   BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetCanInfoField1;
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::setCanInfoField1(const std::string& text,
+										   std::chrono::milliseconds timeout,
+										   BemResponseCallback callback) {
+			if (text.length() > kCanInfoFieldMaxLen) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument,
+							 "CAN Info Field 1 text too long: max " +
+								 std::to_string(kCanInfoFieldMaxLen) + " characters, got " +
+								 std::to_string(text.length()));
+				}
+				return;
+			}
+
+			BemCommand cmd;
+			buildCanInfoFieldSet(text, BemCommandId::GetSetCanInfoField1, cmd);
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::getCanInfoField2(std::chrono::milliseconds timeout,
+										   BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetCanInfoField2;
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::setCanInfoField2(const std::string& text,
+										   std::chrono::milliseconds timeout,
+										   BemResponseCallback callback) {
+			if (text.length() > kCanInfoFieldMaxLen) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument,
+							 "CAN Info Field 2 text too long: max " +
+								 std::to_string(kCanInfoFieldMaxLen) + " characters, got " +
+								 std::to_string(text.length()));
+				}
+				return;
+			}
+
+			BemCommand cmd;
+			buildCanInfoFieldSet(text, BemCommandId::GetSetCanInfoField2, cmd);
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::getCanInfoField3(std::chrono::milliseconds timeout,
+										   BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetCanInfoField3;
+			/* Read-only: no SET variant */
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		/* PGN List Management Commands ----------------------------------------- */
+
+		void SessionImpl::getRxPgnEnableListF1(uint8_t messageIndex,
+											   std::chrono::milliseconds timeout,
+											   BemResponseCallback callback) {
+			if (messageIndex > 1) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument,
+							 "Invalid message index for Rx F1: must be 0 or 1");
+				}
+				return;
+			}
+
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetRxPgnEnableListF1;
+			cmd.data.push_back(messageIndex);
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::getTxPgnEnableListF1(uint8_t messageIndex,
+											   std::chrono::milliseconds timeout,
+											   BemResponseCallback callback) {
+			if (messageIndex > 3) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument,
+							 "Invalid message index for Tx F1: must be 0-3");
+				}
+				return;
+			}
+
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetTxPgnEnableListF1;
+			cmd.data.push_back(messageIndex);
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::getRxPgnEnableListF2(std::chrono::milliseconds timeout,
+											   BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetRxPgnEnableListF2;
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::setRxPgnEnableListF2(const std::vector<uint32_t>& pgns,
+											   std::chrono::milliseconds timeout,
+											   BemResponseCallback callback) {
+			std::string error;
+			std::vector<uint8_t> data;
+			if (!encodeRxPgnEnableListF2SetRequest(pgns, data, error)) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument, error);
+				}
+				return;
+			}
+
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetRxPgnEnableListF2;
+			cmd.data = std::move(data);
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::getTxPgnEnableListF2(std::chrono::milliseconds timeout,
+											   BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetTxPgnEnableListF2;
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::setTxPgnEnableListF2(const std::vector<TxPgnEnableEntry>& entries,
+											   std::chrono::milliseconds timeout,
+											   BemResponseCallback callback) {
+			std::string error;
+			std::vector<uint8_t> data;
+			if (!encodeTxPgnEnableListF2SetRequest(entries, data, error)) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument, error);
+				}
+				return;
+			}
+
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::GetSetTxPgnEnableListF2;
+			cmd.data = std::move(data);
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::deletePgnEnableLists(uint8_t selector,
+											   std::chrono::milliseconds timeout,
+											   BemResponseCallback callback) {
+			if (selector > 2) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument,
+							 "Invalid selector: must be 0 (Rx), 1 (Tx), or 2 (Both)");
+				}
+				return;
+			}
+
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::DeletePgnEnableLists;
+			cmd.data.push_back(selector);
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::activatePgnEnableLists(std::chrono::milliseconds timeout,
+												 BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::ActivatePgnEnableLists;
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::defaultPgnEnableList(std::chrono::milliseconds timeout,
+											   BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::DefaultPgnEnableList;
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
+		void SessionImpl::getParamsPgnEnableLists(std::chrono::milliseconds timeout,
+												  BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::ParamsPgnEnableLists;
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
 		void SessionImpl::startReceiving() {
 			if (running_.exchange(true)) {
 				return; /* Already running */
