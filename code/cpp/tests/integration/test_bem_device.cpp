@@ -751,6 +751,41 @@ TEST_F(BemDeviceTest, SetOperatingMode_NoChange)
 	std::cout << "  SET Operating Mode (no-change) succeeded" << std::endl;
 }
 
+TEST_F(BemDeviceTest, ReInitMainApp_RebootsDevice)
+{
+	/* DESTRUCTIVE: this command reboots the device. Gated on
+	   ACTISENSE_TEST_REBOOT_OK=1 so the standard integration suite never
+	   runs it accidentally. After acceptance the device will be offline for
+	   several seconds; subsequent tests in the same run are likely to fail
+	   their SetUp probe, so reserve this for a dedicated invocation. */
+	const char* rebootOk = std::getenv("ACTISENSE_TEST_REBOOT_OK");
+	if (!rebootOk || std::string(rebootOk) != "1") {
+		GTEST_SKIP() << "ACTISENSE_TEST_REBOOT_OK!=1 — skipping destructive reboot test";
+	}
+
+	auto result = sendConvenience([this](auto timeout, auto cb) {
+		session_->reInitMainApp(timeout, std::move(cb));
+	});
+
+	/* Two outcomes are both acceptable evidence the device received the
+	   command:
+	     - Ok ack before reboot, or
+	     - timeout (device started rebooting before sending the response).
+	   Anything else (e.g. InvalidArgument, MalformedFrame) is a real
+	   failure. */
+	if (result.errorCode == ErrorCode::Ok) {
+		ASSERT_TRUE(result.response.has_value());
+		std::cout << "  ReInitMainApp acknowledged (model 0x" << std::hex << modelId_
+		          << std::dec << ") — device rebooting now" << std::endl;
+	} else if (result.errorCode == ErrorCode::Timeout) {
+		std::cout << "  ReInitMainApp accepted without ack (timeout) — device rebooting now"
+		          << std::endl;
+	} else {
+		FAIL() << "ReInitMainApp returned unexpected error: "
+		       << static_cast<int>(result.errorCode) << " (" << result.errorMsg << ")";
+	}
+}
+
 }; /* namespace Test */
 }; /* namespace Sdk */
 }; /* namespace Actisense */

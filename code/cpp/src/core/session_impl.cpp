@@ -369,6 +369,16 @@ namespace Actisense
 
 		/* Device Control & Information Commands -------------------------------- */
 
+		void SessionImpl::reInitMainApp(std::chrono::milliseconds timeout,
+										BemResponseCallback callback) {
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::ReInitMainApp;
+			/* No data payload — device reboots on receipt. */
+
+			sendBemCommand(cmd, timeout, std::move(callback));
+		}
+
 		void SessionImpl::commitToEeprom(std::chrono::milliseconds timeout,
 										 BemResponseCallback callback) {
 			BemCommand cmd;

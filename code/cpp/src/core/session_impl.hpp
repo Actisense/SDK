@@ -223,6 +223,17 @@ namespace Actisense
 			/* Device Control & Information Commands -------------------------------- */
 
 			/**************************************************************************/ /**
+			 \brief      Send ReInit Main App command (device reboot)
+			 \param[in]  timeout   Timeout for response
+			 \param[in]  callback  Callback invoked on response or timeout
+			 \note       The device reboots after acknowledging this command, so the
+						 caller should expect the session to lose connectivity shortly
+						 afterwards. Many devices do not send a response at all before
+						 rebooting, in which case the callback fires with a timeout.
+			 *******************************************************************************/
+			void reInitMainApp(std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
 			 \brief      Send Commit To EEPROM command (save settings)
 			 \param[in]  timeout   Timeout for response
 			 \param[in]  callback  Callback invoked on response or timeout

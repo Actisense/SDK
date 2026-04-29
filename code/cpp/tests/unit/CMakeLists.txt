@@ -27,6 +27,7 @@ add_sdk_test(test_tx_pgn_enable test_tx_pgn_enable.cpp)
 
 # Phase 2a/2b BEM Command tests
 add_sdk_test(test_device_control test_device_control.cpp)
+add_sdk_test(test_session_device_control test_session_device_control.cpp)
 add_sdk_test(test_total_time test_total_time.cpp)
 add_sdk_test(test_echo test_echo.cpp)
 add_sdk_test(test_unsolicited_messages test_unsolicited_messages.cpp)
