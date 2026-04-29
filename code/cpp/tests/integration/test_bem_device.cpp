@@ -10,6 +10,43 @@
             - ACTISENSE_TEST_PORT: Serial port name (e.g., "COM7")
             - ACTISENSE_TEST_BAUD: Baud rate (default 115200)
 
+            ----------------------------------------------------------------
+            Round-trip test pattern
+            ----------------------------------------------------------------
+            For any GET/SET command pair, a *_RoundTrip test verifies the
+            device actually applied the SET and (critically) leaves the
+            device in its starting state when the test ends:
+
+              1. GET baseline value
+              2. Compute a *different* valid target value
+              3. Install a scope-guard that will SET back to baseline on
+                 destruction (so even an ASSERT_* failure mid-test restores
+                 the device).
+              4. SET to the target value
+              5. (Brief settle delay if the device needs one)
+              6. GET — assert it now reports the target
+              7. SET back to baseline (and disarm the guard)
+              8. GET — assert it now reports the baseline again
+
+            See OperatingMode_RoundTrip for the canonical implementation.
+            Other groups (port baudrate, port pcode, CAN config, PGN enable
+            lists) should follow the same pattern.
+
+            ----------------------------------------------------------------
+            Device capability gates
+            ----------------------------------------------------------------
+            BemDeviceTest::SetUp probes the device's modelId via
+            GetOperatingMode and stores it in modelId_. Tests that depend on
+            specific firmware behaviour use member helpers:
+
+              - deviceSupportsPgnListF1()      F1 PGN list (NOT NGX)
+              - deviceEchoIsReliable()         Echo (firmware-buggy on NGX)
+              - deviceSupportsCommitToFlash()  FLASH commit (NGX only)
+
+            Add new gates to BemDeviceTest as further capability differences
+            surface. GTEST_SKIP with a reason that names the model and links
+            to the relevant Jira ticket when skipping.
+
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 *******************************************************************************/
 
@@ -124,6 +161,22 @@ protected:
 		return static_cast<ArlModelId>(modelId_) != ArlModelId::NGX1;
 	}
 
+	/* False on NGX-1: NGX firmware returns Echo responses with a corrupted
+	   storeLength, leading to truncated or over-long payloads with
+	   uninitialised-memory trailing bytes. The echoed bytes themselves are
+	   correct at the front of the response. Tracked in GIT-75. */
+	bool deviceEchoIsReliable() const noexcept
+	{
+		return static_cast<ArlModelId>(modelId_) != ArlModelId::NGX1;
+	}
+
+	/* True for devices that store settings in FLASH and accept CommitToFlash
+	   (0x02). NGT-class devices use EEPROM only and reject the command. */
+	bool deviceSupportsCommitToFlash() const noexcept
+	{
+		return static_cast<ArlModelId>(modelId_) == ArlModelId::NGX1;
+	}
+
 	void TearDown() override
 	{
 		if (session_) {
@@ -214,8 +267,18 @@ TEST_F(BemDeviceTest, GetOperatingMode)
 
 	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
 	ASSERT_TRUE(result.response.has_value());
-	std::cout << "  Operating Mode response: "
-	          << result.response->data.size() << " data bytes" << std::endl;
+
+	const auto& data = result.response->data;
+	ASSERT_GE(data.size(), 2u) << "Operating Mode response too short to hold uint16_t mode";
+
+	const uint16_t mode = static_cast<uint16_t>(data[0]) |
+	                      (static_cast<uint16_t>(data[1]) << 8);
+	EXPECT_NE(mode, static_cast<uint16_t>(OperatingMode::OM_UndefinedMode))
+		<< "Device reported OM_UndefinedMode (uninitialised)";
+	EXPECT_NE(mode, static_cast<uint16_t>(OperatingMode::OM_NULL))
+		<< "Device reported OM_NULL";
+	std::cout << "  Operating Mode: " << OperatingModeName(static_cast<OperatingMode>(mode))
+	          << " (" << mode << ")" << std::endl;
 }
 
 TEST_F(BemDeviceTest, GetPortBaudrate)
@@ -305,35 +368,107 @@ TEST_F(BemDeviceTest, GetTxPgnEnable)
 /* Phase 2 Commands (via sendBemCommand)                                      */
 /* ========================================================================== */
 
-TEST_F(BemDeviceTest, Echo)
+TEST_F(BemDeviceTest, NgxEchoDiagnostic)
 {
-	/* Send echo payload and verify it comes back.
-	 * Note: Not all devices support Echo (0x18). If the device does not
-	 * support it, the request will time out - this is not a failure. */
-	const std::vector<uint8_t> echoPayload = {0x01, 0x02, 0x03, 0x04, 0xAA, 0xBB};
-	auto cmd = makeCommand(BemCommandId::Echo, echoPayload);
-	auto result = sendSync(cmd);
-
-	if (result.errorCode != ErrorCode::Ok) {
-		std::cout << "  Echo not supported by this device (timed out)" << std::endl;
-		GTEST_SKIP() << "Echo command not supported by this device";
+	/* Diagnostic for GIT-75: probe NGX Echo with multiple payload sizes
+	   back-to-back to characterise the response. */
+	if (modelId_ != static_cast<uint16_t>(ArlModelId::NGX1)) {
+		GTEST_SKIP() << "Diagnostic only for NGX-1; saw " << modelIdToString(modelId_);
 	}
 
-	ASSERT_TRUE(result.response.has_value());
+	auto dump = [](const std::string& label, const std::vector<uint8_t>& sent,
+	               const BemResult& result) {
+		std::cout << "  [" << label << "] sent=" << sent.size() << " bytes; ";
+		if (result.errorCode != ErrorCode::Ok) {
+			std::cout << "errorCode=" << static_cast<int>(result.errorCode)
+			          << " (" << result.errorMsg << ")\n";
+			return;
+		}
+		if (!result.response.has_value()) {
+			std::cout << "no response\n";
+			return;
+		}
+		const auto& h = result.response->header;
+		std::cout << "header: bemId=0x" << std::hex << static_cast<int>(h.bemId)
+		          << " seq=0x" << static_cast<int>(h.sequenceId)
+		          << " model=0x" << h.modelId
+		          << " serial=0x" << h.serialNumber
+		          << " err=0x" << h.errorCode << std::dec
+		          << "; data.size=" << result.response->data.size() << "\n    bytes:";
+		for (std::size_t i = 0; i < result.response->data.size(); ++i) {
+			if (i % 16 == 0) std::cout << "\n     ";
+			char hex[4]; std::snprintf(hex, sizeof(hex), " %02X", result.response->data[i]);
+			std::cout << hex;
+		}
+		std::cout << "\n";
+	};
 
-	/* Echo should return the same payload */
-	const auto& data = result.response->data;
-	std::cout << "  Echo response: " << data.size() << " data bytes" << std::endl;
+	const std::vector<std::vector<uint8_t>> payloads = {
+		{},                                              /* 0 bytes */
+		{0x42},                                          /* 1 byte  */
+		{0xDE, 0xAD, 0xBE, 0xEF},                        /* 4 bytes */
+		{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08} /* 8 bytes */
+	};
 
-	/* Decode and verify */
-	EchoResponse echoResp;
-	std::string error;
-	if (decodeEchoResponse(std::span<const uint8_t>(data), echoResp, error)) {
-		EXPECT_EQ(echoResp.data, echoPayload)
-			<< "Echo data mismatch";
-		std::cout << "  Echo verified: payload matches" << std::endl;
-	} else {
-		std::cout << "  Echo decode note: " << error << std::endl;
+	for (std::size_t i = 0; i < payloads.size(); ++i) {
+		auto cmd = makeCommand(BemCommandId::Echo, payloads[i]);
+		auto result = sendSync(cmd);
+		dump("call " + std::to_string(i), payloads[i], result);
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
+
+	for (int i = 0; i < 3; ++i) {
+		auto cmd = makeCommand(BemCommandId::Echo, payloads[2]);
+		auto result = sendSync(cmd);
+		dump("repeat " + std::to_string(i), payloads[2], result);
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
+}
+
+TEST_F(BemDeviceTest, Echo)
+{
+	/* Send echo payloads of varying sizes and verify each comes back
+	 * byte-for-byte. NGT firmware does not implement Echo (0x18); the
+	 * request times out and the test self-skips. NGX firmware corrupts the
+	 * Echo response storeLength (see deviceEchoIsReliable + GIT-75). */
+	if (!deviceEchoIsReliable()) {
+		GTEST_SKIP() << "Echo unreliable on " << modelIdToString(modelId_)
+		             << " (firmware bug — see GIT-75 NgxEchoDiagnostic)";
+	}
+
+	/* Build a few payloads spanning small / medium / max-size to exercise
+	   the BST type-1 length boundary. */
+	std::vector<std::vector<uint8_t>> payloads;
+	payloads.push_back({0x42});
+	payloads.push_back({});
+	for (uint8_t i = 0; i < 32; ++i) payloads.back().push_back(i);
+	payloads.push_back({});
+	for (uint8_t i = 0; i < 252; ++i) payloads.back().push_back(static_cast<uint8_t>(i ^ 0xA5));
+
+	bool firstAttempt = true;
+	for (const auto& echoPayload : payloads) {
+		auto cmd = makeCommand(BemCommandId::Echo, echoPayload);
+		auto result = sendSync(cmd);
+
+		if (firstAttempt && result.errorCode != ErrorCode::Ok) {
+			std::cout << "  Echo not supported by this device (timed out)" << std::endl;
+			GTEST_SKIP() << "Echo command not supported by this device";
+		}
+		firstAttempt = false;
+
+		ASSERT_EQ(result.errorCode, ErrorCode::Ok)
+			<< "Echo failed for payload size " << echoPayload.size() << ": " << result.errorMsg;
+		ASSERT_TRUE(result.response.has_value());
+
+		EchoResponse echoResp;
+		std::string error;
+		ASSERT_TRUE(decodeEchoResponse(std::span<const uint8_t>(result.response->data),
+									   echoResp, error))
+			<< "Echo decode failed for payload size " << echoPayload.size() << ": " << error;
+		ASSERT_EQ(echoResp.data, echoPayload)
+			<< "Echo data mismatch — sent " << echoPayload.size()
+			<< " bytes, received " << echoResp.data.size();
+		std::cout << "  Echo verified: " << echoPayload.size() << " bytes round-trip" << std::endl;
 	}
 }
 
@@ -346,16 +481,49 @@ TEST_F(BemDeviceTest, GetTotalTime)
 	ASSERT_TRUE(result.response.has_value());
 
 	const auto& data = result.response->data;
-	std::cout << "  Total Time response: " << data.size() << " data bytes" << std::endl;
 
 	TotalTimeResponse ttResp;
 	std::string error;
-	if (decodeTotalTimeResponse(std::span<const uint8_t>(data), ttResp, error)) {
-		std::cout << "  Total Time: " << ttResp.totalTime << " seconds ("
-		          << (ttResp.totalTime / 3600) << " hours)" << std::endl;
-	} else {
-		std::cout << "  Total Time decode note: " << error << std::endl;
-	}
+	ASSERT_TRUE(decodeTotalTimeResponse(std::span<const uint8_t>(data), ttResp, error))
+		<< "Total Time decode failed: " << error;
+	EXPECT_GT(ttResp.totalTime, 0u) << "Total Time of zero is implausible for a used device";
+	std::cout << "  Total Time: " << ttResp.totalTime << " seconds ("
+	          << (ttResp.totalTime / 3600) << " hours)" << std::endl;
+}
+
+TEST_F(BemDeviceTest, TotalTime_Monotonic)
+{
+	/* Two GETs separated by ~1.5s. Total Time is in seconds with at least
+	   1-second resolution, so the second reading must be >= the first.
+	   Strictly monotonic (>) is allowed too once a second has passed. */
+	auto readTotalTime = [&](const char* tag) -> std::optional<uint32_t> {
+		auto result = sendSync(makeGetCommand(BemCommandId::GetSetTotalTime));
+		if (result.errorCode != ErrorCode::Ok || !result.response.has_value()) {
+			ADD_FAILURE() << tag << ": GET Total Time failed: " << result.errorMsg;
+			return std::nullopt;
+		}
+		TotalTimeResponse resp;
+		std::string error;
+		if (!decodeTotalTimeResponse(std::span<const uint8_t>(result.response->data),
+		                              resp, error)) {
+			ADD_FAILURE() << tag << ": decode failed: " << error;
+			return std::nullopt;
+		}
+		return resp.totalTime;
+	};
+
+	const auto first = readTotalTime("first");
+	ASSERT_TRUE(first.has_value());
+	EXPECT_GT(*first, 0u);
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+
+	const auto second = readTotalTime("second");
+	ASSERT_TRUE(second.has_value());
+	EXPECT_GE(*second, *first)
+		<< "Total Time went backwards: first=" << *first << ", second=" << *second;
+	std::cout << "  Total Time advanced: " << *first << " -> " << *second
+	          << " (" << (*second - *first) << "s elapsed)" << std::endl;
 }
 
 TEST_F(BemDeviceTest, GetProductInfo)
@@ -688,6 +856,10 @@ TEST_F(BemDeviceTest, SetEcho)
 {
 	/* Echo SET is inherently safe - it just echoes data back.
 	 * Not all devices support Echo (0x18). */
+	if (!deviceEchoIsReliable()) {
+		GTEST_SKIP() << "Echo unreliable on " << modelIdToString(modelId_)
+		             << " (firmware bug — see GIT-75 NgxEchoDiagnostic)";
+	}
 	const std::vector<uint8_t> payload = {0xDE, 0xAD, 0xBE, 0xEF};
 	auto cmd = makeCommand(BemCommandId::Echo, payload);
 	auto result = sendSync(cmd);
@@ -701,12 +873,156 @@ TEST_F(BemDeviceTest, SetEcho)
 
 	EchoResponse echoResp;
 	std::string error;
-	if (decodeEchoResponse(std::span<const uint8_t>(result.response->data), echoResp, error)) {
-		EXPECT_EQ(echoResp.data, payload) << "Echo SET data mismatch";
-		std::cout << "  Echo SET verified: " << payload.size() << " bytes echoed back" << std::endl;
-	} else {
-		std::cout << "  Echo SET decode note: " << error << std::endl;
+	ASSERT_TRUE(decodeEchoResponse(std::span<const uint8_t>(result.response->data),
+								   echoResp, error))
+		<< "Echo SET decode failed: " << error;
+	ASSERT_EQ(echoResp.data, payload)
+		<< "Echo SET data mismatch — sent " << payload.size()
+		<< " bytes, received " << echoResp.data.size();
+	std::cout << "  Echo SET verified: " << payload.size() << " bytes echoed back" << std::endl;
+}
+
+TEST_F(BemDeviceTest, CommitToEeprom_Acknowledged)
+{
+	/* Verify CommitToEeprom (0x01) is acknowledged by the device. We do not
+	   verify cross-reboot persistence here — that requires a power-cycle and
+	   is out of scope for the unattended integration suite. The GET below
+	   simply confirms the device is still responsive after the commit. */
+	auto commitResult = sendConvenience([this](auto timeout, auto cb) {
+		session_->commitToEeprom(timeout, std::move(cb));
+	});
+
+	ASSERT_EQ(commitResult.errorCode, ErrorCode::Ok)
+		<< "CommitToEeprom failed: " << commitResult.errorMsg;
+	ASSERT_TRUE(commitResult.response.has_value());
+	std::cout << "  CommitToEeprom acknowledged" << std::endl;
+
+	/* Sanity: device still responds after commit. */
+	auto modeResult = sendConvenience([this](auto timeout, auto cb) {
+		session_->getOperatingMode(timeout, std::move(cb));
+	});
+	EXPECT_EQ(modeResult.errorCode, ErrorCode::Ok)
+		<< "Device unresponsive after CommitToEeprom: " << modeResult.errorMsg;
+}
+
+TEST_F(BemDeviceTest, CommitToFlash_Acknowledged)
+{
+	/* As CommitToEeprom_Acknowledged, but for FLASH (0x02). NGT-class devices
+	   only support EEPROM and reject FLASH commit; gate accordingly. */
+	if (!deviceSupportsCommitToFlash()) {
+		GTEST_SKIP() << "CommitToFlash not supported on " << modelIdToString(modelId_)
+		             << " (EEPROM-only device)";
 	}
+	auto commitResult = sendConvenience([this](auto timeout, auto cb) {
+		session_->commitToFlash(timeout, std::move(cb));
+	});
+
+	ASSERT_EQ(commitResult.errorCode, ErrorCode::Ok)
+		<< "CommitToFlash failed: " << commitResult.errorMsg;
+	ASSERT_TRUE(commitResult.response.has_value());
+	std::cout << "  CommitToFlash acknowledged" << std::endl;
+
+	auto modeResult = sendConvenience([this](auto timeout, auto cb) {
+		session_->getOperatingMode(timeout, std::move(cb));
+	});
+	EXPECT_EQ(modeResult.errorCode, ErrorCode::Ok)
+		<< "Device unresponsive after CommitToFlash: " << modeResult.errorMsg;
+}
+
+TEST_F(BemDeviceTest, OperatingMode_RoundTrip)
+{
+	/* Canonical GET -> SET-different -> GET (assert changed) -> SET-original
+	   -> GET (assert reverted) round-trip pattern. The device is restored to
+	   its starting mode via a scope guard even if any assertion in the body
+	   fails. Modes 1 (NGTransferNormalMode) and 2 (NGTransferRxAllMode) are
+	   both supported on NGT-1 and NGX-1, making them safe round-trip targets. */
+
+	auto readMode = [&](const char* tag) -> std::optional<uint16_t> {
+		auto result = sendConvenience([this](auto timeout, auto cb) {
+			session_->getOperatingMode(timeout, std::move(cb));
+		});
+		if (result.errorCode != ErrorCode::Ok || !result.response.has_value() ||
+			result.response->data.size() < 2) {
+			ADD_FAILURE() << tag << ": GET Operating Mode failed: " << result.errorMsg;
+			return std::nullopt;
+		}
+		return static_cast<uint16_t>(result.response->data[0]) |
+			   (static_cast<uint16_t>(result.response->data[1]) << 8);
+	};
+
+	auto setMode = [&](uint16_t mode, const char* tag) -> bool {
+		auto result = sendConvenience([this, mode](auto timeout, auto cb) {
+			session_->setOperatingMode(mode, timeout, std::move(cb));
+		});
+		if (result.errorCode != ErrorCode::Ok) {
+			ADD_FAILURE() << tag << ": SET Operating Mode " << mode
+			              << " failed: " << result.errorMsg;
+			return false;
+		}
+		return true;
+	};
+
+	/* Capture baseline mode. */
+	const auto baseline = readMode("baseline");
+	ASSERT_TRUE(baseline.has_value());
+	const uint16_t baselineMode = *baseline;
+	std::cout << "  Baseline: " << OperatingModeName(static_cast<OperatingMode>(baselineMode))
+	          << " (" << baselineMode << ")" << std::endl;
+
+	/* Pick a different valid mode. Both 1 and 2 are accepted by NGT and NGX. */
+	const uint16_t targetMode =
+		(baselineMode == static_cast<uint16_t>(OperatingMode::OM_NGTransferNormalMode))
+			? static_cast<uint16_t>(OperatingMode::OM_NGTransferRxAllMode)
+			: static_cast<uint16_t>(OperatingMode::OM_NGTransferNormalMode);
+
+	/* Scope guard: always SET the device back to the baseline mode on exit,
+	   even if an ASSERT_* below early-returns from the test body. */
+	struct ModeRestorer {
+		std::function<bool(uint16_t, const char*)> set;
+		uint16_t mode;
+		bool armed;
+		~ModeRestorer() {
+			if (armed) {
+				/* Best-effort restore. Settle first since this path runs
+				   when the in-test SET likely succeeded but a follow-up
+				   call failed — give the device a moment. */
+				std::this_thread::sleep_for(std::chrono::milliseconds(300));
+				(void)set(mode, "teardown restore");
+			}
+		}
+	} restorer{setMode, baselineMode, true};
+
+	/* SET to a different mode. */
+	ASSERT_TRUE(setMode(targetMode, "to-target"));
+
+	/* Allow the device to settle after a mode change before issuing the next
+	   command — empirically NGT-1 needs a brief pause when switching between
+	   NGTransfer Normal/RxAll modes or subsequent GETs time out. */
+	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+	/* GET should now report the target mode. */
+	const auto changed = readMode("after-set-target");
+	ASSERT_TRUE(changed.has_value());
+	ASSERT_EQ(*changed, targetMode)
+		<< "Device did not report target mode after SET (baseline=" << baselineMode
+		<< ", target=" << targetMode << ", got=" << *changed << ")";
+	std::cout << "  After SET to target: "
+	          << OperatingModeName(static_cast<OperatingMode>(*changed))
+	          << " (" << *changed << ")" << std::endl;
+
+	/* SET back to baseline (and disarm the restorer since we did it cleanly). */
+	ASSERT_TRUE(setMode(baselineMode, "back-to-baseline"));
+	restorer.armed = false;
+	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+	/* GET should now report the baseline again. */
+	const auto reverted = readMode("after-restore");
+	ASSERT_TRUE(reverted.has_value());
+	ASSERT_EQ(*reverted, baselineMode)
+		<< "Device did not revert to baseline after SET";
+	std::cout << "  Reverted: "
+	          << OperatingModeName(static_cast<OperatingMode>(*reverted))
+	          << " (" << *reverted << ")" << std::endl;
 }
 
 TEST_F(BemDeviceTest, SetOperatingMode_NoChange)
