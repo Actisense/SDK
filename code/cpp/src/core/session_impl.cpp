@@ -586,15 +586,76 @@ namespace Actisense
 				return; /* Callback was invoked by correlator */
 			}
 
-			/* Unsolicited response - emit as event */
-			if (eventCallback_) {
-				ParsedMessageEvent event;
-				event.protocol = "bem";
-				event.messageType = "BEM_Response_" + std::format("{:X}", response.header.bemId);
-				event.payload = response;
-
-				eventCallback_(EventVariant{event});
+			if (!eventCallback_) {
+				return;
 			}
+
+			/* Unsolicited response: decode known F0/F1/F4 types into typed events.
+			   On decode failure, fall through to the generic emission below so
+			   consumers still see something. */
+			const auto bemId = static_cast<BemCommandId>(response.header.bemId);
+			if (isBemUnsolicited(bemId)) {
+				std::string decodeError;
+				ParsedMessageEvent typedEvent;
+				typedEvent.protocol = "bem";
+				bool emitted = false;
+
+				switch (bemId) {
+					case BemCommandId::StartupStatus: {
+						StartupStatusData data;
+						if (decodeStartupStatus(response.data, data, decodeError)) {
+							typedEvent.messageType = "StartupStatus";
+							typedEvent.payload = data;
+							eventCallback_(EventVariant{typedEvent});
+							emitted = true;
+						}
+						break;
+					}
+					case BemCommandId::ErrorReport: {
+						ErrorReportData data;
+						if (decodeErrorReport(response.data, data, decodeError)) {
+							typedEvent.messageType = "ErrorReport";
+							typedEvent.payload = data;
+							eventCallback_(EventVariant{typedEvent});
+							emitted = true;
+						}
+						break;
+					}
+					case BemCommandId::NegativeAck: {
+						NegativeAckData data;
+						if (decodeNegativeAck(response.data, data, decodeError)) {
+							typedEvent.messageType = "NegativeAck";
+							typedEvent.payload = data;
+							eventCallback_(EventVariant{typedEvent});
+							emitted = true;
+						}
+						break;
+					}
+					default:
+						/* Other unsolicited IDs (e.g. SystemStatus 0xF2) handled
+						   elsewhere; fall through to generic emission. */
+						break;
+				}
+
+				if (emitted) {
+					return;
+				}
+
+				if (!decodeError.empty() && errorCallback_) {
+					errorCallback_(ErrorCode::MalformedFrame,
+								   "Failed to decode unsolicited " +
+									   bemCommandIdToString(bemId) + ": " + decodeError);
+				}
+			}
+
+			/* Generic emission: correlated-miss or unsolicited type without a
+			   typed decoder (or with a decode failure handled above). */
+			ParsedMessageEvent event;
+			event.protocol = "bem";
+			event.messageType = "BEM_Response_" + std::format("{:X}", response.header.bemId);
+			event.payload = response;
+
+			eventCallback_(EventVariant{event});
 		}
 
 		/* Factory Function ----------------------------------------------------- */
