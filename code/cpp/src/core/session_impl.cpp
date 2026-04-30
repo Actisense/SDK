@@ -78,19 +78,19 @@ namespace Actisense
 					return;
 				}
 
-				RequestCompletion completion;
+				RequestCompletion pending_completion;
 				{
 					std::lock_guard<std::mutex> lock(mutex_);
 					auto it = pending_requests_.find(id);
 					if (it == pending_requests_.end()) {
 						return; /* Already canceled or completed */
 					}
-					completion = std::move(it->second);
+					pending_completion = std::move(it->second);
 					pending_requests_.erase(it);
 				}
 
-				if (completion) {
-					completion(code, {});
+				if (pending_completion) {
+					pending_completion(code, {});
 				}
 			});
 
@@ -177,8 +177,8 @@ namespace Actisense
 					WireTraceSink user_sink = new_state->sink;
 					new_state->eblWriter = std::make_unique<EblWriter>(
 						[user_sink = std::move(user_sink)](std::span<const uint8_t> bytes) {
-							user_sink(std::string_view{
-								reinterpret_cast<const char*>(bytes.data()), bytes.size()});
+							user_sink(std::string_view{reinterpret_cast<const char*>(bytes.data()),
+													   bytes.size()});
 						});
 					/* Preamble: TimeUTC then Version. The reader uses the
 					 * leading TimeUTC as the time anchor for everything that
@@ -750,8 +750,7 @@ namespace Actisense
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
-		void SessionImpl::deletePgnEnableLists(uint8_t selector,
-											   std::chrono::milliseconds timeout,
+		void SessionImpl::deletePgnEnableLists(uint8_t selector, std::chrono::milliseconds timeout,
 											   BemResponseCallback callback) {
 			if (selector > 2) {
 				if (callback) {
@@ -1000,9 +999,9 @@ namespace Actisense
 				}
 
 				if (!decodeError.empty() && errorCallback_) {
-					errorCallback_(ErrorCode::MalformedFrame,
-								   "Failed to decode unsolicited " +
-									   bemCommandIdToString(bemId) + ": " + decodeError);
+					errorCallback_(ErrorCode::MalformedFrame, "Failed to decode unsolicited " +
+																  bemCommandIdToString(bemId) +
+																  ": " + decodeError);
 				}
 			}
 

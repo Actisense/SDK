@@ -5,15 +5,15 @@
  \file       ebl_writer.hpp
  \brief      EBL (Enhanced Binary Log) record writer
  \details    Customer-facing helper that emits Actisense EBL log records to a
-             user-supplied byte sink. EBL is a self-describing binary format
-             carrying timestamp markers, direction markers and raw byte data;
-             files written by this class are readable by the EBL Reader tool
-             and any other consumer of the Actisense EBL format.
+			 user-supplied byte sink. EBL is a self-describing binary format
+			 carrying timestamp markers, direction markers and raw byte data;
+			 files written by this class are readable by the EBL Reader tool
+			 and any other consumer of the Actisense EBL format.
 
-             This is a port of the embedded-side EBL writer (CommonLib's
-             EblEmbedded and DesktopLib's EBLDocExportEBL) into the modern
-             C++20 SDK so that customers no longer need to reference the
-             private internal libraries to capture or replay traffic.
+			 This is a port of the embedded-side EBL writer (CommonLib's
+			 EblEmbedded and DesktopLib's EBLDocExportEBL) into the modern
+			 C++20 SDK so that customers no longer need to reference the
+			 private internal libraries to capture or replay traffic.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -175,14 +175,14 @@ namespace Actisense
 			 \note       Assumes std::chrono::system_clock uses the Unix epoch
 						 (guaranteed by C++20).
 			 *******************************************************************************/
-			[[nodiscard]] static uint64_t toFileTimeTicks(
-				std::chrono::system_clock::time_point tp) noexcept;
+			[[nodiscard]] static uint64_t
+			toFileTimeTicks(std::chrono::system_clock::time_point tp) noexcept;
 
 			/**************************************************************************/ /**
 			 \brief      Inverse of toFileTimeTicks()
 			 *******************************************************************************/
-			[[nodiscard]] static std::chrono::system_clock::time_point fromFileTimeTicks(
-				uint64_t ticks) noexcept;
+			[[nodiscard]] static std::chrono::system_clock::time_point
+			fromFileTimeTicks(uint64_t ticks) noexcept;
 
 		private:
 			/**************************************************************************/ /**

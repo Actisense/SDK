@@ -2,8 +2,8 @@
  \file       bst_decoder.cpp
  \brief      BST frame decoder/encoder implementation
  \details    Thin wrappers around BstFrame: decode() validates raw bytes via
-             BstFrame's constructor; encode() emits the bytes BstFrame already
-             holds. All field-level decoding lives in BstFrame itself.
+			 BstFrame's constructor; encode() emits the bytes BstFrame already
+			 holds. All field-level decoding lives in BstFrame itself.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -18,7 +18,7 @@ namespace Actisense
 		/* BstDecoder ----------------------------------------------------------- */
 
 		std::optional<BstFrame> BstDecoder::decode(ConstByteSpan data,
-		                                            std::string& outError) const {
+												   std::string& outError) const {
 			if (data.empty()) {
 				outError = "Empty BST data";
 				return std::nullopt;
@@ -27,8 +27,8 @@ namespace Actisense
 			auto frame = BstFrame::fromRawData(data);
 			if (!frame) {
 				const auto bstId = static_cast<unsigned>(data[0]);
-				outError = "Malformed or unsupported BST frame (ID 0x" +
-				           std::to_string(bstId) + ")";
+				outError =
+					"Malformed or unsupported BST frame (ID 0x" + std::to_string(bstId) + ")";
 				return std::nullopt;
 			}
 
@@ -40,13 +40,13 @@ namespace Actisense
 			/* PDU1 (PDUF < 240):  PGN = (DP << 16) | (PDUF << 8) | 0x00 */
 			if (pduf >= 240) {
 				return (static_cast<uint32_t>(dataPage) << 16) |
-				       (static_cast<uint32_t>(pduf) << 8) | static_cast<uint32_t>(pdus);
+					   (static_cast<uint32_t>(pduf) << 8) | static_cast<uint32_t>(pdus);
 			}
 			return (static_cast<uint32_t>(dataPage) << 16) | (static_cast<uint32_t>(pduf) << 8);
 		}
 
 		void BstDecoder::extractPduFields(uint32_t pgn, uint8_t& pduf, uint8_t& pdus,
-		                                  uint8_t& dataPage) noexcept {
+										  uint8_t& dataPage) noexcept {
 			dataPage = static_cast<uint8_t>((pgn >> 16) & 0x03);
 			pduf = static_cast<uint8_t>((pgn >> 8) & 0xFF);
 
@@ -60,7 +60,7 @@ namespace Actisense
 		/* BstEncoder ----------------------------------------------------------- */
 
 		bool BstEncoder::encode(const BstFrame& frame, std::vector<uint8_t>& outData,
-		                        std::string& outError) const {
+								std::string& outError) const {
 			if (!frame.checksumValid()) {
 				outError = "BstFrame is not valid";
 				outData.clear();

@@ -32,10 +32,10 @@ namespace Actisense
 			std::string renderTimestamp(std::chrono::system_clock::time_point tp,
 										bool absoluteTimestamps) {
 				const auto t = std::chrono::system_clock::to_time_t(tp);
-				const auto subsec = std::chrono::duration_cast<std::chrono::milliseconds>(
-									   tp.time_since_epoch())
-									   .count() %
-								   1000;
+				const auto subsec =
+					std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch())
+						.count() %
+					1000;
 
 				std::tm tm{};
 #ifdef _WIN32

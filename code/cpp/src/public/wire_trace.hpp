@@ -5,9 +5,9 @@
  \file       wire_trace.hpp
  \brief      Optional wire-trace (hex dump) callback for protocol debugging
  \details    Captures every byte the SDK reads from or writes to the transport
-             and renders it as a human-readable hex dump (or, in a future
-             extension, an Actisense EBL binary log). Disabled by default;
-             enabled per session via Session::setWireTrace().
+			 and renders it as a human-readable hex dump (or, in a future
+			 extension, an Actisense EBL binary log). Disabled by default;
+			 enabled per session via Session::setWireTrace().
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/

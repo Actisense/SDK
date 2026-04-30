@@ -445,9 +445,9 @@ namespace Actisense
 			 \param[out] outError   Error message if encoding fails
 			 \return     True on success
 			 *******************************************************************************/
-			[[nodiscard]] bool buildSetTxPgnEnableListF2(
-				const std::vector<TxPgnEnableEntry>& entries, std::vector<uint8_t>& outFrame,
-				std::string& outError);
+			[[nodiscard]] bool
+			buildSetTxPgnEnableListF2(const std::vector<TxPgnEnableEntry>& entries,
+									  std::vector<uint8_t>& outFrame, std::string& outError);
 
 			/**************************************************************************/ /**
 			 \brief      Build Get Rx PGN Enable List F1 command (legacy)

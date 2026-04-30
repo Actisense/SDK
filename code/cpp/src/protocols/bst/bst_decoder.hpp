@@ -5,9 +5,9 @@
  \file       bst_decoder.hpp
  \brief      BST frame decoder/encoder
  \details    Stateless dispatcher that wraps raw BST payloads into BstFrame and
-             back out again. All field decoding lives in BstFrame itself; this
-             file only handles the boundary between raw byte streams and the
-             unified BstFrame type.
+			 back out again. All field decoding lives in BstFrame itself; this
+			 file only handles the boundary between raw byte streams and the
+			 unified BstFrame type.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -32,7 +32,7 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      BST frame decoder
 		 \details    Stateless dispatcher: feeds raw BST payloads (after BDTP
-		             framing is removed) into a BstFrame for unified access.
+					 framing is removed) into a BstFrame for unified access.
 		 *******************************************************************************/
 		class BstDecoder
 		{
@@ -42,10 +42,10 @@ namespace Actisense
 			 \param[in]  data      Raw BST data (starts with BST ID byte)
 			 \param[out] outError  Populated with a description on failure
 			 \return     Decoded frame, or nullopt if the payload is malformed
-			             or the BST ID is unsupported
+						 or the BST ID is unsupported
 			 *******************************************************************************/
 			[[nodiscard]] std::optional<BstFrame> decode(ConstByteSpan data,
-			                                              std::string& outError) const;
+														 std::string& outError) const;
 
 			/**************************************************************************/ /**
 			 \brief      Calculate PGN from PDU fields
@@ -55,7 +55,7 @@ namespace Actisense
 			 \return     18-bit PGN value
 			 *******************************************************************************/
 			[[nodiscard]] static uint32_t calculatePgn(uint8_t pduf, uint8_t pdus,
-			                                           uint8_t dataPage) noexcept;
+													   uint8_t dataPage) noexcept;
 
 			/**************************************************************************/ /**
 			 \brief      Extract PDU fields from a PGN
@@ -65,13 +65,13 @@ namespace Actisense
 			 \param[out] dataPage  Data page (0-3)
 			 *******************************************************************************/
 			static void extractPduFields(uint32_t pgn, uint8_t& pduf, uint8_t& pdus,
-			                             uint8_t& dataPage) noexcept;
+										 uint8_t& dataPage) noexcept;
 		};
 
 		/**************************************************************************/ /**
 		 \brief      BST frame encoder
 		 \details    Produces the raw BST payload (without BDTP framing) for a
-		             BstFrame built via one of its create*() factories.
+					 BstFrame built via one of its create*() factories.
 		 *******************************************************************************/
 		class BstEncoder
 		{
@@ -79,13 +79,13 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Encode a BstFrame for transmission
 			 \param[in]  frame     Frame to encode (typically built via
-			                       BstFrame::create94 / createD0 / etc.)
+								   BstFrame::create94 / createD0 / etc.)
 			 \param[out] outData   Encoded BST payload (without BDTP framing)
 			 \param[out] outError  Populated with a description on failure
 			 \return     True on success
 			 *******************************************************************************/
 			[[nodiscard]] bool encode(const BstFrame& frame, std::vector<uint8_t>& outData,
-			                          std::string& outError) const;
+									  std::string& outError) const;
 		};
 
 	} /* namespace Sdk */

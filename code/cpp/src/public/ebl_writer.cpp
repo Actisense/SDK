@@ -59,7 +59,8 @@ namespace Actisense
 			return kFileTimeEpochOffset100ns + static_cast<uint64_t>(ticks);
 		}
 
-		std::chrono::system_clock::time_point EblWriter::fromFileTimeTicks(uint64_t ticks) noexcept {
+		std::chrono::system_clock::time_point
+		EblWriter::fromFileTimeTicks(uint64_t ticks) noexcept {
 			const int64_t since_unix =
 				static_cast<int64_t>(ticks) - static_cast<int64_t>(kFileTimeEpochOffset100ns);
 			using HundredNs = std::chrono::duration<int64_t, std::ratio<1, 10000000>>;
@@ -78,8 +79,8 @@ namespace Actisense
 		}
 
 		void EblWriter::writeDescription(std::string_view text) {
-			const std::span<const uint8_t> payload{
-				reinterpret_cast<const uint8_t*>(text.data()), text.size()};
+			const std::span<const uint8_t> payload{reinterpret_cast<const uint8_t*>(text.data()),
+												   text.size()};
 			writeRecord(EblTag::Description, payload);
 		}
 
@@ -95,8 +96,7 @@ namespace Actisense
 		}
 
 		void EblWriter::writeDirectionMarker(WireTraceDirection dir) {
-			const uint8_t value =
-				(dir == WireTraceDirection::Rx) ? kEblDirRx : kEblDirTx;
+			const uint8_t value = (dir == WireTraceDirection::Rx) ? kEblDirRx : kEblDirTx;
 			const std::span<const uint8_t> payload{&value, 1};
 			writeRecord(EblTag::DirectionMarker, payload);
 		}

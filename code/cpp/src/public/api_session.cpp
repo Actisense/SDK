@@ -2,22 +2,21 @@
  \file       api_session.cpp
  \brief      Implementation of Api::open() session entry point
  \details    Kept separate from api.cpp so that consumers compiling api.cpp
-             directly (without linking the rest of the SDK) are not forced to
-             pull in SessionImpl and the transport library. Actisense
-             DeviceLib is one such consumer: it embeds api.cpp to expose
-             enumerateSerialDevices() but does not need a working
-             Api::open().
+			 directly (without linking the rest of the SDK) are not forced to
+			 pull in SessionImpl and the transport library. Actisense
+			 DeviceLib is one such consumer: it embeds api.cpp to expose
+			 enumerateSerialDevices() but does not need a working
+			 Api::open().
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "public/api.hpp"
-
 #include <string>
 #include <utility>
 
 #include "core/session_impl.hpp"
+#include "public/api.hpp"
 #include "transport/loopback/loopback_transport.hpp"
 #include "transport/serial/serial_transport.hpp"
 
@@ -32,14 +31,14 @@ namespace Actisense
 		 \param[in]  onError   Callback for errors
 		 \param[in]  onOpened  Callback when session is opened (or failed)
 		 \details    Constructs a transport for the requested kind, opens it, and
-		             hands the user a SessionImpl wired to BDTP/BST/BEM. TCP and
-		             UDP transports are not yet implemented and return
-		             ErrorCode::UnsupportedOperation. If onOpened is null the call
-		             is a no-op (no path to return a session) and onError is
-		             invoked with InvalidArgument when available.
+					 hands the user a SessionImpl wired to BDTP/BST/BEM. TCP and
+					 UDP transports are not yet implemented and return
+					 ErrorCode::UnsupportedOperation. If onOpened is null the call
+					 is a no-op (no path to return a session) and onError is
+					 invoked with InvalidArgument when available.
 		 *******************************************************************************/
 		void Api::open(const OpenOptions& options, EventCallback onEvent, ErrorCallback onError,
-		               SessionOpenedCallback onOpened) {
+					   SessionOpenedCallback onOpened) {
 			if (!onOpened) {
 				if (onError) {
 					onError(ErrorCode::InvalidArgument, "Api::open requires a non-null onOpened");
@@ -63,7 +62,7 @@ namespace Actisense
 						(options.transport.kind == TransportKind::TcpClient) ? "TCP" : "UDP";
 					if (onError) {
 						onError(ErrorCode::UnsupportedOperation,
-						        std::string{kindName} + " transport is not yet implemented");
+								std::string{kindName} + " transport is not yet implemented");
 					}
 					onOpened(ErrorCode::UnsupportedOperation, nullptr);
 					return;
@@ -72,7 +71,7 @@ namespace Actisense
 
 			ErrorCode openResult = ErrorCode::Internal;
 			transport->asyncOpen(options.transport,
-			                     [&openResult](ErrorCode code) { openResult = code; });
+								 [&openResult](ErrorCode code) { openResult = code; });
 
 			if (openResult != ErrorCode::Ok) {
 				if (onError) {
@@ -83,7 +82,7 @@ namespace Actisense
 			}
 
 			auto session = std::make_unique<SessionImpl>(std::move(transport), std::move(onEvent),
-			                                             std::move(onError));
+														 std::move(onError));
 			session->startReceiving();
 			onOpened(ErrorCode::Ok, std::move(session));
 		}

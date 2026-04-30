@@ -710,9 +710,9 @@ namespace Actisense
 			   has a bounded wait. Treat an unconfigured/zero timeout as the
 			   default poll interval rather than blocking indefinitely. */
 			static constexpr unsigned kMaxPollIntervalMs = 100;
-			const unsigned pollMs =
-				(readTimeoutMs_ == 0) ? kMaxPollIntervalMs
-									  : std::min(readTimeoutMs_, kMaxPollIntervalMs);
+			const unsigned pollMs = (readTimeoutMs_ == 0)
+										? kMaxPollIntervalMs
+										: std::min(readTimeoutMs_, kMaxPollIntervalMs);
 
 			std::vector<uint8_t> tempBuffer(tempBufferSize_);
 			ACTISENSE_LOG_INFO("Serial", "Read thread started");
