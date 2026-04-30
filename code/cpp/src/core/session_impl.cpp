@@ -162,9 +162,32 @@ namespace Actisense
 		}
 
 		void SessionImpl::setWireTrace(WireTraceConfig config, WireTraceSink sink) {
-			auto new_state = sink ? std::make_shared<WireTraceState>(
-										WireTraceState{config, std::move(sink)})
-								  : nullptr;
+			std::shared_ptr<WireTraceState> new_state;
+			if (sink) {
+				new_state = std::make_shared<WireTraceState>();
+				new_state->config = config;
+				new_state->sink = std::move(sink);
+
+				if (config.format == WireTraceFormat::Ebl) {
+					/* Bridge the user's std::string_view sink into the EBL
+					 * writer's std::span<const uint8_t> sink so the EBL
+					 * record bytes flow through verbatim. The capture by
+					 * value of the WireTraceSink keeps the bridge alive for
+					 * as long as the writer needs it. */
+					WireTraceSink user_sink = new_state->sink;
+					new_state->eblWriter = std::make_unique<EblWriter>(
+						[user_sink = std::move(user_sink)](std::span<const uint8_t> bytes) {
+							user_sink(std::string_view{
+								reinterpret_cast<const char*>(bytes.data()), bytes.size()});
+						});
+					/* Preamble: TimeUTC then Version. The reader uses the
+					 * leading TimeUTC as the time anchor for everything that
+					 * follows until the next time marker. */
+					new_state->eblWriter->writeTimeUtc(std::chrono::system_clock::now());
+					new_state->eblWriter->writeVersion();
+				}
+			}
+
 			const bool active = (new_state != nullptr);
 			{
 				std::lock_guard<std::mutex> lock(wire_trace_mutex_);
@@ -188,6 +211,15 @@ namespace Actisense
 				state = wire_trace_state_;
 			}
 			if (!state || !state->sink) {
+				return;
+			}
+
+			if (state->config.format == WireTraceFormat::Ebl) {
+				if (state->eblWriter) {
+					state->eblWriter->writeTimeUtc(std::chrono::system_clock::now());
+					state->eblWriter->writeDirectionMarker(dir);
+					state->eblWriter->writeRawStream(data);
+				}
 				return;
 			}
 

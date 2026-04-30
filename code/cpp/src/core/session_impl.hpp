@@ -22,6 +22,7 @@
 #include "protocols/bem/bem_protocol.hpp"
 #include "protocols/bst/bst_decoder.hpp"
 #include "public/config.hpp"
+#include "public/ebl_writer.hpp"
 #include "public/events.hpp"
 #include "public/session.hpp"
 #include "transport/transport.hpp"
@@ -537,6 +538,8 @@ namespace Actisense
 			{
 				WireTraceConfig config;
 				WireTraceSink sink;
+				/* Only populated when config.format == Ebl. */
+				std::unique_ptr<EblWriter> eblWriter;
 			};
 
 			std::atomic<bool> wire_trace_active_{false};

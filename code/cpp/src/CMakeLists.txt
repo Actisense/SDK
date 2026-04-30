@@ -27,6 +27,7 @@ set(PUBLIC_HEADERS
     public/logging.hpp
     public/metrics.hpp
     public/wire_trace.hpp
+    public/ebl_writer.hpp
 )
 
 # ============================================================================
@@ -59,6 +60,7 @@ set(SDK_SOURCES
     public/api.cpp
     public/api_session.cpp
     public/wire_trace.cpp
+    public/ebl_writer.cpp
 
     # Platform-specific
     $<$<PLATFORM_ID:Windows>:platform/windows/enumerate_serial_devices_windows.cpp>
