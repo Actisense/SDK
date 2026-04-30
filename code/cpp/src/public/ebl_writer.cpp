@@ -64,7 +64,9 @@ namespace Actisense
 			const int64_t since_unix =
 				static_cast<int64_t>(ticks) - static_cast<int64_t>(kFileTimeEpochOffset100ns);
 			using HundredNs = std::chrono::duration<int64_t, std::ratio<1, 10000000>>;
-			return std::chrono::system_clock::time_point{HundredNs{since_unix}};
+			return std::chrono::system_clock::time_point{
+				std::chrono::duration_cast<std::chrono::system_clock::duration>(
+					HundredNs{since_unix})};
 		}
 
 		/* ============================================================================
