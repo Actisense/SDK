@@ -19,6 +19,7 @@
 
 #include "public/error.hpp"
 #include "public/metrics.hpp"
+#include "public/wire_trace.hpp"
 
 namespace Actisense
 {
@@ -108,6 +109,26 @@ namespace Actisense
 			 \brief      Reset all metrics counters to zero
 			 *******************************************************************************/
 			virtual void resetMetrics() = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Enable a wire-trace sink for this session
+			 \param[in]  config  Format configuration (hex dump, columns, ASCII, ...)
+			 \param[in]  sink    Callback invoked with one rendered line per call.
+								 Pass an empty std::function (or call clearWireTrace())
+								 to disable.
+			 \details    The sink runs on the calling transport thread and must
+						 not block. Replacing an existing sink is safe; the
+						 previous sink is released after the swap completes.
+			 *******************************************************************************/
+			virtual void setWireTrace(WireTraceConfig config, WireTraceSink sink) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Disable any active wire-trace sink
+			 \details    Equivalent to setWireTrace({}, {}). When no sink is set,
+						 the session's hot path is a single atomic load and
+						 performs no allocation per wire event.
+			 *******************************************************************************/
+			virtual void clearWireTrace() = 0;
 
 		protected:
 			Session() = default;
