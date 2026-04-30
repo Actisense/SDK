@@ -50,6 +50,8 @@ namespace Actisense
 				frame.assign(payload.begin(), payload.end());
 			}
 
+			traceWire(WireTraceDirection::Tx, frame);
+
 			transport_->asyncSend(frame, [completion](ErrorCode code, std::size_t /*written*/) {
 				if (completion)
 					completion(code);
@@ -157,6 +159,40 @@ namespace Actisense
 
 		void SessionImpl::resetMetrics() {
 			metricsCollector_.reset();
+		}
+
+		void SessionImpl::setWireTrace(WireTraceConfig config, WireTraceSink sink) {
+			auto new_state = sink ? std::make_shared<WireTraceState>(
+										WireTraceState{config, std::move(sink)})
+								  : nullptr;
+			const bool active = (new_state != nullptr);
+			{
+				std::lock_guard<std::mutex> lock(wire_trace_mutex_);
+				wire_trace_state_ = std::move(new_state);
+			}
+			wire_trace_active_.store(active, std::memory_order_release);
+		}
+
+		void SessionImpl::clearWireTrace() {
+			setWireTrace(WireTraceConfig{}, WireTraceSink{});
+		}
+
+		void SessionImpl::traceWire(WireTraceDirection dir, std::span<const uint8_t> data) {
+			if (!wire_trace_active_.load(std::memory_order_acquire)) {
+				return; /* Fast path: no sink registered */
+			}
+
+			std::shared_ptr<WireTraceState> state;
+			{
+				std::lock_guard<std::mutex> lock(wire_trace_mutex_);
+				state = wire_trace_state_;
+			}
+			if (!state || !state->sink) {
+				return;
+			}
+
+			formatHexDumpEvent(state->config, dir, data, std::chrono::system_clock::now(),
+							   [&](std::string_view line) { state->sink(line); });
 		}
 
 		void SessionImpl::sendBemCommand(const BemCommand& command,
@@ -757,6 +793,7 @@ namespace Actisense
 						}
 						ACTISENSE_LOG_HEX(LogLevel::Trace, "Session", "Raw data", data.data(),
 										  data.size());
+						traceWire(WireTraceDirection::Rx, data);
 						processReceivedData(data);
 					}
 					completed.store(true, std::memory_order_release);

@@ -12,6 +12,7 @@
 /* Dependent includes ------------------------------------------------------- */
 #include <atomic>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -69,6 +70,10 @@ namespace Actisense
 			[[nodiscard]] SessionMetrics metrics() const override;
 
 			void resetMetrics() override;
+
+			void setWireTrace(WireTraceConfig config, WireTraceSink sink) override;
+
+			void clearWireTrace() override;
 
 			/* Session-specific methods --------------------------------------------- */
 
@@ -498,6 +503,12 @@ namespace Actisense
 			 *******************************************************************************/
 			void handleBemResponse(const BemResponse& response);
 
+			/**************************************************************************/ /**
+			 \brief      Emit a wire-trace event for the given direction/data
+			 \details    Fast-path no-op when no sink has been registered.
+			 *******************************************************************************/
+			void traceWire(WireTraceDirection dir, std::span<const uint8_t> data);
+
 			TransportPtr transport_;
 			EventCallback eventCallback_;
 			ErrorCallback errorCallback_;
@@ -520,6 +531,17 @@ namespace Actisense
 
 			/* Metrics collector */
 			MetricsCollector metricsCollector_;
+
+			/* Wire trace state ----------------------------------------------------- */
+			struct WireTraceState
+			{
+				WireTraceConfig config;
+				WireTraceSink sink;
+			};
+
+			std::atomic<bool> wire_trace_active_{false};
+			mutable std::mutex wire_trace_mutex_;
+			std::shared_ptr<WireTraceState> wire_trace_state_;
 		};
 
 		/**************************************************************************/ /**
