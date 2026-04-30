@@ -491,6 +491,29 @@ TEST_F(BemDeviceTest, GetTotalTime)
 	          << (ttResp.totalTime / 3600) << " hours)" << std::endl;
 }
 
+TEST_F(BemDeviceTest, GetTotalTime_ViaSession)
+{
+	/* Public-API counterpart to GetTotalTime: exercises the SessionImpl::getTotalTime
+	   convenience wrapper rather than building the BemCommand by hand. The two
+	   tests should agree on the response — divergence indicates the wrapper has
+	   drifted from the raw protocol. */
+	auto result = sendConvenience([this](auto timeout, auto cb) {
+		session_->getTotalTime(timeout, std::move(cb));
+	});
+
+	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
+	ASSERT_TRUE(result.response.has_value());
+
+	TotalTimeResponse ttResp;
+	std::string error;
+	ASSERT_TRUE(decodeTotalTimeResponse(std::span<const uint8_t>(result.response->data),
+	                                    ttResp, error))
+		<< "Total Time decode failed: " << error;
+	EXPECT_GT(ttResp.totalTime, 0u) << "Total Time of zero is implausible for a used device";
+	std::cout << "  Total Time (via session API): " << ttResp.totalTime << " seconds ("
+	          << (ttResp.totalTime / 3600) << " hours)" << std::endl;
+}
+
 TEST_F(BemDeviceTest, TotalTime_Monotonic)
 {
 	/* Two GETs separated by ~1.5s. Total Time is in seconds with at least
@@ -880,6 +903,39 @@ TEST_F(BemDeviceTest, SetEcho)
 		<< "Echo SET data mismatch — sent " << payload.size()
 		<< " bytes, received " << echoResp.data.size();
 	std::cout << "  Echo SET verified: " << payload.size() << " bytes echoed back" << std::endl;
+}
+
+TEST_F(BemDeviceTest, SetEcho_ViaSession)
+{
+	/* Public-API counterpart to SetEcho: exercises the SessionImpl::echo
+	   convenience wrapper. Same payload, same expected round-trip — proves the
+	   wrapper builds an identical BemCommand to the hand-rolled version. */
+	if (!deviceEchoIsReliable()) {
+		GTEST_SKIP() << "Echo unreliable on " << modelIdToString(modelId_)
+		             << " (firmware bug — see GIT-75 NgxEchoDiagnostic)";
+	}
+	const std::vector<uint8_t> payload = {0xDE, 0xAD, 0xBE, 0xEF};
+	auto result = sendConvenience([this, &payload](auto timeout, auto cb) {
+		session_->echo(std::span<const uint8_t>(payload), timeout, std::move(cb));
+	});
+
+	if (result.errorCode != ErrorCode::Ok) {
+		std::cout << "  Echo (via session API) not supported by this device" << std::endl;
+		GTEST_SKIP() << "Echo command not supported by this device";
+	}
+
+	ASSERT_TRUE(result.response.has_value());
+
+	EchoResponse echoResp;
+	std::string error;
+	ASSERT_TRUE(decodeEchoResponse(std::span<const uint8_t>(result.response->data),
+	                               echoResp, error))
+		<< "Echo (via session API) decode failed: " << error;
+	ASSERT_EQ(echoResp.data, payload)
+		<< "Echo (via session API) data mismatch — sent " << payload.size()
+		<< " bytes, received " << echoResp.data.size();
+	std::cout << "  Echo (via session API) verified: " << payload.size()
+	          << " bytes echoed back" << std::endl;
 }
 
 TEST_F(BemDeviceTest, CommitToEeprom_Acknowledged)
