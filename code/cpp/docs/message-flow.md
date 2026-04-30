@@ -561,8 +561,6 @@ classDiagram
     class Session {
         <<interface>>
         +asyncSend(protocol, payload, completion)*
-        +asyncRequestResponse(protocol, payload, timeout, completion)*
-        +cancel(handle)*
         +close()*
         +isConnected()*
     }

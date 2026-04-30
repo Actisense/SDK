@@ -28,7 +28,7 @@ For the layered transmit/receive flow (BEM &rarr; BST &rarr; BDTP &rarr; transpo
 Sending a BEM command is a three-step process:
 
 1. **Build** the framed bytes with a `BemProtocol::buildXxx(...)` helper.
-2. **Send** the framed bytes via `Session::asyncSend(...)` (or `asyncRequestResponse`) using the `"raw"` protocol — `BemProtocol` already adds BDTP framing, so the session must not double-frame.
+2. **Send** the framed bytes via `Session::asyncSend(...)` using the `"raw"` protocol — `BemProtocol` already adds BDTP framing, so the session must not double-frame.
 3. **Decode** the response in your `EventCallback` (or via the BEM correlator if you registered the request).
 
 ```cpp

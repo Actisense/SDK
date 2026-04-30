@@ -5,6 +5,23 @@ All notable changes to the Actisense C++ SDK are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed (breaking)
+
+- **`Session::asyncRequestResponse()` and `Session::cancel()` have been
+  removed from the public interface**, along with the `RequestHandle` struct
+  and `RequestCompletion` callback typedef. The generic request/response path
+  was never wired up to a correlator: successful responses could not be
+  matched back to the returned `RequestHandle`, and the `timeout` parameter
+  was ignored. Only the cancel/close paths fired the completion (always with
+  `ErrorCode::Canceled`), making the API a footgun for any caller who
+  expected an actual response or timeout. Callers wanting fire-and-forget
+  should use `asyncSend()`; callers needing correlated request/response
+  should use the typed BEM helpers on `SessionImpl` (e.g. `getProductInfo`,
+  `sendBemCommand`). The generic path may return once a real correlator is
+  implemented for non-BEM protocols.
+
 ## [0.4.0] - 2026-04-19
 
 ### Changed (potentially breaking)

@@ -58,63 +58,6 @@ namespace Actisense
 			});
 		}
 
-		RequestHandle SessionImpl::asyncRequestResponse(
-			const std::string& protocol, std::span<const uint8_t> payload,
-			[[maybe_unused]] std::chrono::milliseconds timeout, RequestCompletion completion) {
-			RequestHandle handle;
-
-			{
-				std::lock_guard<std::mutex> lock(mutex_);
-				handle.id = nextRequestId_++;
-				if (completion) {
-					pending_requests_.emplace(handle.id, completion);
-				}
-			}
-
-			/* For now, just send and rely on BEM correlation. On send failure,
-			 * release the pending entry and report the error to the caller. */
-			asyncSend(protocol, payload, [this, id = handle.id](ErrorCode code) {
-				if (code == ErrorCode::Ok) {
-					return;
-				}
-
-				RequestCompletion pending_completion;
-				{
-					std::lock_guard<std::mutex> lock(mutex_);
-					auto it = pending_requests_.find(id);
-					if (it == pending_requests_.end()) {
-						return; /* Already canceled or completed */
-					}
-					pending_completion = std::move(it->second);
-					pending_requests_.erase(it);
-				}
-
-				if (pending_completion) {
-					pending_completion(code, {});
-				}
-			});
-
-			return handle;
-		}
-
-		void SessionImpl::cancel(RequestHandle handle) {
-			RequestCompletion completion;
-			{
-				std::lock_guard<std::mutex> lock(mutex_);
-				auto it = pending_requests_.find(handle.id);
-				if (it == pending_requests_.end()) {
-					return;
-				}
-				completion = std::move(it->second);
-				pending_requests_.erase(it);
-			}
-
-			/* Invoke outside the lock so the callback may safely re-enter. */
-			if (completion) {
-				completion(ErrorCode::Canceled, {});
-			}
-		}
-
 		void SessionImpl::close() {
 			running_ = false;
 
@@ -131,22 +74,6 @@ namespace Actisense
 			}
 
 			bem_.clearPendingRequests();
-
-			/* Release any waiters on generic asyncRequestResponse() requests. */
-			std::vector<RequestCompletion> completions;
-			{
-				std::lock_guard<std::mutex> lock(mutex_);
-				completions.reserve(pending_requests_.size());
-				for (auto& [id, completion] : pending_requests_) {
-					completions.push_back(std::move(completion));
-				}
-				pending_requests_.clear();
-			}
-			for (auto& completion : completions) {
-				if (completion) {
-					completion(ErrorCode::Canceled, {});
-				}
-			}
 		}
 
 		bool SessionImpl::isConnected() const noexcept {

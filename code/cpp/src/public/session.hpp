@@ -10,12 +10,10 @@
  *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <span>
 #include <string>
-#include <vector>
 
 #include "public/error.hpp"
 #include "public/metrics.hpp"
@@ -26,23 +24,6 @@ namespace Actisense
 	namespace Sdk
 	{
 		/* Definitions ---------------------------------------------------------- */
-
-		/**************************************************************************/ /**
-		 \brief      Opaque handle for tracking in-flight requests
-		 *******************************************************************************/
-		struct RequestHandle
-		{
-			uint64_t id = 0;
-
-			bool operator==(const RequestHandle& other) const noexcept { return id == other.id; }
-			bool operator!=(const RequestHandle& other) const noexcept { return id != other.id; }
-		};
-
-		/**************************************************************************/ /**
-		 \brief      Request completion callback signature
-		 *******************************************************************************/
-		using RequestCompletion =
-			std::function<void(ErrorCode code, std::vector<uint8_t> response)>;
 
 		/**************************************************************************/ /**
 		 \brief      Send completion callback signature
@@ -69,27 +50,8 @@ namespace Actisense
 								   SendCompletion completion) = 0;
 
 			/**************************************************************************/ /**
-			 \brief      Send a request and await response
-			 \param[in]  protocol    Protocol ID to use
-			 \param[in]  payload     Request payload bytes
-			 \param[in]  timeout     Timeout for response
-			 \param[in]  completion  Callback with response or error
-			 \return     Handle for cancellation
-			 *******************************************************************************/
-			virtual RequestHandle asyncRequestResponse(const std::string& protocol,
-													   std::span<const uint8_t> payload,
-													   std::chrono::milliseconds timeout,
-													   RequestCompletion completion) = 0;
-
-			/**************************************************************************/ /**
-			 \brief      Cancel an in-flight request
-			 \param[in]  handle  Request handle from asyncRequestResponse
-			 *******************************************************************************/
-			virtual void cancel(RequestHandle handle) = 0;
-
-			/**************************************************************************/ /**
 			 \brief      Close the session gracefully
-			 \details    Flushes pending writes, cancels requests, closes transport
+			 \details    Flushes pending writes, closes transport
 			 *******************************************************************************/
 			virtual void close() = 0;
 

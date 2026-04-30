@@ -11,7 +11,6 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include <atomic>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -56,13 +55,6 @@ namespace Actisense
 
 			void asyncSend(const std::string& protocol, std::span<const uint8_t> payload,
 						   SendCompletion completion) override;
-
-			RequestHandle asyncRequestResponse(const std::string& protocol,
-											   std::span<const uint8_t> payload,
-											   std::chrono::milliseconds timeout,
-											   RequestCompletion completion) override;
-
-			void cancel(RequestHandle handle) override;
 
 			void close() override;
 
@@ -521,10 +513,6 @@ namespace Actisense
 
 			std::atomic<bool> running_{false};
 			std::thread receiveThread_;
-
-			mutable std::mutex mutex_;
-			uint64_t nextRequestId_ = 1;
-			std::map<uint64_t, RequestCompletion> pending_requests_;
 
 			/* Statistics */
 			std::atomic<std::size_t> frames_received_{0};
