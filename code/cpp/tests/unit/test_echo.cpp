@@ -79,16 +79,17 @@ TEST_F(EchoTest, EncodeRequest_MultipleBytes)
 
 TEST_F(EchoTest, EncodeRequest_MaxSize)
 {
-	/* 252 bytes is the max payload size (limited by BEM frame overhead) */
-	std::vector<uint8_t> data(252, 0xAA);
+	/* 222 bytes is the max payload size (firmware DA_CapacityU8 = 223
+	   minus the leading size byte). */
+	std::vector<uint8_t> data(222, 0xAA);
 	EXPECT_TRUE(m_protocol.buildEcho(data, m_frame, m_error));
 	EXPECT_TRUE(m_error.empty());
 }
 
 TEST_F(EchoTest, EncodeRequest_TooLarge)
 {
-	/* 253 bytes exceeds max payload size */
-	std::vector<uint8_t> data(253, 0xBB);
+	/* 223 bytes exceeds max payload size */
+	std::vector<uint8_t> data(223, 0xBB);
 	EXPECT_FALSE(m_protocol.buildEcho(data, m_frame, m_error));
 	EXPECT_FALSE(m_error.empty());
 	EXPECT_TRUE(m_error.find("too large") != std::string::npos);
@@ -111,10 +112,24 @@ TEST_F(EchoTest, EncodeEchoRequest_ValidData)
 
 	EXPECT_TRUE(encodeEchoRequest(inData, outData, m_error));
 	EXPECT_TRUE(m_error.empty());
-	EXPECT_EQ(outData.size(), 3u);
-	EXPECT_EQ(outData[0], 0x01);
-	EXPECT_EQ(outData[1], 0x02);
-	EXPECT_EQ(outData[2], 0x03);
+	/* Length-prefixed: [size=3][01][02][03] */
+	ASSERT_EQ(outData.size(), 4u);
+	EXPECT_EQ(outData[0], 0x03);
+	EXPECT_EQ(outData[1], 0x01);
+	EXPECT_EQ(outData[2], 0x02);
+	EXPECT_EQ(outData[3], 0x03);
+}
+
+TEST_F(EchoTest, EncodeEchoRequest_EmptyData)
+{
+	std::vector<uint8_t> inData;
+	std::vector<uint8_t> outData;
+
+	EXPECT_TRUE(encodeEchoRequest(inData, outData, m_error));
+	EXPECT_TRUE(m_error.empty());
+	/* Just a single zero size byte for empty payload (acts as ping). */
+	ASSERT_EQ(outData.size(), 1u);
+	EXPECT_EQ(outData[0], 0x00);
 }
 
 TEST_F(EchoTest, EncodeEchoRequest_TooLarge)
@@ -137,17 +152,38 @@ TEST_F(EchoTest, DecodeResponse_EmptyData)
 	EXPECT_TRUE(response.data.empty());
 }
 
+TEST_F(EchoTest, DecodeResponse_ZeroLengthPing)
+{
+	/* Length-prefixed empty response: size byte = 0, no data. */
+	std::array<uint8_t, 1> responseData = {0x00};
+
+	EchoResponse response;
+	EXPECT_TRUE(decodeEchoResponse(responseData, response, m_error));
+	EXPECT_TRUE(response.data.empty());
+}
+
 TEST_F(EchoTest, DecodeResponse_ValidData)
 {
-	std::array<uint8_t, 5> responseData = {0x01, 0x02, 0x03, 0x04, 0x05};
+	/* Length-prefixed: [size=4][01][02][03][04] */
+	std::array<uint8_t, 5> responseData = {0x04, 0x01, 0x02, 0x03, 0x04};
 
 	EchoResponse response;
 	EXPECT_TRUE(decodeEchoResponse(responseData, response, m_error));
 
-	EXPECT_EQ(response.data.size(), 5u);
-	for (int i = 0; i < 5; ++i) {
-		EXPECT_EQ(response.data[i], responseData[i]);
+	ASSERT_EQ(response.data.size(), 4u);
+	for (int i = 0; i < 4; ++i) {
+		EXPECT_EQ(response.data[i], static_cast<uint8_t>(i + 1));
 	}
+}
+
+TEST_F(EchoTest, DecodeResponse_Truncated)
+{
+	/* Header claims 5 bytes but only 2 follow. */
+	std::array<uint8_t, 3> responseData = {0x05, 0xAA, 0xBB};
+
+	EchoResponse response;
+	EXPECT_FALSE(decodeEchoResponse(responseData, response, m_error));
+	EXPECT_FALSE(m_error.empty());
 }
 
 /* Verify Response Tests ---------------------------------------------------- */
@@ -224,7 +260,7 @@ TEST_F(EchoTest, FormatEchoData_NoTruncation)
 
 TEST_F(EchoTest, Constants)
 {
-	EXPECT_EQ(kEchoMaxPayloadSize, 252u);
+	EXPECT_EQ(kEchoMaxPayloadSize, 222u);
 }
 
 /* BEM Command ID String Test ----------------------------------------------- */

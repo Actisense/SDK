@@ -67,7 +67,6 @@ namespace Actisense
 			GetSetPortBaudrate = 0x17, ///< Get/Set port baudrate configuration
 
 			/* NMEA 2000 Product Information Commands */
-			GetSupportedPgnList = 0x40, ///< Get list of supported PGNs
 			GetProductInfo = 0x41,		///< Get product information
 			GetSetCanConfig = 0x42,		///< Get/Set CAN configuration (NMEA NAME)
 			GetSetCanInfoField1 = 0x43, ///< Get/Set CAN installation description 1
@@ -79,6 +78,7 @@ namespace Actisense
 			GetSetTxPgnEnable = 0x47, ///< Get/Set Tx PGN enable state
 
 			/* PGN List Management Commands */
+			GetSupportedPgnList = 0x40,		///< Get list of supported PGNs (multi-message, transferId)
 			GetSetRxPgnEnableListF1 = 0x48, ///< Get/Set Rx PGN enable list (Format 1, legacy)
 			GetSetTxPgnEnableListF1 = 0x49, ///< Get/Set Tx PGN enable list (Format 1, legacy)
 			DeletePgnEnableLists = 0x4A,	///< Delete PGN enable lists from session
@@ -122,8 +122,6 @@ namespace Actisense
 				case BemCommandId::GetSetPortBaudrate:
 					return "GetSetPortBaudrate";
 				/* NMEA 2000 Product Information Commands */
-				case BemCommandId::GetSupportedPgnList:
-					return "GetSupportedPgnList";
 				case BemCommandId::GetProductInfo:
 					return "GetProductInfo";
 				case BemCommandId::GetSetCanConfig:
@@ -140,6 +138,8 @@ namespace Actisense
 				case BemCommandId::GetSetTxPgnEnable:
 					return "GetSetTxPgnEnable";
 				/* PGN List Management Commands */
+				case BemCommandId::GetSupportedPgnList:
+					return "GetSupportedPgnList";
 				case BemCommandId::GetSetRxPgnEnableListF1:
 					return "GetSetRxPgnEnableListF1";
 				case BemCommandId::GetSetTxPgnEnableListF1:

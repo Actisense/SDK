@@ -69,8 +69,8 @@ page covering the C++ build/decode API, parameters, and any quirks per command.
 | Device control | [device-control.md](device-control.md) | `ReInitMainApp` (00H), `CommitToEeprom` (01H), `CommitToFlash` (02H) |
 | Device information | [device-information.md](device-information.md) | `GetSetOperatingMode` (11H), `GetSetTotalTime` (15H), `Echo` (18H) |
 | Port configuration | [port-configuration.md](port-configuration.md) | `GetSetPortPCode` (13H), `GetSetPortBaudrate` (17H) |
-| NMEA 2000 product information | [nmea2000-product-info.md](nmea2000-product-info.md) | `GetSupportedPgnList` (40H), `GetProductInfo` (41H), `GetSetCanConfig` (42H), `GetSetCanInfoField1/2/3` (43H/44H/45H) |
-| PGN enable lists | [pgn-enable-lists.md](pgn-enable-lists.md) | `GetSetRxPgnEnable` (46H), `GetSetTxPgnEnable` (47H), `RxPgnEnableListF1/F2` (48H/4EH), `TxPgnEnableListF1/F2` (49H/4FH), `DeletePgnEnableLists` (4AH), `ActivatePgnEnableLists` (4BH), `DefaultPgnEnableList` (4CH), `ParamsPgnEnableLists` (4DH) |
+| NMEA 2000 product information | [nmea2000-product-info.md](nmea2000-product-info.md) | `GetProductInfo` (41H), `GetSetCanConfig` (42H), `GetSetCanInfoField1/2/3` (43H/44H/45H) |
+| PGN list & enable | [pgn-enable-lists.md](pgn-enable-lists.md) | `GetSupportedPgnList` (40H), `GetSetRxPgnEnable` (46H), `GetSetTxPgnEnable` (47H), `RxPgnEnableListF1/F2` (48H/4EH), `TxPgnEnableListF1/F2` (49H/4FH), `DeletePgnEnableLists` (4AH), `ActivatePgnEnableLists` (4BH), `DefaultPgnEnableList` (4CH), `ParamsPgnEnableLists` (4DH) |
 | Unsolicited messages | [unsolicited-messages.md](unsolicited-messages.md) | `StartupStatus` (F0H), `ErrorReport` (F1H), `SystemStatus` (F2H), `NegativeAck` (F4H) |
 
 ---
@@ -155,7 +155,7 @@ pending request; treat it as an unsolicited message
 
 A few commands have their own typed response decoder under
 `src/protocols/bem/bem_commands/<command>.hpp`. The most fully-realised is
-`product_info.hpp`, which auto-detects format 1 / format 2 responses; see
+`product_info.hpp`; see
 [nmea2000-product-info.md](nmea2000-product-info.md). Other commands return
 their payload as raw bytes in `BemResponse::data` and the application is
 responsible for decoding using the byte layout described in the wire-protocol

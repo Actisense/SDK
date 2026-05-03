@@ -1,14 +1,15 @@
-# PGN Enable List Commands
+# PGN List & Enable Commands
 
-Commands that read, configure, and manage the per-direction lists of
-NMEA 2000 PGNs the gateway will accept (Rx) or transmit (Tx). All operate
-on the **session** copy of the lists in RAM; persist them to non-volatile
-storage with the relevant
+Commands that report the firmware-supported PGN set, read and configure
+per-direction enable state, and manage the bulk Rx/Tx enable lists. All
+mutating commands operate on the **session** copy of the lists in RAM;
+persist with the relevant
 [Commit-To-EEPROM / Commit-To-FLASH](device-control.md) command after a
 batch of changes.
 
 | Command | BEM ID | C++ builders |
 | ------- | ------ | ------------ |
+| Get Supported PGN List | `0x40` | `buildGetSupportedPgnList()` |
 | Get/Set Rx PGN Enable | `0x46` | `buildGetRxPgnEnable()`, `buildSetRxPgnEnable()`, `buildSetRxPgnEnableWithMask()` |
 | Get/Set Tx PGN Enable | `0x47` | `buildGetTxPgnEnable()`, `buildSetTxPgnEnable()`, `buildSetTxPgnEnableWithRate()` |
 | Rx PGN Enable List F1 (legacy) | `0x48` | `buildGetRxPgnEnableListF1()` |
@@ -24,6 +25,34 @@ batch of changes.
 > single-list format. **NGX-1** does not support F1 and only responds to
 > F2 commands &mdash; check the device model before sending F1 reads. See
 > [`bem_types.hpp`](../../src/protocols/bem/bem_types.hpp) for `ArlModelId::NGX1`.
+
+---
+
+## Get Supported PGN List (`0x40`)
+
+Returns the list of NMEA 2000 PGNs that the device's firmware is built to
+handle. This is **read-only** and reflects firmware capability, not the
+session enable state &mdash; use the `0x46`/`0x47`/`0x4E`/`0x4F` commands
+below to inspect or change which of those supported PGNs are currently
+active. The response is multi-message; large lists are split across
+several BST datagrams that share a `transferId` and are sequenced via
+`pgnIndex`. Wire-protocol detail:
+[supported-pgn-list.md](../../../../docs/DataFormats/Binary/bem-detail/supported-pgn-list.md).
+
+```cpp
+[[nodiscard]] bool buildGetSupportedPgnList(uint8_t pgnIndex,
+                                            uint8_t transferId,
+                                            std::vector<uint8_t>& outFrame,
+                                            std::string& outError);
+```
+
+Initial request: pass `pgnIndex = 0` and a `transferId` of your choosing
+(any value &mdash; the device echoes it back). Iterate by re-sending with
+incremented `pgnIndex` until the response indicates no more entries.
+
+The response payload is an array of 24-bit PGN values. Application code is
+responsible for assembling the multi-message stream and de-duplicating
+PGNs.
 
 ---
 

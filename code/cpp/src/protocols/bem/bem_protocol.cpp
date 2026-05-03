@@ -8,6 +8,7 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include "protocols/bem/bem_protocol.hpp"
+#include "protocols/bem/bem_commands/echo.hpp"
 
 namespace Actisense
 {
@@ -273,15 +274,12 @@ namespace Actisense
 
 		bool BemProtocol::buildEcho(std::span<const uint8_t> data, std::vector<uint8_t>& outFrame,
 									std::string& outError) {
-			if (data.size() > 254) {
-				outError = "Echo data too large: max 254 bytes, got " + std::to_string(data.size());
-				return false;
-			}
-
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::Echo;
-			cmd.data.assign(data.begin(), data.end());
+			if (!encodeEchoRequest(data, cmd.data, outError)) {
+				return false;
+			}
 
 			return encodeCommand(cmd, outFrame, outError);
 		}

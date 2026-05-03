@@ -13,6 +13,7 @@
 #include <format>
 #include <sstream>
 
+#include "protocols/bem/bem_commands/echo.hpp"
 #include "protocols/bst/bst_frame.hpp"
 #include "transport/serial/serial_transport.hpp"
 #include "util/debug_log.hpp"
@@ -427,19 +428,16 @@ namespace Actisense
 
 		void SessionImpl::echo(std::span<const uint8_t> data, std::chrono::milliseconds timeout,
 							   BemResponseCallback callback) {
-			if (data.size() > kEchoMaxPayloadSize) {
-				if (callback) {
-					callback(std::nullopt, ErrorCode::InvalidArgument,
-							 "Echo data too large: max " + std::to_string(kEchoMaxPayloadSize) +
-								 " bytes, got " + std::to_string(data.size()));
-				}
-				return;
-			}
-
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::Echo;
-			cmd.data.assign(data.begin(), data.end());
+			std::string encodeError;
+			if (!encodeEchoRequest(data, cmd.data, encodeError)) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument, encodeError);
+				}
+				return;
+			}
 
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}

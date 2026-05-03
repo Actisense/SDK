@@ -161,13 +161,16 @@ protected:
 		return static_cast<ArlModelId>(modelId_) != ArlModelId::NGX1;
 	}
 
-	/* False on NGX-1: NGX firmware returns Echo responses with a corrupted
-	   storeLength, leading to truncated or over-long payloads with
-	   uninitialised-memory trailing bytes. The echoed bytes themselves are
-	   correct at the front of the response. Tracked in GIT-75. */
+	/* Historical NGX-1 workaround for GIT-75 / NGXSW-4136: prior to the
+	   length-prefix fix, the SDK sent raw Echo data without the leading
+	   array-size byte, so the firmware misinterpreted the first payload
+	   byte as a count and over-read uninitialised RAM. With both the SDK
+	   encoder and the firmware bounds-check fixed, Echo is reliable on
+	   every supported device — leave the gate in place as a kill-switch
+	   should a per-device regression appear. */
 	bool deviceEchoIsReliable() const noexcept
 	{
-		return static_cast<ArlModelId>(modelId_) != ArlModelId::NGX1;
+		return true;
 	}
 
 	/* True for devices that store settings in FLASH and accept CommitToFlash
@@ -410,15 +413,22 @@ TEST_F(BemDeviceTest, NgxEchoDiagnostic)
 		{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08} /* 8 bytes */
 	};
 
+	auto encode = [](const std::vector<uint8_t>& payload) {
+		std::vector<uint8_t> encoded;
+		std::string err;
+		(void)encodeEchoRequest(std::span<const uint8_t>(payload), encoded, err);
+		return encoded;
+	};
+
 	for (std::size_t i = 0; i < payloads.size(); ++i) {
-		auto cmd = makeCommand(BemCommandId::Echo, payloads[i]);
+		auto cmd = makeCommand(BemCommandId::Echo, encode(payloads[i]));
 		auto result = sendSync(cmd);
 		dump("call " + std::to_string(i), payloads[i], result);
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
 
 	for (int i = 0; i < 3; ++i) {
-		auto cmd = makeCommand(BemCommandId::Echo, payloads[2]);
+		auto cmd = makeCommand(BemCommandId::Echo, encode(payloads[2]));
 		auto result = sendSync(cmd);
 		dump("repeat " + std::to_string(i), payloads[2], result);
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -429,25 +439,33 @@ TEST_F(BemDeviceTest, Echo)
 {
 	/* Send echo payloads of varying sizes and verify each comes back
 	 * byte-for-byte. NGT firmware does not implement Echo (0x18); the
-	 * request times out and the test self-skips. NGX firmware corrupts the
-	 * Echo response storeLength (see deviceEchoIsReliable + GIT-75). */
+	 * request times out and the test self-skips. */
 	if (!deviceEchoIsReliable()) {
 		GTEST_SKIP() << "Echo unreliable on " << modelIdToString(modelId_)
 		             << " (firmware bug — see GIT-75 NgxEchoDiagnostic)";
 	}
 
-	/* Build a few payloads spanning small / medium / max-size to exercise
-	   the BST type-1 length boundary. */
+	/* Build payloads spanning empty (ping) / small / medium / max-size to
+	   exercise the BST length boundary. Max is kEchoMaxPayloadSize (222)
+	   per the firmware DA_CapacityU8 limit. */
 	std::vector<std::vector<uint8_t>> payloads;
+	payloads.push_back({});
 	payloads.push_back({0x42});
 	payloads.push_back({});
 	for (uint8_t i = 0; i < 32; ++i) payloads.back().push_back(i);
 	payloads.push_back({});
-	for (uint8_t i = 0; i < 252; ++i) payloads.back().push_back(static_cast<uint8_t>(i ^ 0xA5));
+	for (std::size_t i = 0; i < kEchoMaxPayloadSize; ++i) {
+		payloads.back().push_back(static_cast<uint8_t>(i ^ 0xA5));
+	}
 
 	bool firstAttempt = true;
 	for (const auto& echoPayload : payloads) {
-		auto cmd = makeCommand(BemCommandId::Echo, echoPayload);
+		std::vector<uint8_t> encoded;
+		std::string encodeErr;
+		ASSERT_TRUE(encodeEchoRequest(std::span<const uint8_t>(echoPayload), encoded, encodeErr))
+			<< "encodeEchoRequest failed: " << encodeErr;
+
+		auto cmd = makeCommand(BemCommandId::Echo, encoded);
 		auto result = sendSync(cmd);
 
 		if (firstAttempt && result.errorCode != ErrorCode::Ok) {
@@ -884,7 +902,11 @@ TEST_F(BemDeviceTest, SetEcho)
 		             << " (firmware bug — see GIT-75 NgxEchoDiagnostic)";
 	}
 	const std::vector<uint8_t> payload = {0xDE, 0xAD, 0xBE, 0xEF};
-	auto cmd = makeCommand(BemCommandId::Echo, payload);
+	std::vector<uint8_t> encoded;
+	std::string encodeErr;
+	ASSERT_TRUE(encodeEchoRequest(std::span<const uint8_t>(payload), encoded, encodeErr))
+		<< "encodeEchoRequest failed: " << encodeErr;
+	auto cmd = makeCommand(BemCommandId::Echo, encoded);
 	auto result = sendSync(cmd);
 
 	if (result.errorCode != ErrorCode::Ok) {

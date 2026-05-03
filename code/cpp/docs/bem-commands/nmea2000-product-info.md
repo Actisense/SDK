@@ -7,37 +7,15 @@ support both Get and Set.
 
 | Command | BEM ID | C++ builders |
 | ------- | ------ | ------------ |
-| Get Supported PGN List | `0x40` | `buildGetSupportedPgnList()` |
 | Get Product Info | `0x41` | `buildGetProductInfo()`, `decodeProductInfoResponse()` |
 | Get/Set CAN Config | `0x42` | `buildGetCanConfig()`, `buildSetCanConfig()` |
 | Get/Set CAN Info Field 1 | `0x43` | `buildGetCanInfoField1()`, `buildSetCanInfoField1()` |
 | Get/Set CAN Info Field 2 | `0x44` | `buildGetCanInfoField2()`, `buildSetCanInfoField2()` |
 | Get CAN Info Field 3 | `0x45` | `buildGetCanInfoField3()` (read-only) |
 
----
-
-## Get Supported PGN List (`0x40`)
-
-Returns the list of NMEA 2000 PGNs that the device's firmware is built to
-handle. The response is multi-message; large lists are split across several
-BST datagrams that share a `transferId` and are sequenced via `pgnIndex`.
-Wire-protocol detail:
-[supported-pgn-list.md](../../../../docs/DataFormats/Binary/bem-detail/supported-pgn-list.md).
-
-```cpp
-[[nodiscard]] bool buildGetSupportedPgnList(uint8_t pgnIndex,
-                                            uint8_t transferId,
-                                            std::vector<uint8_t>& outFrame,
-                                            std::string& outError);
-```
-
-Initial request: pass `pgnIndex = 0` and a `transferId` of your choosing
-(any value &mdash; the device echoes it back). Iterate by re-sending with
-incremented `pgnIndex` until the response indicates no more entries.
-
-The response payload is an array of 24-bit PGN values. Application code is
-responsible for assembling the multi-message stream and de-duplicating
-PGNs.
+> The firmware-supported PGN list query (`0x40`) is documented under
+> [PGN enable lists](pgn-enable-lists.md) since it concerns PGN-list
+> management rather than product identity.
 
 ---
 
@@ -53,29 +31,26 @@ Wire-protocol detail:
                                        std::string& outError);
 ```
 
-There is **no** payload on the request. Two response formats coexist:
-
-| Format | Identifier | Detection | Notes |
-| ------ | ---------- | --------- | ----- |
-| Format 1 | (no SV ID) | First 4 response bytes &ne; `0x00000011` | Legacy multi-message form (5 messages) |
-| Format 2 | `0x00000011` | First 4 response bytes == structure-variant ID | Single 138-byte message, firmware v2.500+ |
-
-The decoder in `protocols/bem/bem_commands/product_info.hpp` auto-detects
-format 2 and surfaces it as a `ProductInfoResponse`:
+There is **no** payload on the request. The SDK supports the modern
+single-message response form only: a 138-byte payload whose first four
+bytes are the structure-variant ID `0x00000011`. All current Actisense
+gateway firmware (NGT/NGW/NGX) responds in this form. The deprecated
+legacy multi-message Product Info form is **not supported** &mdash;
+`decodeProductInfoResponse(...)` rejects responses whose structure-variant
+ID does not match.
 
 ```cpp
 struct ProductInfoResponse
 {
-    ProductInfoFormat format;        // Format1 / Format2 / Unknown
-    uint32_t          structureVariantId;
-    uint16_t          nmea2000Version;
-    uint16_t          productCode;
-    std::string       modelId;       // up to 32 chars
-    std::string       softwareVersion;
-    std::string       modelVersion;
-    std::string       modelSerialCode;
-    uint8_t           certificationLevel;
-    uint8_t           loadEquivalency; // mA / 50
+    uint32_t    structureVariantId;
+    uint16_t    nmea2000Version;
+    uint16_t    productCode;
+    std::string modelId;       // up to 32 chars
+    std::string softwareVersion;
+    std::string modelVersion;
+    std::string modelSerialCode;
+    uint8_t     certificationLevel;
+    uint8_t     loadEquivalency; // mA / 50
 };
 
 [[nodiscard]] bool decodeProductInfoResponse(std::span<const uint8_t> data,
@@ -96,14 +71,7 @@ if (decodeProductInfoResponse(std::span{rsp->data}, info, err)) {
 ```
 
 `formatProductInfo(info)` produces a multi-line human-readable summary,
-useful for logging. `productInfoFormatToString(info.format)` returns the
-detected format name.
-
-> **Format 1.** The decoder currently only validates the format-2
-> single-message form. Format-1 messages (legacy multi-message) need the
-> session layer to re-assemble all five messages before decode &mdash; see
-> [product-info.md](../../../../docs/DataFormats/Binary/bem-detail/product-info.md)
-> for the wire layout.
+useful for logging.
 
 ---
 

@@ -26,10 +26,13 @@ namespace Actisense
 	{
 		/* Constants ------------------------------------------------------------ */
 
-		/// Maximum Echo payload size (limited by BST store length: 255 - 3 header = 252 bytes)
-		/// Note: BEM command has BST ID (1) + StoreLen (1) + BEM ID (1) + Data + Checksum (1)
-		/// The encodeCommand function limits data to 252 bytes (255 - 3 header bytes)
-		static constexpr std::size_t kEchoMaxPayloadSize = 252;
+		/// Maximum Echo payload size.
+		/// The BEM data section for Echo is a length-prefixed array: one size byte
+		/// followed by N data bytes. The firmware encoder rejects array sizes
+		/// >= DA_CapacityU8 (223), so the largest payload that round-trips is 222
+		/// data bytes (size byte + 222 = 223 bytes of BEM data, well within the
+		/// 252-byte BST data window).
+		static constexpr std::size_t kEchoMaxPayloadSize = 222;
 
 		/* Data Structures ------------------------------------------------------ */
 
@@ -55,7 +58,9 @@ namespace Actisense
 
 		/**************************************************************************/ /**
 		 \brief      Decode Echo response from BEM data payload
-		 \param[in]  data       BEM response data (after 12-byte header)
+		 \details    Echo response data section is length-prefixed: one size byte
+					 followed by N echoed bytes (mirrors the request shape).
+		 \param[in]  data       BEM response data (after 12-byte BEM header)
 		 \param[out] response   Decoded response structure
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
@@ -63,16 +68,34 @@ namespace Actisense
 		[[nodiscard]] inline bool decodeEchoResponse(std::span<const uint8_t> data,
 													 EchoResponse& response,
 													 std::string& outError) {
-			/* Echo can have 0 or more bytes of data */
-			(void)outError;
-			response.data.assign(data.begin(), data.end());
+			if (data.empty()) {
+				/* Treat an empty response as a zero-length echo (ping). */
+				response.data.clear();
+				return true;
+			}
+
+			const std::size_t arraySize = data[0];
+			if (arraySize > data.size() - 1) {
+				outError = "Echo response truncated: header reports " +
+						   std::to_string(arraySize) + " bytes, only " +
+						   std::to_string(data.size() - 1) + " present";
+				return false;
+			}
+
+			response.data.assign(data.begin() + 1, data.begin() + 1 + arraySize);
 			return true;
 		}
 
 		/**************************************************************************/ /**
 		 \brief      Encode Echo request data
+		 \details    Echo wire format is a length-prefixed array: one size byte
+					 followed by N data bytes. The firmware handler reads byte[0]
+					 as N and copies N bytes from byte[1] back into the response,
+					 so the size prefix is mandatory — sending raw data causes the
+					 device to misinterpret the first data byte as a count and
+					 over-read uninitialised RAM (NGXSW-4136 / GIT-75).
 		 \param[in]  echoData  Data to send for echoing
-		 \param[out] outData   Encoded request data
+		 \param[out] outData   Encoded request data (size byte followed by payload)
 		 \param[out] outError  Error message if encoding fails
 		 \return     True on success, false on error
 		 *******************************************************************************/
@@ -85,7 +108,10 @@ namespace Actisense
 				return false;
 			}
 
-			outData.assign(echoData.begin(), echoData.end());
+			outData.clear();
+			outData.reserve(echoData.size() + 1);
+			outData.push_back(static_cast<uint8_t>(echoData.size()));
+			outData.insert(outData.end(), echoData.begin(), echoData.end());
 			return true;
 		}
 

@@ -1,14 +1,16 @@
 /**************************************************************************//**
 \file       test_pgn_list_management.cpp
 \brief      Unit tests for PGN List Management BEM commands
-\details    Tests encode/decode for Delete PGN Enable Lists (0x4A),
-            Activate PGN Enable Lists (0x4B), Default PGN Enable List (0x4C),
-            Params PGN Enable Lists (0x4D), and PGN Enable List F1/F2 (0x48-0x4F)
+\details    Tests encode/decode for Supported PGN List (0x40), Delete PGN
+            Enable Lists (0x4A), Activate PGN Enable Lists (0x4B), Default
+            PGN Enable List (0x4C), Params PGN Enable Lists (0x4D), and PGN
+            Enable List F1/F2 (0x48-0x4F)
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
+#include "protocols/bem/bem_commands/supported_pgn_list.hpp"
 #include "protocols/bem/bem_commands/delete_pgn_enable_lists.hpp"
 #include "protocols/bem/bem_commands/activate_pgn_enable_lists.hpp"
 #include "protocols/bem/bem_commands/default_pgn_enable_list.hpp"
@@ -45,7 +47,97 @@ protected:
 		m_frame.clear();
 		m_error.clear();
 	}
+
+	/* Helper to find BEM ID in frame */
+	bool findBemIdInFrame(uint8_t bemId) const
+	{
+		for (std::size_t i = 4; i < m_frame.size() - 3; ++i) {
+			if (m_frame[i] == bemId) {
+				return true;
+			}
+		}
+		return false;
+	}
 };
+
+/* Supported PGN List (0x40) Tests ------------------------------------------ */
+
+TEST_F(PgnListManagementTest, SupportedPgnList_EncodeGetRequest)
+{
+	EXPECT_TRUE(m_protocol.buildGetSupportedPgnList(0, 1, m_frame, m_error));
+	EXPECT_TRUE(m_error.empty());
+	EXPECT_FALSE(m_frame.empty());
+
+	EXPECT_TRUE(findBemIdInFrame(0x40)) << "BEM ID 0x40 not found in frame";
+}
+
+TEST_F(PgnListManagementTest, SupportedPgnList_DecodeResponse)
+{
+	/* Response: pgnIndex (1) + transferId (1) + pgnCount (1) + pgns (4 each) */
+	/* Example: 3 PGNs */
+	const std::vector<uint8_t> data = {
+		0x00,                          /* pgnIndex = 0 */
+		0x01,                          /* transferId = 1 */
+		0x03,                          /* pgnCount = 3 */
+		0x60, 0xEF, 0x01, 0x00,        /* PGN 126816 (0x01EF60) */
+		0x10, 0xF0, 0x01, 0x00,        /* PGN 126992 (0x01F010) */
+		0x14, 0xF1, 0x01, 0x00         /* PGN 127252 (0x01F114) */
+	};
+
+	SupportedPgnListResponse response;
+	EXPECT_TRUE(decodeSupportedPgnListResponse(data, response, m_error));
+	EXPECT_TRUE(m_error.empty());
+
+	EXPECT_EQ(response.pgnIndex, 0);
+	EXPECT_EQ(response.transferId, 1);
+	EXPECT_EQ(response.pgnCount, 3);
+	EXPECT_EQ(response.pgns.size(), 3u);
+	EXPECT_EQ(response.pgns[0], 126816u);
+	EXPECT_EQ(response.pgns[1], 126992u);
+	EXPECT_EQ(response.pgns[2], 127252u);
+}
+
+TEST_F(PgnListManagementTest, SupportedPgnList_IsLastMessage)
+{
+	SupportedPgnListResponse response;
+	response.pgnIndex = 0;
+	response.pgnCount = 10;  /* Less than max (62) */
+
+	EXPECT_TRUE(response.isLastMessage());
+
+	response.pgnCount = 62;  /* Max */
+	EXPECT_FALSE(response.isLastMessage());
+}
+
+TEST_F(PgnListManagementTest, SupportedPgnList_NextIndex)
+{
+	SupportedPgnListResponse response;
+	response.pgnIndex = 0;
+	response.pgnCount = 62;
+
+	EXPECT_EQ(response.nextIndex(), 62u);
+
+	response.pgnCount = 10;  /* Last message */
+	EXPECT_EQ(response.nextIndex(), 0xFF);
+}
+
+TEST_F(PgnListManagementTest, SupportedPgnList_DecodeTooShort)
+{
+	const std::vector<uint8_t> shortData = {0x00, 0x01};  /* Missing pgnCount */
+
+	SupportedPgnListResponse response;
+	EXPECT_FALSE(decodeSupportedPgnListResponse(shortData, response, m_error));
+	EXPECT_FALSE(m_error.empty());
+}
+
+TEST_F(PgnListManagementTest, SupportedPgnList_Constants)
+{
+	EXPECT_EQ(kSupportedPgnListGetRequestSize, 2u);
+	EXPECT_EQ(kSupportedPgnListResponseHeaderSize, 3u);
+	EXPECT_EQ(kSupportedPgnListMaxPgnsPerMessage, 62u);
+	EXPECT_EQ(kSupportedPgnListFirstIndex, 0x00);
+	EXPECT_EQ(kSupportedPgnListEndIndex, 0xFF);
+}
 
 /* Delete PGN Enable Lists (0x4A) Tests ------------------------------------- */
 
@@ -520,6 +612,7 @@ TEST_F(PgnListManagementTest, Constants)
 
 TEST_F(PgnListManagementTest, BemCommandIdToString)
 {
+	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetSupportedPgnList), "GetSupportedPgnList");
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetSetRxPgnEnableListF1), "GetSetRxPgnEnableListF1");
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetSetTxPgnEnableListF1), "GetSetTxPgnEnableListF1");
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::DeletePgnEnableLists), "DeletePgnEnableLists");

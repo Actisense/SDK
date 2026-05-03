@@ -1,8 +1,8 @@
 /**************************************************************************//**
 \file       test_nmea2000_product_info.cpp
 \brief      Unit tests for NMEA 2000 Product Info BEM commands
-\details    Tests encode/decode for Product Info (0x41), CAN Config (0x42),
-            CAN Info Fields (0x43-0x45), and Supported PGN List (0x40)
+\details    Tests encode/decode for Product Info (0x41, single-message
+            form only), CAN Config (0x42), and CAN Info Fields (0x43-0x45)
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 *******************************************************************************/
@@ -11,7 +11,6 @@
 #include "protocols/bem/bem_commands/product_info.hpp"
 #include "protocols/bem/bem_commands/can_config.hpp"
 #include "protocols/bem/bem_commands/can_info_fields.hpp"
-#include "protocols/bem/bem_commands/supported_pgn_list.hpp"
 #include "protocols/bem/bem_protocol.hpp"
 
 #include <gtest/gtest.h>
@@ -64,9 +63,9 @@ TEST_F(Nmea2000ProductInfoTest, ProductInfo_EncodeGetRequest)
 	EXPECT_TRUE(findBemIdInFrame(0x41)) << "BEM ID 0x41 not found in frame";
 }
 
-TEST_F(Nmea2000ProductInfoTest, ProductInfo_DecodeFormat2)
+TEST_F(Nmea2000ProductInfoTest, ProductInfo_Decode)
 {
-	/* Create Format 2 response (138 bytes) */
+	/* Single-message response (138 bytes) */
 	std::vector<uint8_t> data(138, 0xFF);
 
 	/* Structure Variant ID = 0x00000011 */
@@ -104,10 +103,9 @@ TEST_F(Nmea2000ProductInfoTest, ProductInfo_DecodeFormat2)
 	data[137] = 0x02;
 
 	ProductInfoResponse response;
-	EXPECT_TRUE(decodeProductInfoFormat2(data, response, m_error));
+	EXPECT_TRUE(decodeProductInfoResponse(data, response, m_error));
 	EXPECT_TRUE(m_error.empty());
 
-	EXPECT_EQ(response.format, ProductInfoFormat::Format2);
 	EXPECT_EQ(response.nmea2000Version, 2049);
 	EXPECT_EQ(response.productCode, 4660);
 	EXPECT_EQ(response.modelId, "NGT-1");
@@ -118,13 +116,25 @@ TEST_F(Nmea2000ProductInfoTest, ProductInfo_DecodeFormat2)
 	EXPECT_EQ(response.loadEquivalency, 2);
 }
 
-TEST_F(Nmea2000ProductInfoTest, ProductInfo_DecodeFormat2TooShort)
+TEST_F(Nmea2000ProductInfoTest, ProductInfo_DecodeTooShort)
 {
-	std::vector<uint8_t> data(100, 0x00);  /* Too short for Format 2 */
+	std::vector<uint8_t> data(100, 0x00);  /* Too short for the 138-byte response */
 	data[0] = 0x11; data[1] = 0x00; data[2] = 0x00; data[3] = 0x00;
 
 	ProductInfoResponse response;
-	EXPECT_FALSE(decodeProductInfoFormat2(data, response, m_error));
+	EXPECT_FALSE(decodeProductInfoResponse(data, response, m_error));
+	EXPECT_FALSE(m_error.empty());
+}
+
+TEST_F(Nmea2000ProductInfoTest, ProductInfo_RejectsLegacyMultiMessage)
+{
+	/* Anything other than the supported structure-variant ID at bytes 0-3 is
+	   treated as the deprecated legacy multi-message form and rejected. */
+	std::vector<uint8_t> data(138, 0xFF);
+	data[0] = 0x00; data[1] = 0x00; data[2] = 0x00; data[3] = 0x00;
+
+	ProductInfoResponse response;
+	EXPECT_FALSE(decodeProductInfoResponse(data, response, m_error));
 	EXPECT_FALSE(m_error.empty());
 }
 
@@ -140,17 +150,10 @@ TEST_F(Nmea2000ProductInfoTest, ProductInfo_ConvertPaddedStringEmpty)
 	EXPECT_EQ(convertPaddedString(data, 4), "");
 }
 
-TEST_F(Nmea2000ProductInfoTest, ProductInfo_FormatToString)
-{
-	EXPECT_STREQ(productInfoFormatToString(ProductInfoFormat::Format1), "Format 1 (Legacy Multi-Message)");
-	EXPECT_STREQ(productInfoFormatToString(ProductInfoFormat::Format2), "Format 2 (Single Message)");
-	EXPECT_STREQ(productInfoFormatToString(ProductInfoFormat::Unknown), "Unknown");
-}
-
 TEST_F(Nmea2000ProductInfoTest, ProductInfo_Constants)
 {
-	EXPECT_EQ(kProductInfoFormat2StructVariantId, 0x00000011u);
-	EXPECT_EQ(kProductInfoFormat2MinSize, 138u);
+	EXPECT_EQ(kProductInfoStructVariantId, 0x00000011u);
+	EXPECT_EQ(kProductInfoMinSize, 138u);
 	EXPECT_EQ(kProductInfoStringMaxLen, 32u);
 }
 
@@ -315,90 +318,10 @@ TEST_F(Nmea2000ProductInfoTest, CanInfoField_Constants)
 	EXPECT_EQ(kCanInfoFieldMaxLen, 70u);
 }
 
-/* Supported PGN List (0x40) Tests ------------------------------------------ */
-
-TEST_F(Nmea2000ProductInfoTest, SupportedPgnList_EncodeGetRequest)
-{
-	EXPECT_TRUE(m_protocol.buildGetSupportedPgnList(0, 1, m_frame, m_error));
-	EXPECT_TRUE(m_error.empty());
-	EXPECT_FALSE(m_frame.empty());
-
-	EXPECT_TRUE(findBemIdInFrame(0x40)) << "BEM ID 0x40 not found in frame";
-}
-
-TEST_F(Nmea2000ProductInfoTest, SupportedPgnList_DecodeResponse)
-{
-	/* Response: pgnIndex (1) + transferId (1) + pgnCount (1) + pgns (4 each) */
-	/* Example: 3 PGNs */
-	const std::vector<uint8_t> data = {
-		0x00,                          /* pgnIndex = 0 */
-		0x01,                          /* transferId = 1 */
-		0x03,                          /* pgnCount = 3 */
-		0x60, 0xEF, 0x01, 0x00,        /* PGN 126816 (0x01EF60) */
-		0x10, 0xF0, 0x01, 0x00,        /* PGN 126992 (0x01F010) */
-		0x14, 0xF1, 0x01, 0x00         /* PGN 127252 (0x01F114) */
-	};
-
-	SupportedPgnListResponse response;
-	EXPECT_TRUE(decodeSupportedPgnListResponse(data, response, m_error));
-	EXPECT_TRUE(m_error.empty());
-
-	EXPECT_EQ(response.pgnIndex, 0);
-	EXPECT_EQ(response.transferId, 1);
-	EXPECT_EQ(response.pgnCount, 3);
-	EXPECT_EQ(response.pgns.size(), 3u);
-	EXPECT_EQ(response.pgns[0], 126816u);
-	EXPECT_EQ(response.pgns[1], 126992u);
-	EXPECT_EQ(response.pgns[2], 127252u);
-}
-
-TEST_F(Nmea2000ProductInfoTest, SupportedPgnList_IsLastMessage)
-{
-	SupportedPgnListResponse response;
-	response.pgnIndex = 0;
-	response.pgnCount = 10;  /* Less than max (62) */
-
-	EXPECT_TRUE(response.isLastMessage());
-
-	response.pgnCount = 62;  /* Max */
-	EXPECT_FALSE(response.isLastMessage());
-}
-
-TEST_F(Nmea2000ProductInfoTest, SupportedPgnList_NextIndex)
-{
-	SupportedPgnListResponse response;
-	response.pgnIndex = 0;
-	response.pgnCount = 62;
-
-	EXPECT_EQ(response.nextIndex(), 62u);
-
-	response.pgnCount = 10;  /* Last message */
-	EXPECT_EQ(response.nextIndex(), 0xFF);
-}
-
-TEST_F(Nmea2000ProductInfoTest, SupportedPgnList_DecodeTooShort)
-{
-	const std::vector<uint8_t> shortData = {0x00, 0x01};  /* Missing pgnCount */
-
-	SupportedPgnListResponse response;
-	EXPECT_FALSE(decodeSupportedPgnListResponse(shortData, response, m_error));
-	EXPECT_FALSE(m_error.empty());
-}
-
-TEST_F(Nmea2000ProductInfoTest, SupportedPgnList_Constants)
-{
-	EXPECT_EQ(kSupportedPgnListGetRequestSize, 2u);
-	EXPECT_EQ(kSupportedPgnListResponseHeaderSize, 3u);
-	EXPECT_EQ(kSupportedPgnListMaxPgnsPerMessage, 62u);
-	EXPECT_EQ(kSupportedPgnListFirstIndex, 0x00);
-	EXPECT_EQ(kSupportedPgnListEndIndex, 0xFF);
-}
-
 /* BEM Command ID String Tests ---------------------------------------------- */
 
 TEST_F(Nmea2000ProductInfoTest, BemCommandIdToString_Nmea2000)
 {
-	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetSupportedPgnList), "GetSupportedPgnList");
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetProductInfo), "GetProductInfo");
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetSetCanConfig), "GetSetCanConfig");
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetSetCanInfoField1), "GetSetCanInfoField1");
