@@ -11,11 +11,24 @@
 			},
 			"binaryDir": "${sourceDir}/build",
 			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Release",
 				"ACTISENSE_BUILD_TESTS": "ON",
 				"ACTISENSE_BUILD_EXAMPLES": "ON",
 				"VCPKG_APPLOCAL_DEPS": "OFF"
 			}
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "release",
+			"displayName": "Release",
+			"configurePreset": "default",
+			"configuration": "Release"
+		},
+		{
+			"name": "debug",
+			"displayName": "Debug",
+			"configurePreset": "default",
+			"configuration": "Debug"
 		}
 	]
 }
