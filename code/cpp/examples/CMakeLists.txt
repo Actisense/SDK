@@ -23,10 +23,11 @@ endfunction()
 # Example Definitions
 # ============================================================================
 add_sdk_example(actisense_console actisense_console.cpp)
+add_sdk_example(pgn_transmitter pgn_transmitter.cpp)
 
 # Future examples (uncomment when files are created)
 # add_sdk_example(serial_nmea_receiver serial_nmea_receiver.cpp)
 # add_sdk_example(udp_sender udp_sender.cpp)
 # add_sdk_example(raw_transport_usage raw_transport_usage.cpp)
 
-message(STATUS "Examples configured: actisense_console")
+message(STATUS "Examples configured: actisense_console, pgn_transmitter")

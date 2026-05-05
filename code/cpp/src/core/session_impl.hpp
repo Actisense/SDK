@@ -56,6 +56,19 @@ namespace Actisense
 			void asyncSend(const std::string& protocol, std::span<const uint8_t> payload,
 						   SendCompletion completion) override;
 
+			void sendPgn(uint32_t pgn, std::span<const uint8_t> payload,
+						 uint8_t destination = 0xFF, uint8_t priority = 6,
+						 SendCompletion completion = {}) override;
+
+			void getOperatingMode(std::chrono::milliseconds timeout,
+								  OperatingModeCallback callback) override;
+
+			void setOperatingMode(OperatingMode mode, std::chrono::milliseconds timeout,
+								  BemResultCallback callback) override;
+
+			void getHardwareInfo(std::chrono::milliseconds timeout,
+								 HardwareInfoCallback callback) override;
+
 			void close() override;
 
 			[[nodiscard]] bool isConnected() const noexcept override;

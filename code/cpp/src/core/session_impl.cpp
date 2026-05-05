@@ -14,6 +14,7 @@
 #include <sstream>
 
 #include "protocols/bem/bem_commands/echo.hpp"
+#include "protocols/bem/bem_commands/product_info.hpp"
 #include "protocols/bst/bst_frame.hpp"
 #include "transport/serial/serial_transport.hpp"
 #include "util/debug_log.hpp"
@@ -189,6 +190,101 @@ namespace Actisense
 
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
+
+		/* Public Session-interface overloads ----------------------------------- */
+
+		void SessionImpl::sendPgn(uint32_t pgn, std::span<const uint8_t> payload,
+								  uint8_t destination, uint8_t priority,
+								  SendCompletion completion) {
+			const BstFrame frame = BstFrame::create94(pgn, destination, payload, priority);
+			asyncSend("bst", frame.rawData(), std::move(completion));
+		}
+
+		void SessionImpl::getOperatingMode(std::chrono::milliseconds timeout,
+										   OperatingModeCallback callback) {
+			getOperatingMode(timeout,
+				[cb = std::move(callback)](const std::optional<BemResponse>& response,
+										   ErrorCode code, std::string_view errorMsg) {
+					if (!cb) {
+						return;
+					}
+					if (code != ErrorCode::Ok || !response) {
+						cb(code, errorMsg, std::nullopt);
+						return;
+					}
+					if (response->header.errorCode != 0) {
+						cb(ErrorCode::MalformedFrame,
+						   "Device returned BEM error code", std::nullopt);
+						return;
+					}
+					if (response->data.size() < 2) {
+						cb(ErrorCode::MalformedFrame,
+						   "Operating-mode response too short", std::nullopt);
+						return;
+					}
+					const uint16_t modeRaw = static_cast<uint16_t>(response->data[0]) |
+											 (static_cast<uint16_t>(response->data[1]) << 8);
+					cb(ErrorCode::Ok, {}, std::make_optional(static_cast<OperatingMode>(modeRaw)));
+				});
+		}
+
+		void SessionImpl::setOperatingMode(OperatingMode mode, std::chrono::milliseconds timeout,
+										   BemResultCallback callback) {
+			setOperatingMode(static_cast<uint16_t>(mode), timeout,
+				[cb = std::move(callback)](const std::optional<BemResponse>& response,
+										   ErrorCode code, std::string_view errorMsg) {
+					if (!cb) {
+						return;
+					}
+					if (code != ErrorCode::Ok || !response) {
+						cb(code, errorMsg);
+						return;
+					}
+					if (response->header.errorCode != 0) {
+						cb(ErrorCode::MalformedFrame, "Device returned BEM error code");
+						return;
+					}
+					cb(ErrorCode::Ok, {});
+				});
+		}
+
+		void SessionImpl::getHardwareInfo(std::chrono::milliseconds timeout,
+										  HardwareInfoCallback callback) {
+			getProductInfo(timeout,
+				[cb = std::move(callback)](const std::optional<BemResponse>& response,
+										   ErrorCode code, std::string_view errorMsg) {
+					if (!cb) {
+						return;
+					}
+					if (code != ErrorCode::Ok || !response) {
+						cb(code, errorMsg, std::nullopt);
+						return;
+					}
+					if (response->header.errorCode != 0) {
+						cb(ErrorCode::MalformedFrame,
+						   "Device returned BEM error code", std::nullopt);
+						return;
+					}
+					ProductInfoResponse decoded;
+					std::string decodeError;
+					if (!decodeProductInfoResponse(response->data, decoded, decodeError)) {
+						cb(ErrorCode::MalformedFrame, decodeError, std::nullopt);
+						return;
+					}
+					HardwareInfo info;
+					info.nmea2000Version = decoded.nmea2000Version;
+					info.productCode = decoded.productCode;
+					info.modelId = decoded.modelId;
+					info.softwareVersion = decoded.softwareVersion;
+					info.modelVersion = decoded.modelVersion;
+					info.modelSerialCode = decoded.modelSerialCode;
+					info.certificationLevel = decoded.certificationLevel;
+					info.loadEquivalency = decoded.loadEquivalency;
+					cb(ErrorCode::Ok, {}, std::make_optional(std::move(info)));
+				});
+		}
+
+		/* Internal uint16_t / BemResponseCallback overload --------------------- */
 
 		void SessionImpl::setOperatingMode(uint16_t mode, std::chrono::milliseconds timeout,
 										   BemResponseCallback callback) {

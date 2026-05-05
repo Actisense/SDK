@@ -25,8 +25,8 @@ Examples:
 #include "protocols/bst/bst_decoder.hpp"
 #include "protocols/bst/bst_frame.hpp"
 #include "protocols/bem/bem_types.hpp"
-#include "protocols/bem/bem_commands/operating_mode.hpp"
 #include "protocols/bem/bem_commands/system_status.hpp"
+#include "public/operating_mode.hpp"
 #include "util/debug_log.hpp"
 
 #include <iostream>

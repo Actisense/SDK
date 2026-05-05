@@ -18,8 +18,8 @@
 #include <vector>
 
 #include "protocols/bem/bem_commands/bem_commands.hpp"
-#include "protocols/bem/bem_commands/operating_mode.hpp"
 #include "protocols/bst/bst_types.hpp"
+#include "public/operating_mode.hpp"
 #include "public/error.hpp"
 
 namespace Actisense

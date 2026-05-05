@@ -1,12 +1,15 @@
-#ifndef __ACTISENSE_SDK_BEM_OPERATING_MODE_HPP
-#define __ACTISENSE_SDK_BEM_OPERATING_MODE_HPP
+#ifndef __ACTISENSE_SDK_OPERATING_MODE_HPP
+#define __ACTISENSE_SDK_OPERATING_MODE_HPP
 
 /**************************************************************************/ /**
  \file       operating_mode.hpp
  \author     (Created) Phil Whitehurst
  \date       (Created) 09/01/2026
  \brief      Operating modes as an enum
- \details    Each device has an Operating Mode that determines how it behaves.
+ \details    Each Actisense device has an Operating Mode that determines how
+			 it behaves. The current mode can be queried or changed via the
+			 BEM Get/Set Operating Mode command (see Session::getOperatingMode
+			 / Session::setOperatingMode).
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -19,7 +22,7 @@ namespace Actisense
 {
 	namespace Sdk
 	{
-		/* Definitions -------------------------------------------------------------- */
+		/* Definitions ---------------------------------------------------------- */
 
 		/**************************************************************************/ /**
 		 \brief    Operating Mode ID enumerations.
@@ -223,7 +226,7 @@ namespace Actisense
 						 file for each user defined mode
 
 			 \note		Enum value range 50000 to 59999 - to offer 9999 user modes!
-			 ***************************************************************************/
+			 *******************************************************************************/
 			OM_USER_START = 50000,
 			OM_USER_1 = OM_USER_START,
 			OM_USER_2,
@@ -250,6 +253,6 @@ namespace Actisense
 	} /* namespace Sdk */
 } /* namespace Actisense */
 
-#endif /* __ACTISENSE_SDK_BEM_OPERATING_MODE_HPP */
+#endif /* __ACTISENSE_SDK_OPERATING_MODE_HPP */
 
 /**************** (C) COPYRIGHT Active Research Limited  ** END OF FILE **/

@@ -1,6 +1,6 @@
 # Sending NMEA 2000 Data
 
-This guide shows how to transmit NMEA 2000 messages to the bus through an Actisense device using the `BstFrame` class.
+This guide shows how to transmit NMEA 2000 PGNs to the bus through an Actisense gateway using the public SDK API.
 
 See [Getting Started](getting-started.md) for session setup.
 
@@ -8,88 +8,53 @@ See [Getting Started](getting-started.md) for session setup.
 
 ```cpp
 #include "public/api.hpp"
-#include "protocols/bst/bst_frame.hpp"
+#include "public/operating_mode.hpp"
+#include "public/pgn_encoders.hpp"
 
 using namespace Actisense::Sdk;
 ```
 
-## Building a Frame
+## 1. Put the device into a transmitting mode
 
-Use `BstFrame::create94()` to construct a PC-to-gateway N2K message (BST-94):
+PGN transmission only happens when the gateway is in an operating mode that has its Tx PGN list active. For NGT/NGX gateways that is `OM_NGTransferNormalMode` (mode 1):
 
 ```cpp
-uint32_t pgn     = 127250;   // Vessel Heading
-uint8_t  dest    = 255;      // Broadcast
-uint8_t  priority = 2;
-
-std::vector<uint8_t> payload = { /* PGN data bytes */ };
-
-auto frame = BstFrame::create94(pgn, dest,
-                                std::span<const uint8_t>(payload), priority);
+session->setOperatingMode(OperatingMode::OM_NGTransferNormalMode,
+                          std::chrono::seconds(5),
+                          [](ErrorCode code, std::string_view msg) {
+    if (code != ErrorCode::Ok) {
+        std::fprintf(stderr, "Set operating mode failed: %s\n", msg.data());
+    }
+});
 ```
 
-For the extended D0 format, use `BstFrame::createD0()`:
+## 2. Encode the PGN payload
+
+The SDK ships small encoders for the most common PGNs in `public/pgn_encoders.hpp`:
 
 ```cpp
-auto frame = BstFrame::createD0(pgn, source, dest,
-                                 std::span<const uint8_t>(payload));
+auto payload = encodeVesselHeading(/*sid*/ 0, /*heading_rad*/ 1.5708);
 ```
 
-## Sending the Frame
+The full NMEA 2000 PGN catalogue is not part of the public SDK; if you need a PGN we don't ship an encoder for, build the 8-byte payload yourself in little-endian order using the PGN's documented field resolutions.
 
-Pass the frame's raw bytes to `Session::asyncSend()` with the `"bst"` protocol identifier:
+## 3. Send the payload
 
 ```cpp
-session->asyncSend("bst", frame.rawData(),
+session->sendPgn(127250, payload, /*destination*/ 0xFF, /*priority*/ 6,
     [](ErrorCode code) {
         if (code != ErrorCode::Ok) {
             std::fprintf(stderr, "Send failed: %s\n",
-                         errorMessage(code).c_str());
+                         std::string{errorMessage(code)}.c_str());
         }
     });
 ```
 
-## Complete Example
-
-Sending a Vessel Heading PGN (127250) with a heading of 90.0 degrees:
-
-```cpp
-#include "public/api.hpp"
-#include "protocols/bst/bst_frame.hpp"
-
-using namespace Actisense::Sdk;
-
-void sendHeading(Session& session, double headingDegrees)
-{
-    // PGN 127250 payload: heading in radians * 10000 as uint16_t
-    double radians = headingDegrees * 3.14159265358979 / 180.0;
-    uint16_t encoded = static_cast<uint16_t>(radians * 10000.0);
-
-    std::vector<uint8_t> payload(8, 0xFF);  // 8 bytes, unused fields = 0xFF
-    payload[0] = 0;                          // SID
-    payload[1] = static_cast<uint8_t>(encoded & 0xFF);
-    payload[2] = static_cast<uint8_t>(encoded >> 8);
-
-    auto frame = BstFrame::create94(
-        127250,     // PGN
-        255,        // Destination (broadcast)
-        std::span<const uint8_t>(payload),
-        2           // Priority
-    );
-
-    session.asyncSend("bst", frame.rawData(),
-        [](ErrorCode code) {
-            if (code != ErrorCode::Ok) {
-                std::fprintf(stderr, "Send failed: %s\n",
-                             errorMessage(code).c_str());
-            }
-        });
-}
-```
+`sendPgn()` wraps the payload in a BST-94 frame and dispatches it via the BDTP-framed transport. Defaults are broadcast destination (`0xFF`) and priority `6`, so the call collapses to `session->sendPgn(pgn, payload)` for the common case.
 
 ## Send Completion
 
-`asyncSend()` is non-blocking. The completion callback fires once the data has been written to the transport. This confirms delivery to the device, not necessarily onto the CAN bus.
+`sendPgn()` is non-blocking. The completion callback fires once the data has been written to the transport. This confirms delivery to the device, not necessarily onto the CAN bus.
 
 ## Error Handling
 
@@ -98,12 +63,21 @@ Common send errors:
 | ErrorCode | Meaning |
 |-----------|---------|
 | `Ok` | Data written to transport successfully |
-| `TransportError` | Serial port write failure |
+| `TransportIo` | Serial port write failure |
 | `NotConnected` | Session is not open |
-| `InvalidParameter` | Malformed frame data |
+| `InvalidArgument` | Malformed frame data |
+
+## Worked example
+
+A complete, runnable example lives in `examples/pgn_transmitter.cpp`. It opens a serial session, switches into Transfer-Normal mode, prints the device's hardware info, and ramps a chosen PGN's primary value at a configurable rate. Run it with:
+
+```
+pgn_transmitter --port COM7 --pgn 127250
+```
 
 ## Notes
 
 - The Actisense gateway handles CAN arbitration and timing. You only need to provide the PGN, addresses, priority, and payload.
-- For multi-frame PGNs (>8 bytes), the gateway handles ISO 11783 Transport Protocol segmentation automatically when using BST-94/D0 frames.
+- For multi-frame PGNs (>8 bytes), the gateway handles ISO 11783 Transport Protocol segmentation automatically.
 - Source address management (address claiming) is handled by the gateway device.
+- If `sendPgn()` succeeds but nothing reaches the bus, check that the chosen PGN is enabled in the device's Tx PGN list. The Actisense Toolkit can configure that list, and the SDK exposes the underlying BEM commands on the internal `SessionImpl` interface.

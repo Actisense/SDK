@@ -79,6 +79,21 @@ namespace Actisense
 			static void open(const OpenOptions& options, EventCallback onEvent,
 							 ErrorCallback onError, SessionOpenedCallback onOpened);
 
+			/**************************************************************************/ /**
+			 \brief      Open a serial session synchronously
+			 \param[in]  config    Serial port configuration
+			 \param[in]  onEvent   Callback for parsed messages and status events
+			 \param[in]  onError   Callback for errors
+			 \return     Opened session, or nullptr if the port could not be opened
+			 \details    Convenience wrapper around open() for the common
+						 serial-port case. The returned session has already
+						 started its receive loop; the caller owns it via
+						 std::unique_ptr.
+			 *******************************************************************************/
+			[[nodiscard]] static std::unique_ptr<Session>
+			createSerialSession(const SerialConfig& config, EventCallback onEvent,
+								ErrorCallback onError);
+
 		private:
 			Api() = delete;
 			~Api() = delete;
