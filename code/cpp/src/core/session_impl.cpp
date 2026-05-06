@@ -115,6 +115,9 @@ namespace Actisense
 							user_sink(std::string_view{reinterpret_cast<const char*>(bytes.data()),
 													   bytes.size()});
 						});
+					/* DESKTOP-332: stateful Rx reassembler so chunked transport
+					 * reads turn into complete EBLT_BstRawFrame records. */
+					new_state->rxAssembler = std::make_unique<BdtpFrameAssembler>();
 					/* Preamble: TimeUTC then Version. The reader uses the
 					 * leading TimeUTC as the time anchor for everything that
 					 * follows until the next time marker. */
@@ -151,9 +154,38 @@ namespace Actisense
 
 			if (state->config.format == WireTraceFormat::Ebl) {
 				if (state->eblWriter) {
-					state->eblWriter->writeTimeUtc(std::chrono::system_clock::now());
-					state->eblWriter->writeDirectionMarker(dir);
-					state->eblWriter->writeRawStream(data);
+					/* Serialise the per-event record group across concurrent Tx
+					   and Rx threads. Without this the three sink calls below
+					   could interleave with another event's group, scrambling
+					   direction tags and frame bytes in the output. */
+					std::lock_guard<std::mutex> lock(state->eblMutex);
+					const auto now = std::chrono::system_clock::now();
+					if (dir == WireTraceDirection::Tx) {
+						/* Tx: every asyncSend emits one complete BDTP frame, so
+						   chunk boundaries always align with frame boundaries.
+						   Keep the wire-bytes-as-raw-stream contract — useful
+						   when the user wants to see exactly what hit the
+						   transport, including any DLE escaping. */
+						state->eblWriter->writeTimeUtc(now);
+						state->eblWriter->writeDirectionMarker(dir);
+						state->eblWriter->writeRawStream(data);
+					}
+					else {
+						/* Rx (DESKTOP-332): transport reads can split a single
+						   BDTP frame across multiple callback chunks. Feed the
+						   bytes through a stateful reassembler and emit one
+						   EBLT_BstRawFrame record per complete frame so EBL
+						   Reader's processBSTMessage can decode without having
+						   to track partial frames across non-EBL segments. */
+						if (state->rxAssembler) {
+							state->rxAssembler->feed(data,
+								[&](std::span<const uint8_t> frame) {
+									state->eblWriter->writeTimeUtc(now);
+									state->eblWriter->writeDirectionMarker(dir);
+									state->eblWriter->writeBstRawFrame(frame);
+								});
+						}
+					}
 				}
 				return;
 			}

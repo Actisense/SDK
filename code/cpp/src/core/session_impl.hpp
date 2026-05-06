@@ -25,6 +25,7 @@
 #include "public/events.hpp"
 #include "public/session.hpp"
 #include "transport/transport.hpp"
+#include "util/bdtp_frame_assembler.hpp"
 
 namespace Actisense
 {
@@ -541,6 +542,14 @@ namespace Actisense
 				WireTraceSink sink;
 				/* Only populated when config.format == Ebl. */
 				std::unique_ptr<EblWriter> eblWriter;
+				/* DESKTOP-332: Rx wire chunks may not align with BDTP frame
+				   boundaries. The assembler reassembles complete frames across
+				   chunk boundaries so we can emit one EBLT_BstRawFrame per
+				   logical message instead of one raw-stream record per OS read. */
+				std::unique_ptr<BdtpFrameAssembler> rxAssembler;
+				/* Serialises the per-event TimeUtc + DirectionMarker + frame
+				   record group across concurrent Tx and Rx threads. */
+				std::mutex eblMutex;
 			};
 
 			std::atomic<bool> wire_trace_active_{false};

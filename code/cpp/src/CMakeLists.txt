@@ -57,6 +57,7 @@ set(SDK_SOURCES
     protocols/protocol_error.cpp
 
     # Utilities
+    util/bdtp_frame_assembler.cpp
     util/stderr_logger.cpp
 
     # Public API implementation

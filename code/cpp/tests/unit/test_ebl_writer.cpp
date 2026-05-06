@@ -503,6 +503,75 @@ TEST_F(SessionEblWireTraceTest, AsyncSendEmitsTimeDirectionAndStream)
 	EXPECT_TRUE(std::equal(payload.begin(), payload.end(), rawAfterTx.begin()));
 }
 
+TEST_F(SessionEblWireTraceTest, RxBdtpFrameAppearsAsBstRawFrameRecord)
+{
+	/* DESKTOP-332: an Rx-side BDTP frame (delivered by the transport in one
+	   or more chunks) must appear in the EBL output as a single
+	   EBLT_BstRawFrame record carrying the inner BST payload. The previous
+	   behaviour wrote the raw wire bytes via writeRawStream, which split
+	   chunked frames into separate non-EBL segments and broke EBL Reader's
+	   stateless segment-by-segment decode. Loopback echoes asyncSend bytes
+	   back as Rx so a single asyncSend("bdtp") exercises both sides. */
+	std::mutex mtx;
+	std::vector<uint8_t> captured;
+
+	WireTraceConfig config;
+	config.format = WireTraceFormat::Ebl;
+	session_->setWireTrace(config, [&](std::string_view bytes) {
+		std::lock_guard<std::mutex> lk(mtx);
+		captured.insert(captured.end(), bytes.begin(), bytes.end());
+	});
+
+	/* Inner BST payload — a tiny BST-93-style buffer. The SDK's "bdtp"
+	   path will append a zero-sum checksum and DLE+STX/DLE+ETX-frame the
+	   bytes before they hit the transport. */
+	const std::vector<uint8_t> inner_payload = {0x93, 0x02, 0xAA, 0x55};
+	session_->asyncSend("bdtp", inner_payload, nullptr);
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+	std::vector<uint8_t> capture_copy;
+	{
+		std::lock_guard<std::mutex> lk(mtx);
+		capture_copy = captured;
+	}
+
+	const auto events = parseEbl(capture_copy);
+
+	/* Walk the events looking for an Rx DirectionMarker followed by an
+	   EBLT_BstRawFrame whose payload begins with our BST_ID. */
+	bool sawRxMarker = false;
+	bool sawRxBstRawFrame = false;
+	std::vector<uint8_t> bst_record_payload;
+	for (const auto& ev : events) {
+		auto* r = std::get_if<RecordEvent>(&ev);
+		if (!r) {
+			continue;
+		}
+		if (r->tag == EblTag::DirectionMarker && !r->payload.empty() &&
+		    r->payload[0] == kEblDirRx) {
+			sawRxMarker = true;
+			continue;
+		}
+		if (sawRxMarker && r->tag == EblTag::BstRawFrame) {
+			sawRxBstRawFrame = true;
+			bst_record_payload = r->payload;
+			break;
+		}
+	}
+
+	ASSERT_TRUE(sawRxMarker)
+		<< "No Rx DirectionMarker emitted — loopback echo did not reach traceWire";
+	ASSERT_TRUE(sawRxBstRawFrame)
+		<< "Rx event was not written as an EBLT_BstRawFrame record";
+
+	/* Inner record bytes must include our payload prefix; the BDTP encoder
+	   appends a checksum byte after, which is part of the BST raw frame. */
+	ASSERT_GE(bst_record_payload.size(), inner_payload.size());
+	EXPECT_TRUE(std::equal(inner_payload.begin(), inner_payload.end(),
+	                       bst_record_payload.begin()));
+}
+
 TEST_F(SessionEblWireTraceTest, ClearStopsEmissions)
 {
 	std::mutex mtx;
