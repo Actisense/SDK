@@ -20,12 +20,20 @@
 Usage:
 	pgn_transmitter --port <port> --pgn <128267|127250|127251>
 					[--baud <rate>] [--rate-hz <hz>] [--restore-mode]
+					[--log <file>]
 	pgn_transmitter --list
+
+	The --log option captures every byte exchanged with the gateway. The
+	output format is selected by the file extension:
+		*.ebl  -> Actisense EBL binary log (readable by EBL Reader)
+		*.*    -> Human-readable hex-dump text log
 
 Examples:
 	pgn_transmitter --port COM7  --pgn 127250
 	pgn_transmitter --port COM7  --pgn 128267 --rate-hz 2
 	pgn_transmitter --port /dev/ttyUSB0 --pgn 127251 --restore-mode
+	pgn_transmitter --port COM7  --pgn 127250 --log capture.txt
+	pgn_transmitter --port COM7  --pgn 127250 --log capture.ebl
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
@@ -33,13 +41,18 @@ Examples:
 #include "public/hardware_info.hpp"
 #include "public/operating_mode.hpp"
 #include "public/pgn_encoders.hpp"
+#include "public/wire_trace.hpp"
 
+#include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <condition_variable>
 #include <csignal>
 #include <cstdint>
+#include <fstream>
 #include <iomanip>
+#include <ios>
 #include <iostream>
 #include <mutex>
 #include <optional>
@@ -136,8 +149,24 @@ static void printUsage(const char* programName) {
 	std::cout << "      --rate-hz <hz>    Transmission rate (default: 1.0)\n";
 	std::cout << "      --restore-mode    Read the device's existing operating mode and\n";
 	std::cout << "                        restore it on exit (default: leave in Transfer Normal)\n";
+	std::cout << "      --log <file>      Capture wire traffic to <file>. Format is chosen\n";
+	std::cout << "                        by the extension: .ebl -> Actisense EBL binary\n";
+	std::cout << "                        log, anything else -> hex-dump text log.\n";
 	std::cout << "  -l, --list            List available serial ports\n";
 	std::cout << "  -h, --help            Show this help message\n";
+}
+
+/* Returns true if `path` ends (case-insensitive) with `.ebl`. */
+static bool isEblLogPath(const std::string& path) {
+	const std::string ext = ".ebl";
+	if (path.size() < ext.size()) {
+		return false;
+	}
+	return std::equal(ext.rbegin(), ext.rend(), path.rbegin(),
+		[](char a, char b) {
+			return std::tolower(static_cast<unsigned char>(a)) ==
+				   std::tolower(static_cast<unsigned char>(b));
+		});
 }
 
 static void listSerialPorts() {
@@ -189,6 +218,7 @@ int main(int argc, char* argv[]) {
 	unsigned baud = 115200;
 	double rateHz = 1.0;
 	bool restoreMode = false;
+	std::string logPath;
 
 	for (int i = 1; i < argc; ++i) {
 		std::string arg = argv[i];
@@ -214,6 +244,9 @@ int main(int argc, char* argv[]) {
 		}
 		else if (arg == "--restore-mode") {
 			restoreMode = true;
+		}
+		else if (arg == "--log" && i + 1 < argc) {
+			logPath = argv[++i];
 		}
 		else {
 			std::cerr << "Unknown argument: " << arg << "\n";
@@ -252,6 +285,10 @@ int main(int argc, char* argv[]) {
 	std::cout << "PGN:     " << pgn << " (" << pgnDescription(pgn) << ")\n";
 	std::cout << "Rate:    " << rateHz << " Hz\n";
 	std::cout << "Restore: " << (restoreMode ? "yes" : "no") << "\n";
+	if (!logPath.empty()) {
+		std::cout << "Log:     " << logPath
+				  << (isEblLogPath(logPath) ? " (EBL binary)" : " (hex text)") << "\n";
+	}
 	std::cout << "----------------------------------------\n";
 
 	SerialConfig config;
@@ -270,6 +307,42 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 	std::cout << "[INIT] Connected.\n";
+
+	/* Wire trace --------------------------------------------------------- */
+	/* If the user requested a log file, install a wire-trace sink before any
+	 * BEM traffic happens so the on-the-wire bytes for getOperatingMode,
+	 * setOperatingMode and getHardwareInfo are captured in the file too. The
+	 * SDK invokes the sink on the transport thread, so file writes are
+	 * serialised behind logMutex. */
+	std::ofstream logFile;
+	std::mutex logMutex;
+	if (!logPath.empty()) {
+		const bool eblFormat = isEblLogPath(logPath);
+		/* Both formats are opened in binary mode: EBL is a binary record
+		 * stream that must not be CRLF-translated, and the hex formatter
+		 * already terminates each line with '\n' so we don't need text-mode
+		 * translation either. */
+		logFile.open(logPath, std::ios::out | std::ios::binary | std::ios::trunc);
+		if (!logFile) {
+			std::cerr << "[FAIL] Could not open log file: " << logPath << "\n";
+			session->close();
+			return 1;
+		}
+
+		WireTraceConfig traceConfig;
+		traceConfig.format = eblFormat ? WireTraceFormat::Ebl : WireTraceFormat::Hex;
+
+		session->setWireTrace(traceConfig,
+			[&logFile, &logMutex](std::string_view bytes) {
+				std::lock_guard<std::mutex> lk{logMutex};
+				if (logFile) {
+					logFile.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+				}
+			});
+
+		std::cout << "[INIT] Wire trace -> " << logPath
+				  << (eblFormat ? " (EBL)" : " (hex)") << "\n";
+	}
 
 	/* Optionally remember the existing operating mode for restore-on-exit. */
 	std::optional<OperatingMode> previousMode;
@@ -434,6 +507,17 @@ int main(int argc, char* argv[]) {
 				sig.signal();
 			});
 		sig.wait(4s);
+	}
+
+	/* Detach the trace sink before closing the file so no late callback
+	 * from the transport thread can write to a stream that's about to be
+	 * destroyed. The session's swap-and-release guarantees the previous
+	 * sink has been released by the time clearWireTrace() returns. */
+	if (logFile.is_open()) {
+		session->clearWireTrace();
+		std::lock_guard<std::mutex> lk{logMutex};
+		logFile.flush();
+		logFile.close();
 	}
 
 	session->close();

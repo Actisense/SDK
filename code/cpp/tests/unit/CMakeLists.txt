@@ -39,6 +39,9 @@ add_sdk_test(test_nmea2000_product_info test_nmea2000_product_info.cpp)
 # Public PGN encoder tests (GIT-14)
 add_sdk_test(test_pgn_encoders test_pgn_encoders.cpp)
 
+# Session::sendPgn on-wire framing regression test (GIT-81 follow-up)
+add_sdk_test(test_session_send_pgn test_session_send_pgn.cpp)
+
 # Phase 2d PGN List Management tests
 add_sdk_test(test_pgn_list_management test_pgn_list_management.cpp)
 add_sdk_test(test_session_pgn_list_management test_session_pgn_list_management.cpp)

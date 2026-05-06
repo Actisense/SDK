@@ -45,8 +45,14 @@ namespace Actisense
 			std::vector<uint8_t> frame;
 
 			if (protocol == "bdtp" || protocol == "bst") {
-				/* Encode with BDTP framing */
-				BdtpProtocol::encodeFrame(payload, frame);
+				/* BST datagrams require a trailing zero-sum checksum byte:
+				 * sum(ID + length + payload + checksum) must be 0 mod 256.
+				 * Without it the device's BDTP parser drops the frame. */
+				std::vector<uint8_t> bstPayload(payload.begin(), payload.end());
+				const uint8_t checksum =
+					static_cast<uint8_t>(-BdtpProtocol::calculateChecksum(bstPayload));
+				bstPayload.push_back(checksum);
+				BdtpProtocol::encodeFrame(bstPayload, frame);
 			} else {
 				/* Raw send */
 				frame.assign(payload.begin(), payload.end());
