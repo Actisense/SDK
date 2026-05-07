@@ -565,11 +565,12 @@ TEST_F(SessionEblWireTraceTest, RxBdtpFrameAppearsAsBstRawFrameRecord)
 	ASSERT_TRUE(sawRxBstRawFrame)
 		<< "Rx event was not written as an EBLT_BstRawFrame record";
 
-	/* Inner record bytes must include our payload prefix; the BDTP encoder
-	   appends a checksum byte after, which is part of the BST raw frame. */
-	ASSERT_GE(bst_record_payload.size(), inner_payload.size());
-	EXPECT_TRUE(std::equal(inner_payload.begin(), inner_payload.end(),
-	                       bst_record_payload.begin()));
+	/* The EBLT_BSTRawFrame payload must equal the inner BST message exactly:
+	   no DLE framing AND no trailing BDTP checksum byte. EBL Reader's
+	   MapBST93MsgToN2KMsg validates `Size == BST_MsgLocLen + 2`, so leaving
+	   the wire-frame checksum in the record causes the decoded N2KMsg to be
+	   cleared (rendered as "<Zero size array>"). */
+	EXPECT_EQ(bst_record_payload, inner_payload);
 }
 
 TEST_F(SessionEblWireTraceTest, ClearStopsEmissions)

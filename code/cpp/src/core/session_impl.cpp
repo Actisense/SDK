@@ -176,13 +176,28 @@ namespace Actisense
 						   bytes through a stateful reassembler and emit one
 						   EBLT_BstRawFrame record per complete frame so EBL
 						   Reader's processBSTMessage can decode without having
-						   to track partial frames across non-EBL segments. */
+						   to track partial frames across non-EBL segments.
+
+						   The assembler hands us the inner DLE-unescaped frame
+						   payload `BST_ID..checksum`. EBLT_BSTRawFrame must
+						   carry only the BST message itself (no DLE framing
+						   AND no BDTP checksum) per CommonLib's
+						   EblEmbedded::writeBstRawArray contract — the BST 93
+						   / 94 / D0 length fields encode message size without
+						   the trailing checksum, so leaving it in causes EBL
+						   Reader's MapBST93MsgToN2KMsg size check to fail and
+						   the decoded N2KMsg ends up empty (rendered as
+						   "<Zero size array>"). Strip the last byte. */
 						if (state->rxAssembler) {
 							state->rxAssembler->feed(data,
 								[&](std::span<const uint8_t> frame) {
+									if (frame.empty()) {
+										return;
+									}
 									state->eblWriter->writeTimeUtc(now);
 									state->eblWriter->writeDirectionMarker(dir);
-									state->eblWriter->writeBstRawFrame(frame);
+									state->eblWriter->writeBstRawFrame(
+										frame.first(frame.size() - 1));
 								});
 						}
 					}
