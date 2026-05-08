@@ -9,6 +9,7 @@
 /* Dependent includes ------------------------------------------------------- */
 #include "protocols/bem/bem_protocol.hpp"
 #include "protocols/bem/bem_commands/echo.hpp"
+#include "protocols/bem/bem_commands/operating_mode.hpp"
 
 namespace Actisense
 {
@@ -80,10 +81,7 @@ namespace Actisense
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::GetSetOperatingMode;
-
-			/* Mode is 2 bytes, little-endian */
-			cmd.data.resize(2);
-			writeU16LE(cmd.data.data(), mode);
+			encodeOperatingModeSetRequest(mode, cmd.data);
 
 			return encodeCommand(cmd, outFrame, outError);
 		}

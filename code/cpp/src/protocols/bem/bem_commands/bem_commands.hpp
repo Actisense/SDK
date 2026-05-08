@@ -20,6 +20,7 @@
 #include "protocols/bem/bem_commands/echo.hpp"
 #include "protocols/bem/bem_commands/error_report.hpp"
 #include "protocols/bem/bem_commands/negative_ack.hpp"
+#include "protocols/bem/bem_commands/operating_mode.hpp"
 #include "protocols/bem/bem_commands/params_pgn_enable_lists.hpp"
 #include "protocols/bem/bem_commands/port_baudrate.hpp"
 #include "protocols/bem/bem_commands/port_pcode.hpp"

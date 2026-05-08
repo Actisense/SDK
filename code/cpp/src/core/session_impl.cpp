@@ -14,6 +14,7 @@
 #include <sstream>
 
 #include "protocols/bem/bem_commands/echo.hpp"
+#include "protocols/bem/bem_commands/operating_mode.hpp"
 #include "protocols/bem/bem_commands/product_info.hpp"
 #include "protocols/bst/bst_frame.hpp"
 #include "transport/serial/serial_transport.hpp"
@@ -278,14 +279,13 @@ namespace Actisense
 						   "Device returned BEM error code", std::nullopt);
 						return;
 					}
-					if (response->data.size() < 2) {
-						cb(ErrorCode::MalformedFrame,
-						   "Operating-mode response too short", std::nullopt);
+					OperatingMode decoded = OperatingMode::OM_UndefinedMode;
+					std::string decodeError;
+					if (!decodeOperatingModeResponse(response->data, decoded, decodeError)) {
+						cb(ErrorCode::MalformedFrame, decodeError, std::nullopt);
 						return;
 					}
-					const uint16_t modeRaw = static_cast<uint16_t>(response->data[0]) |
-											 (static_cast<uint16_t>(response->data[1]) << 8);
-					cb(ErrorCode::Ok, {}, std::make_optional(static_cast<OperatingMode>(modeRaw)));
+					cb(ErrorCode::Ok, {}, std::make_optional(decoded));
 				});
 		}
 
@@ -352,9 +352,7 @@ namespace Actisense
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::GetSetOperatingMode;
-			cmd.data.resize(2);
-			cmd.data[0] = static_cast<uint8_t>(mode & 0xFF);
-			cmd.data[1] = static_cast<uint8_t>((mode >> 8) & 0xFF);
+			encodeOperatingModeSetRequest(mode, cmd.data);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}

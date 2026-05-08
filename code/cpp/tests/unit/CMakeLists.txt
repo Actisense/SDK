@@ -21,6 +21,7 @@ add_sdk_test(test_bdtp_frame_assembler test_bdtp_frame_assembler.cpp)
 add_sdk_test(test_bst_frame test_bst_frame.cpp)
 
 # BEM Command tests
+add_sdk_test(test_operating_mode test_operating_mode.cpp)
 add_sdk_test(test_port_baudrate test_port_baudrate.cpp)
 add_sdk_test(test_port_pcode test_port_pcode.cpp)
 add_sdk_test(test_rx_pgn_enable test_rx_pgn_enable.cpp)
