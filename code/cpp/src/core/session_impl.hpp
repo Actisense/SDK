@@ -516,6 +516,19 @@ namespace Actisense
 			 *******************************************************************************/
 			void traceWire(WireTraceDirection dir, std::span<const uint8_t> data);
 
+			/**************************************************************************/ /**
+			 \brief      Send already-framed bytes through the transport
+			 \details    Emits a Tx wire-trace event for the supplied frame, then
+						 forwards verbatim to the underlying transport. Used by
+						 paths whose encoder produces a fully-framed buffer
+						 (e.g. BEM commands) so they participate in wire trace
+						 alongside SessionImpl::asyncSend (GIT-82).
+			 \param[in]  frame       Bytes to send (already DLE+STX framed if BDTP)
+			 \param[in]  completion  Transport-level completion callback
+			 *******************************************************************************/
+			void asyncSendRaw(std::span<const uint8_t> frame,
+							  SendCompletionHandler completion);
+
 			TransportPtr transport_;
 			EventCallback eventCallback_;
 			ErrorCallback errorCallback_;

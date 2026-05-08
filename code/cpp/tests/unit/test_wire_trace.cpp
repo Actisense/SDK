@@ -15,10 +15,12 @@
 #include "public/wire_trace.hpp"
 
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -370,6 +372,36 @@ TEST_F(SessionWireTraceTest, AsyncSendEmitsTxLine)
 	const std::string& first = lines.front();
 	EXPECT_NE(first.find("> CA FE BA BE"), std::string::npos);
 	EXPECT_EQ(first.back(), '\n');
+}
+
+TEST_F(SessionWireTraceTest, BemCommandEmitsTxLine)
+{
+	/* GIT-82: SessionImpl::sendBemCommand previously bypassed traceWire, so
+	   no Tx line appeared in hex-mode captures for any BEM command. After
+	   the fix, getOperatingMode() must produce a "> .." Tx line. */
+	std::mutex mtx;
+	std::vector<std::string> lines;
+
+	WireTraceConfig config;
+	config.bytesPerLine = 16;
+	config.absoluteTimestamps = false;
+	config.includeAscii = true;
+
+	session_->setWireTrace(config, [&](std::string_view line) {
+		std::lock_guard<std::mutex> lk(mtx);
+		lines.emplace_back(line);
+	});
+
+	session_->getOperatingMode(std::chrono::milliseconds(50),
+		[](ErrorCode, std::string_view, std::optional<OperatingMode>) {});
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+	std::lock_guard<std::mutex> lk(mtx);
+	const bool sawTxLine = std::any_of(lines.begin(), lines.end(),
+		[](const std::string& l) { return l.find("> ") != std::string::npos; });
+	EXPECT_TRUE(sawTxLine)
+		<< "BEM command Tx must produce a hex-mode '> ..' line (GIT-82)";
 }
 
 TEST_F(SessionWireTraceTest, ClearWireTraceStopsEmissions)

@@ -209,6 +209,12 @@ namespace Actisense
 							   [&](std::string_view line) { state->sink(line); });
 		}
 
+		void SessionImpl::asyncSendRaw(std::span<const uint8_t> frame,
+									   SendCompletionHandler completion) {
+			traceWire(WireTraceDirection::Tx, frame);
+			transport_->asyncSend(frame, std::move(completion));
+		}
+
 		void SessionImpl::sendBemCommand(const BemCommand& command,
 										 std::chrono::milliseconds timeout,
 										 BemResponseCallback callback) {
@@ -227,8 +233,10 @@ namespace Actisense
 				bem_.registerRequest(command.bemId, command.bstId, timeout, std::move(callback));
 			(void)seqId; /* Sequence ID is embedded in the frame by BEM encoder in future */
 
-			/* Send frame */
-			transport_->asyncSend(frame, [this](ErrorCode code, std::size_t /*written*/) {
+			/* GIT-82: route through asyncSendRaw so the wire-trace Tx hook fires.
+			   Calling transport_->asyncSend directly here bypassed traceWire and
+			   left .ebl/hex captures with only the device response, no command. */
+			asyncSendRaw(frame, [this](ErrorCode code, std::size_t /*written*/) {
 				if (code != ErrorCode::Ok && errorCallback_) {
 					errorCallback_(code, "Failed to send BEM command");
 				}

@@ -10,6 +10,7 @@
  *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
+#include "protocols/bem/bem_protocol.hpp"
 #include "public/api.hpp"
 #include "public/ebl_writer.hpp"
 #include "public/wire_trace.hpp"
@@ -571,6 +572,89 @@ TEST_F(SessionEblWireTraceTest, RxBdtpFrameAppearsAsBstRawFrameRecord)
 	   the wire-frame checksum in the record causes the decoded N2KMsg to be
 	   cleared (rendered as "<Zero size array>"). */
 	EXPECT_EQ(bst_record_payload, inner_payload);
+}
+
+TEST_F(SessionEblWireTraceTest, BemCommandTxBytesMatchEncodedFrame)
+{
+	/* GIT-82: SessionImpl::sendBemCommand previously dispatched directly to
+	   transport_->asyncSend, bypassing traceWire. The fix routes BEM
+	   commands through asyncSendRaw which emits the Tx hook. Verify the
+	   captured Tx raw stream is byte-for-byte identical to what
+	   BemProtocol::encodeCommand produces for getOperatingMode — proves
+	   both that the hook fires AND that it sees the actual frame the
+	   transport receives. */
+
+	/* Compute the expected wire frame independently. */
+	std::vector<uint8_t> expected_frame;
+	{
+		BemProtocol bem;
+		std::string err;
+		BemCommand cmd;
+		cmd.bstId = BstId::Bem_PG_A1;
+		cmd.bemId = BemCommandId::GetSetOperatingMode;
+		ASSERT_TRUE(bem.encodeCommand(cmd, expected_frame, err)) << err;
+		ASSERT_FALSE(expected_frame.empty());
+	}
+
+	std::mutex mtx;
+	std::vector<uint8_t> captured;
+
+	WireTraceConfig config;
+	config.format = WireTraceFormat::Ebl;
+	session_->setWireTrace(config, [&](std::string_view bytes) {
+		std::lock_guard<std::mutex> lk(mtx);
+		captured.insert(captured.end(), bytes.begin(), bytes.end());
+	});
+
+	const std::size_t preamble_size = [&] {
+		std::lock_guard<std::mutex> lk(mtx);
+		return captured.size();
+	}();
+
+	session_->getOperatingMode(std::chrono::milliseconds(50),
+		[](ErrorCode, std::string_view, std::optional<OperatingMode>) {});
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+	std::vector<uint8_t> per_event_bytes;
+	{
+		std::lock_guard<std::mutex> lk(mtx);
+		per_event_bytes.assign(captured.begin() + preamble_size, captured.end());
+	}
+
+	const auto events = parseEbl(per_event_bytes);
+	ASSERT_FALSE(events.empty());
+
+	/* Walk: find Tx DirectionMarker, then collect contiguous RawByte events
+	   until the next RecordEvent. The Tx event group writes a raw stream
+	   between records; the eblMutex serialises Tx vs Rx so the next record
+	   will be the Rx group's TimeUtc. */
+	bool sawTxMarker = false;
+	std::vector<uint8_t> txStream;
+	bool stoppedAtNextRecord = false;
+	for (const auto& ev : events) {
+		if (auto* r = std::get_if<RecordEvent>(&ev)) {
+			if (sawTxMarker) {
+				stoppedAtNextRecord = true;
+				break;
+			}
+			if (r->tag == EblTag::DirectionMarker && !r->payload.empty() &&
+			    r->payload[0] == kEblDirTx) {
+				sawTxMarker = true;
+			}
+		} else if (auto* b = std::get_if<RawByte>(&ev)) {
+			if (sawTxMarker) {
+				txStream.push_back(b->value);
+			}
+		}
+	}
+
+	ASSERT_TRUE(sawTxMarker)
+		<< "BEM command Tx must emit a DirectionMarker (GIT-82)";
+	ASSERT_TRUE(stoppedAtNextRecord)
+		<< "Expected Rx record group after Tx raw stream";
+	EXPECT_EQ(txStream, expected_frame)
+		<< "Tx raw stream must equal BemProtocol::encodeCommand output (GIT-82)";
 }
 
 TEST_F(SessionEblWireTraceTest, ClearStopsEmissions)

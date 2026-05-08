@@ -7,12 +7,13 @@
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 
 Usage:
-    actisense_console --port <port> [--baud <rate>] [--log <file>]
+    actisense_console --port <port> [--baud <rate>] [--log <file>] [--ebl <file.ebl>]
     actisense_console --list
 
 Examples:
     actisense_console --port COM7
     actisense_console --port /dev/ttyUSB0 --baud 115200
+    actisense_console --port COM7 --ebl consolelog.ebl
     actisense_console --list
 *******************************************************************************/
 
@@ -27,6 +28,7 @@ Examples:
 #include "protocols/bem/bem_types.hpp"
 #include "protocols/bem/bem_commands/system_status.hpp"
 #include "public/operating_mode.hpp"
+#include "public/wire_trace.hpp"
 #include "util/debug_log.hpp"
 
 #include <iostream>
@@ -37,6 +39,7 @@ Examples:
 #include <atomic>
 #include <csignal>
 #include <fstream>
+#include <mutex>
 #include <sstream>
 
 #ifdef _WIN32
@@ -54,6 +57,8 @@ using namespace Actisense::Sdk;
 static std::atomic<bool> g_running{true};
 static std::atomic<bool> g_consoleOutputEnabled{true};
 static std::ofstream g_logFile;
+static std::ofstream g_eblFile;
+static std::mutex g_eblMutex;
 
 /* Forward Declarations ----------------------------------------------------- */
 void printUsage(const char* programName);
@@ -226,6 +231,7 @@ int main(int argc, char* argv[])
 	std::string port;
 	unsigned baud = 115200;
 	std::string logPath;
+	std::string eblPath;
 	std::string debugLogPath;
 	LogLevel consoleDebugLevel = LogLevel::None;
 	LogLevel fileDebugLevel = LogLevel::None;
@@ -256,6 +262,10 @@ int main(int argc, char* argv[])
 		else if ((arg == "--log") && i + 1 < argc)
 		{
 			logPath = argv[++i];
+		}
+		else if ((arg == "--ebl") && i + 1 < argc)
+		{
+			eblPath = argv[++i];
 		}
 		else if ((arg == "--debug-log") && i + 1 < argc)
 		{
@@ -328,6 +338,30 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	/* Open EBL wire-trace file if specified. Path must end in .ebl so the
+	   captured file is recognised by EBL Reader / Toolkit. */
+	if (!eblPath.empty())
+	{
+		const std::string suffix = ".ebl";
+		const bool hasEblExt = eblPath.size() >= suffix.size() &&
+			std::equal(suffix.rbegin(), suffix.rend(), eblPath.rbegin(),
+				[](char a, char b) {
+					return std::tolower(static_cast<unsigned char>(a)) ==
+						std::tolower(static_cast<unsigned char>(b));
+				});
+		if (!hasEblExt)
+		{
+			std::cerr << "Error: --ebl path must end in .ebl: " << eblPath << std::endl;
+			return 1;
+		}
+		g_eblFile.open(eblPath, std::ios::out | std::ios::binary | std::ios::trunc);
+		if (!g_eblFile.is_open())
+		{
+			std::cerr << "Error: Could not open EBL file: " << eblPath << std::endl;
+			return 1;
+		}
+	}
+
 	/* Install signal handler for clean shutdown */
 	std::signal(SIGINT, signalHandler);
 #if !defined(_WIN32)
@@ -350,6 +384,10 @@ int main(int argc, char* argv[])
 	if (!logPath.empty())
 	{
 		std::cout << "Frame Log: " << logPath << std::endl;
+	}
+	if (!eblPath.empty())
+	{
+		std::cout << "EBL Trace: " << eblPath << std::endl;
 	}
 	std::cout << "----------------------------------------" << std::endl;
 	std::cout << "Press Ctrl+C to exit" << std::endl;
@@ -375,6 +413,24 @@ int main(int argc, char* argv[])
 	}
 
 	std::cout << "[INIT] Connected successfully!" << std::endl;
+
+	/* Wire up EBL wire-trace if requested. The sink writes binary EBL
+	   record bytes (preamble + per-event TimeUtc/DirectionMarker/frame
+	   records) straight to the file; mutex serialises Tx and Rx callbacks
+	   on the receive thread. */
+	if (g_eblFile.is_open())
+	{
+		WireTraceConfig wtConfig;
+		wtConfig.format = WireTraceFormat::Ebl;
+		session->setWireTrace(wtConfig, [](std::string_view bytes) {
+			std::lock_guard<std::mutex> lk(g_eblMutex);
+			if (g_eblFile.is_open())
+			{
+				g_eblFile.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+			}
+		});
+	}
+
 	std::cout << std::endl;
 
 	/* Main loop - process input and display frames */
@@ -393,11 +449,24 @@ int main(int argc, char* argv[])
 	std::cout << "       Frames received: " << session->framesReceived() << std::endl;
 	std::cout << "       BEM responses: " << session->bemResponsesReceived() << std::endl;
 
+	/* Stop the trace before closing the session so no further writes hit
+	   g_eblFile after we close it below. */
+	if (g_eblFile.is_open())
+	{
+		session->clearWireTrace();
+	}
+
 	session->close();
 
 	if (g_logFile.is_open())
 	{
 		g_logFile.close();
+	}
+
+	if (g_eblFile.is_open())
+	{
+		std::lock_guard<std::mutex> lk(g_eblMutex);
+		g_eblFile.close();
 	}
 
 	std::cout << "[EXIT] Done." << std::endl;
@@ -415,6 +484,7 @@ void printUsage(const char* programName)
 	std::cout << "  -p, --port <port>   Serial port (e.g., COM7, /dev/ttyUSB0)" << std::endl;
 	std::cout << "  -b, --baud <rate>   Baud rate (default: 115200)" << std::endl;
 	std::cout << "  --log <file>        Log frames to file" << std::endl;
+	std::cout << "  --ebl <file.ebl>    Capture wire trace to EBL file (path must end in .ebl)" << std::endl;
 	std::cout << "  -l, --list          List available serial ports" << std::endl;
 	std::cout << "  -h, --help          Show this help message" << std::endl;
 	std::cout << std::endl;
