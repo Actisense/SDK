@@ -62,7 +62,8 @@ Rules and procedures governing how data is exchanged.
 
 File formats for logging and replay.
 
-- [EBL File Format](FileFormats/ebl-file-format.md) — Enhanced Binary Log format: metatags, timestamping, and layered escaping
+- [EBL File Format](FileFormats/ebl/ebl-file-format.md) — Enhanced Binary Log format: metatags, timestamping, and layered escaping
+- [Writing an EBL Reader](FileFormats/ebl/writing-an-ebl-reader.md) — Implementation guide with state-machine pseudocode, error-recovery rules, and worked hex examples
 
 ---
 
