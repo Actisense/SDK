@@ -27,6 +27,32 @@ namespace Actisense
 {
 	namespace Sdk
 	{
+		namespace
+		{
+			/* All A1 BEM commands share the same BstId, so the 30+ call
+			 * sites that build one don't need to repeat the assignment
+			 * pair. Callers add data afterwards via push_back / appendLe /
+			 * cmd.data.assign / etc. as the per-command encoding needs. */
+			BemCommand makeBemA1(BemCommandId id) {
+				BemCommand cmd;
+				cmd.bstId = BstId::Bem_PG_A1;
+				cmd.bemId = id;
+				return cmd;
+			}
+
+			/* CAN Info Field 1/2 setter payload: kCanInfoFieldMaxLen bytes
+			 * of 0xFF with the user text copied in at the front. Returned
+			 * by value; NRVO elides the copy at the call site. */
+			BemCommand buildCanInfoFieldSet(const std::string& text, BemCommandId bemId) {
+				BemCommand cmd = makeBemA1(bemId);
+				cmd.data.assign(kCanInfoFieldMaxLen, 0xFF);
+				for (std::size_t i = 0; i < text.length(); ++i) {
+					cmd.data[i] = static_cast<uint8_t>(text[i]);
+				}
+				return cmd;
+			}
+		} /* anonymous namespace */
+
 		/* Public Function Definitions ------------------------------------------ */
 
 		SessionImpl::SessionImpl(TransportPtr transport, EventCallback eventCallback,
@@ -259,11 +285,8 @@ namespace Actisense
 
 		void SessionImpl::getOperatingMode(std::chrono::milliseconds timeout,
 										   BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetOperatingMode;
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetSetOperatingMode), timeout,
+						   std::move(callback));
 		}
 
 		/* Public Session-interface overloads ----------------------------------- */
@@ -362,9 +385,7 @@ namespace Actisense
 
 		void SessionImpl::setOperatingMode(uint16_t mode, std::chrono::milliseconds timeout,
 										   BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetOperatingMode;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetOperatingMode);
 			encodeOperatingModeSetRequest(mode, cmd.data);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
@@ -372,9 +393,7 @@ namespace Actisense
 
 		void SessionImpl::getPortBaudrate(uint8_t portNumber, std::chrono::milliseconds timeout,
 										  BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetPortBaudrate;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetPortBaudrate);
 			cmd.data.push_back(portNumber);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
@@ -383,9 +402,7 @@ namespace Actisense
 		void SessionImpl::setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud,
 										  uint32_t storeBaud, std::chrono::milliseconds timeout,
 										  BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetPortBaudrate;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetPortBaudrate);
 			cmd.data.reserve(9);
 			cmd.data.push_back(portNumber);
 			appendLe<uint32_t>(cmd.data, sessionBaud);
@@ -396,12 +413,8 @@ namespace Actisense
 
 		void SessionImpl::getPortPCode(std::chrono::milliseconds timeout,
 									   BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetPortPCode;
-			/* GET request has no data payload */
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetSetPortPCode), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::setPortPCode(std::span<const uint8_t> pCodes,
@@ -415,9 +428,7 @@ namespace Actisense
 				return;
 			}
 
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetPortPCode;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetPortPCode);
 			cmd.data.assign(pCodes.begin(), pCodes.end());
 
 			sendBemCommand(cmd, timeout, std::move(callback));
@@ -425,9 +436,7 @@ namespace Actisense
 
 		void SessionImpl::getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
 										 BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetRxPgnEnable;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnable);
 			appendLe<uint32_t>(cmd.data, pgn);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
@@ -436,9 +445,7 @@ namespace Actisense
 		void SessionImpl::setRxPgnEnable(uint32_t pgn, uint8_t enable,
 										 std::chrono::milliseconds timeout,
 										 BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetRxPgnEnable;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnable);
 			cmd.data.reserve(5);
 			appendLe<uint32_t>(cmd.data, pgn);
 			cmd.data.push_back(enable);
@@ -449,9 +456,7 @@ namespace Actisense
 		void SessionImpl::setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
 												 std::chrono::milliseconds timeout,
 												 BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetRxPgnEnable;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnable);
 			cmd.data.reserve(9);
 			appendLe<uint32_t>(cmd.data, pgn);
 			cmd.data.push_back(enable);
@@ -462,9 +467,7 @@ namespace Actisense
 
 		void SessionImpl::getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
 										 BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetTxPgnEnable;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnable);
 			appendLe<uint32_t>(cmd.data, pgn);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
@@ -473,9 +476,7 @@ namespace Actisense
 		void SessionImpl::setTxPgnEnable(uint32_t pgn, uint8_t enable,
 										 std::chrono::milliseconds timeout,
 										 BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetTxPgnEnable;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnable);
 			cmd.data.reserve(5);
 			appendLe<uint32_t>(cmd.data, pgn);
 			cmd.data.push_back(enable);
@@ -486,9 +487,7 @@ namespace Actisense
 		void SessionImpl::setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
 												 std::chrono::milliseconds timeout,
 												 BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetTxPgnEnable;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnable);
 			cmd.data.reserve(9);
 			appendLe<uint32_t>(cmd.data, pgn);
 			cmd.data.push_back(enable);
@@ -501,50 +500,33 @@ namespace Actisense
 
 		void SessionImpl::reInitMainApp(std::chrono::milliseconds timeout,
 										BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::ReInitMainApp;
 			/* No data payload — device reboots on receipt. */
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::ReInitMainApp), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::commitToEeprom(std::chrono::milliseconds timeout,
 										 BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::CommitToEeprom;
-			/* No data payload */
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::CommitToEeprom), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::commitToFlash(std::chrono::milliseconds timeout,
 										BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::CommitToFlash;
-			/* No data payload */
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::CommitToFlash), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::getTotalTime(std::chrono::milliseconds timeout,
 									   BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetTotalTime;
-			/* GET request has no data payload */
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetSetTotalTime), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::setTotalTime(uint32_t totalTime, uint32_t passkey,
 									   std::chrono::milliseconds timeout,
 									   BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetTotalTime;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetTotalTime);
 			cmd.data.reserve(8);
 			appendLe<uint32_t>(cmd.data, totalTime);
 			appendLe<uint32_t>(cmd.data, passkey);
@@ -554,9 +536,7 @@ namespace Actisense
 
 		void SessionImpl::echo(std::span<const uint8_t> data, std::chrono::milliseconds timeout,
 							   BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::Echo;
+			BemCommand cmd = makeBemA1(BemCommandId::Echo);
 			std::string encodeError;
 			if (!encodeEchoRequest(data, cmd.data, encodeError)) {
 				if (callback) {
@@ -573,42 +553,30 @@ namespace Actisense
 		void SessionImpl::getSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
 											  std::chrono::milliseconds timeout,
 											  BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSupportedPgnList;
-			cmd.data.resize(2);
-			cmd.data[0] = pgnIndex;
-			cmd.data[1] = transferId;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSupportedPgnList);
+			cmd.data.reserve(2);
+			cmd.data.push_back(pgnIndex);
+			cmd.data.push_back(transferId);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
 		void SessionImpl::getProductInfo(std::chrono::milliseconds timeout,
 										 BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetProductInfo;
-			/* GET request has no data payload */
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetProductInfo), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::getCanConfig(std::chrono::milliseconds timeout,
 									   BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetCanConfig;
-			/* GET request has no data payload */
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetSetCanConfig), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::setCanConfig(uint64_t name, uint8_t sourceAddress,
 									   std::chrono::milliseconds timeout,
 									   BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetCanConfig;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetCanConfig);
 			cmd.data.reserve(9);
 			appendLe<uint64_t>(cmd.data, name);
 			cmd.data.push_back(sourceAddress);
@@ -616,26 +584,10 @@ namespace Actisense
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
-		namespace
-		{
-			void buildCanInfoFieldSet(const std::string& text, BemCommandId bemId,
-									  BemCommand& cmd) {
-				cmd.bstId = BstId::Bem_PG_A1;
-				cmd.bemId = bemId;
-				cmd.data.assign(kCanInfoFieldMaxLen, 0xFF);
-				for (std::size_t i = 0; i < text.length(); ++i) {
-					cmd.data[i] = static_cast<uint8_t>(text[i]);
-				}
-			}
-		} /* namespace */
-
 		void SessionImpl::getCanInfoField1(std::chrono::milliseconds timeout,
 										   BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetCanInfoField1;
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetSetCanInfoField1), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::setCanInfoField1(const std::string& text,
@@ -651,19 +603,14 @@ namespace Actisense
 				return;
 			}
 
-			BemCommand cmd;
-			buildCanInfoFieldSet(text, BemCommandId::GetSetCanInfoField1, cmd);
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(buildCanInfoFieldSet(text, BemCommandId::GetSetCanInfoField1),
+						   timeout, std::move(callback));
 		}
 
 		void SessionImpl::getCanInfoField2(std::chrono::milliseconds timeout,
 										   BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetCanInfoField2;
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetSetCanInfoField2), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::setCanInfoField2(const std::string& text,
@@ -679,20 +626,15 @@ namespace Actisense
 				return;
 			}
 
-			BemCommand cmd;
-			buildCanInfoFieldSet(text, BemCommandId::GetSetCanInfoField2, cmd);
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(buildCanInfoFieldSet(text, BemCommandId::GetSetCanInfoField2),
+						   timeout, std::move(callback));
 		}
 
 		void SessionImpl::getCanInfoField3(std::chrono::milliseconds timeout,
 										   BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetCanInfoField3;
 			/* Read-only: no SET variant */
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetCanInfoField3), timeout,
+						   std::move(callback));
 		}
 
 		/* PGN List Management Commands ----------------------------------------- */
@@ -708,9 +650,7 @@ namespace Actisense
 				return;
 			}
 
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetRxPgnEnableListF1;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnableListF1);
 			cmd.data.push_back(messageIndex);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
@@ -727,9 +667,7 @@ namespace Actisense
 				return;
 			}
 
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetTxPgnEnableListF1;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnableListF1);
 			cmd.data.push_back(messageIndex);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
@@ -737,11 +675,8 @@ namespace Actisense
 
 		void SessionImpl::getRxPgnEnableListF2(std::chrono::milliseconds timeout,
 											   BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetRxPgnEnableListF2;
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetSetRxPgnEnableListF2), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::setRxPgnEnableListF2(const std::vector<uint32_t>& pgns,
@@ -756,9 +691,7 @@ namespace Actisense
 				return;
 			}
 
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetRxPgnEnableListF2;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnableListF2);
 			cmd.data = std::move(data);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
@@ -766,11 +699,8 @@ namespace Actisense
 
 		void SessionImpl::getTxPgnEnableListF2(std::chrono::milliseconds timeout,
 											   BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetTxPgnEnableListF2;
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetSetTxPgnEnableListF2), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::setTxPgnEnableListF2(const std::vector<TxPgnEnableEntry>& entries,
@@ -785,9 +715,7 @@ namespace Actisense
 				return;
 			}
 
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetTxPgnEnableListF2;
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnableListF2);
 			cmd.data = std::move(data);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
@@ -803,9 +731,7 @@ namespace Actisense
 				return;
 			}
 
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::DeletePgnEnableLists;
+			BemCommand cmd = makeBemA1(BemCommandId::DeletePgnEnableLists);
 			cmd.data.push_back(selector);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
@@ -813,29 +739,20 @@ namespace Actisense
 
 		void SessionImpl::activatePgnEnableLists(std::chrono::milliseconds timeout,
 												 BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::ActivatePgnEnableLists;
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::ActivatePgnEnableLists), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::defaultPgnEnableList(std::chrono::milliseconds timeout,
 											   BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::DefaultPgnEnableList;
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::DefaultPgnEnableList), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::getParamsPgnEnableLists(std::chrono::milliseconds timeout,
 												  BemResponseCallback callback) {
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::ParamsPgnEnableLists;
-
-			sendBemCommand(cmd, timeout, std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::ParamsPgnEnableLists), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::startReceiving() {
