@@ -57,6 +57,7 @@ Examples:
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <thread>
 
 #ifdef _WIN32
@@ -467,7 +468,10 @@ int main(int argc, char* argv[]) {
 	double minValue = 0.0;
 	double maxValue = 0.0;
 	double step = 0.0;
-	std::string units;
+	/* Backed by the string literals in the switch below; safe to capture
+	 * by value into per-send completion lambdas without copying a heap
+	 * std::string each time round the loop. */
+	std::string_view units;
 	switch (pgn) {
 		case 128267:
 			minValue = 0.0;
