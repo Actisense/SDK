@@ -26,7 +26,7 @@ namespace Actisense
 
 		BdtpProtocol::BdtpProtocol()
 			: state_(State::Idle), frame_buffer_(), frames_received_(0), frames_dropped_(0) {
-			frame_buffer_.reserve(kMaxFrameSize);
+			frame_buffer_.reserve(kBdtpMaxFrameSize);
 		}
 
 		BdtpProtocol::~BdtpProtocol() = default;
@@ -80,7 +80,7 @@ namespace Actisense
 							state_ = State::InFrameGotDLE;
 						} else {
 							/* Regular data byte */
-							if (frame_buffer_.size() < kMaxFrameSize) {
+							if (frame_buffer_.size() < kBdtpMaxFrameSize) {
 								frame_buffer_.push_back(byte);
 							} else {
 								/* Frame too large - abort and signal error */
@@ -108,7 +108,7 @@ namespace Actisense
 							state_ = State::Idle;
 						} else if (byte == BdtpChars::DLE) {
 							/* Escaped DLE - literal 0x10 byte */
-							if (frame_buffer_.size() < kMaxFrameSize) {
+							if (frame_buffer_.size() < kBdtpMaxFrameSize) {
 								frame_buffer_.push_back(BdtpChars::DLE);
 							}
 							state_ = State::InFrame;

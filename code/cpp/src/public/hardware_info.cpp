@@ -26,7 +26,8 @@ namespace Actisense
 			result += "\n  Product Code:     " + std::to_string(info.productCode);
 			result += "\n  NMEA 2000:        v" + std::to_string(info.nmea2000Version);
 			result += "\n  Certification:    level " + std::to_string(info.certificationLevel);
-			result += "\n  Load Equivalency: " + std::to_string(info.loadEquivalency * 50) + " mA";
+			result += "\n  Load Equivalency: " +
+					  std::to_string(info.loadEquivalency * kLenMilliampsPerCount) + " mA";
 			return result;
 		}
 	} /* namespace Sdk */

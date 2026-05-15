@@ -28,6 +28,8 @@
 #include <span>
 #include <vector>
 
+#include "protocols/bdtp/bdtp_protocol.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -39,17 +41,14 @@ namespace Actisense
 		 \details    Frames split across feed() calls are reassembled. Bytes
 		             outside any frame (idle/junk between frames) are silently
 		             discarded — the wire-trace use case does not need them.
-		             A frame larger than @p kMaxFrameSize is dropped and the
-		             machine resets to Idle so the stream can recover.
+		             A frame larger than @ref kBdtpMaxFrameSize is dropped
+		             and the machine resets to Idle so the stream can recover.
 		 *******************************************************************************/
 		class BdtpFrameAssembler
 		{
 		public:
 			/** Per-frame callback. Span lifetime is the duration of the call. */
 			using FrameCallback = std::function<void(std::span<const uint8_t> frame)>;
-
-			/** Caps a single frame at the same value as the BDTP parser. */
-			static constexpr std::size_t kMaxFrameSize = 512;
 
 			/**
 			 * @brief      Feed bytes into the assembler

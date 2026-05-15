@@ -24,6 +24,14 @@ namespace Actisense
 		/* Definitions ---------------------------------------------------------- */
 
 		/**************************************************************************/ /**
+		 \brief      NMEA 2000 Load Equivalency Number (LEN) unit, in milliamps
+		 \details    The N2K product-info `loadEquivalency` field is expressed
+					 in LEN counts; one count corresponds to this many mA of
+					 bus current draw.
+		 *******************************************************************************/
+		inline constexpr unsigned kLenMilliampsPerCount = 50;
+
+		/**************************************************************************/ /**
 		 \brief      Decoded device hardware/product information
 		 \details    Populated by Session::getHardwareInfo() from the NMEA 2000
 					 Product Information response (BEM command 0x41).

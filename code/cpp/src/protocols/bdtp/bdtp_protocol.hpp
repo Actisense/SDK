@@ -33,6 +33,14 @@ namespace Actisense
 		};
 
 		/**************************************************************************/ /**
+		 \brief      Maximum size of a single inner BDTP frame, in bytes
+		 \details    Shared cap used by BdtpProtocol's live parser and the
+		             wire-trace BdtpFrameAssembler so the two never disagree
+		             about what counts as oversized.
+		 *******************************************************************************/
+		inline constexpr std::size_t kBdtpMaxFrameSize = 512;
+
+		/**************************************************************************/ /**
 		 \brief      BST (Binary Serial Transfer) datagram structure
 		 \details    Payload extracted from BDTP frame
 		 *******************************************************************************/
@@ -135,8 +143,6 @@ namespace Actisense
 			std::vector<uint8_t> frame_buffer_;
 			std::size_t frames_received_;
 			std::size_t frames_dropped_;
-
-			static constexpr std::size_t kMaxFrameSize = 512;
 
 			void processCompletedFrame(MessageEmitter emitMessage, ErrorEmitter emitError);
 

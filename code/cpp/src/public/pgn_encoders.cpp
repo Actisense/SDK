@@ -42,6 +42,16 @@ namespace Actisense
 				return static_cast<uint32_t>(counts);
 			}
 
+			/* Quantise a real value to a signed integer count.
+			 *
+			 * Bounds are STRICT-EXCLUSIVE on both ends — a quantised count
+			 * <= minCount or >= maxCount returns the not-available sentinel.
+			 * This is deliberate: NMEA 2000 reserves the most-negative and
+			 * most-positive signed values for "error" and "not available"
+			 * respectively, so the legal range is (minCount, maxCount). For
+			 * an int16 field this means valid counts lie in (-32767, 32767);
+			 * a count of exactly +32767 (== INT16_MAX) is reserved and so is
+			 * mapped to notAvailable. */
 			int32_t quantiseSigned(double value, double resolution, int32_t minCount,
 								   int32_t maxCount, int32_t notAvailable) {
 				if (!std::isfinite(value)) {
@@ -56,8 +66,9 @@ namespace Actisense
 			}
 		} /* anonymous namespace */
 
-		std::vector<uint8_t> encodeWaterDepth(uint8_t sid, double depth_m, double offset_m,
-											  double range_m) {
+		std::vector<uint8_t> encodeWaterDepth(uint8_t sid, double depth_m,
+											  std::optional<double> offset_m,
+											  std::optional<double> range_m) {
 			std::vector<uint8_t> out(8, 0xFF);
 
 			out[0] = sid;
@@ -67,23 +78,23 @@ namespace Actisense
 				quantiseUnsigned(depth_m, 0.01, kU32NotAvailable, kU32NotAvailable);
 			writeLe<uint32_t>(&out[1], depthCounts);
 
-			/* Offset: int16 LE, resolution 0.001 m. 0 means "not provided". */
-			if (offset_m == 0.0) {
-				writeLe<int16_t>(&out[5], kI16NotAvailable);
-			}
-			else {
+			/* Offset: int16 LE, resolution 0.001 m. nullopt = "not provided". */
+			if (offset_m) {
 				const int32_t offsetCounts =
-					quantiseSigned(offset_m, 0.001, -32767, 32767, kI16NotAvailable);
+					quantiseSigned(*offset_m, 0.001, -32767, 32767, kI16NotAvailable);
 				writeLe<int16_t>(&out[5], static_cast<int16_t>(offsetCounts));
 			}
+			else {
+				writeLe<int16_t>(&out[5], kI16NotAvailable);
+			}
 
-			/* Range: uint8 LE, resolution 10 m. 0 means "not provided". */
-			if (range_m == 0.0) {
-				out[7] = 0xFF;
+			/* Range: uint8 LE, resolution 10 m. nullopt = "not provided". */
+			if (range_m) {
+				const uint32_t rangeCounts = quantiseUnsigned(*range_m, 10.0, 254u, 0xFFu);
+				out[7] = static_cast<uint8_t>(rangeCounts);
 			}
 			else {
-				const uint32_t rangeCounts = quantiseUnsigned(range_m, 10.0, 254u, 0xFFu);
-				out[7] = static_cast<uint8_t>(rangeCounts);
+				out[7] = 0xFF;
 			}
 
 			return out;

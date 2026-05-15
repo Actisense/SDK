@@ -42,7 +42,7 @@ namespace Actisense
 						if (byte == BdtpChars::DLE) {
 							state_ = State::InFrameGotDLE;
 						}
-						else if (frame_.size() < kMaxFrameSize) {
+						else if (frame_.size() < kBdtpMaxFrameSize) {
 							frame_.push_back(byte);
 						}
 						else {
@@ -65,7 +65,7 @@ namespace Actisense
 						}
 						else if (byte == BdtpChars::DLE) {
 							/* DLE+DLE → literal 0x10 inside the frame. */
-							if (frame_.size() < kMaxFrameSize) {
+							if (frame_.size() < kBdtpMaxFrameSize) {
 								frame_.push_back(BdtpChars::DLE);
 							}
 							state_ = State::InFrame;

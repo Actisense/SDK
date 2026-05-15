@@ -292,7 +292,7 @@ namespace Actisense
 						   "Device returned BEM error code", std::nullopt);
 						return;
 					}
-					OperatingMode decoded = OperatingMode::OM_UndefinedMode;
+					OperatingMode decoded{};
 					std::string decodeError;
 					if (!decodeOperatingModeResponse(response->data, decoded, decodeError)) {
 						cb(ErrorCode::MalformedFrame, decodeError, std::nullopt);

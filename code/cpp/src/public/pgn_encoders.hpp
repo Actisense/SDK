@@ -21,6 +21,7 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace Actisense
@@ -46,14 +47,19 @@ namespace Actisense
 		 \param[in]  depth_m    Depth below transducer in metres
 		 \param[in]  offset_m   Distance between transducer and waterline in metres
 									(positive = waterline above transducer; negative
-									= keel below transducer). Pass 0 if unknown.
+									= keel below transducer). Pass std::nullopt
+									to emit the NMEA 2000 "not available" sentinel;
+									a literal 0.0 is encoded as a genuine zero
+									offset.
 		 \param[in]  range_m    Maximum range scale in metres (0..2540 m, step 10 m).
-									Pass 0 if not applicable.
+									Pass std::nullopt to emit the not-available
+									sentinel.
 		 \return     8-byte PGN payload
 		 *******************************************************************************/
-		[[nodiscard]] std::vector<uint8_t> encodeWaterDepth(uint8_t sid, double depth_m,
-															double offset_m = 0.0,
-															double range_m = 0.0);
+		[[nodiscard]] std::vector<uint8_t>
+		encodeWaterDepth(uint8_t sid, double depth_m,
+						 std::optional<double> offset_m = std::nullopt,
+						 std::optional<double> range_m = std::nullopt);
 
 		/**************************************************************************/ /**
 		 \brief      Encode PGN 127250 Vessel Heading (8 bytes)
