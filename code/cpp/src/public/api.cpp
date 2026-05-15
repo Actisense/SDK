@@ -13,6 +13,7 @@
 #include <cstdio>
 
 #include "platform/linux/enumerate_serial_devices_linux.hpp"
+#include "platform/macos/enumerate_serial_devices_macos.hpp"
 #include "platform/windows/enumerate_serial_devices_windows.hpp"
 
 namespace Actisense
@@ -47,7 +48,7 @@ namespace Actisense
 		 \details    Platform-specific implementation:
 					 - Windows: Uses SetupDiGetClassDevs and registry enumeration
 					 - Linux:   Uses sysfs /sys/class/tty enumeration
-					 - macOS:   Stub - not yet implemented
+					 - macOS:   Uses IOKit kIOSerialBSDServiceValue matching
 		 *******************************************************************************/
 		std::vector<SerialDeviceInfo> Api::enumerateSerialDevices() {
 #if defined(_WIN32)
@@ -57,9 +58,8 @@ namespace Actisense
 			/* Linux implementation - use platform-specific EnumerateSerialDevices */
 			return EnumerateSerialDevices();
 #elif defined(__APPLE__)
-			/* macOS stub - not yet implemented */
-			/* TODO: Implement using IOKit IOServiceMatching for serial devices */
-			return std::vector<SerialDeviceInfo>{};
+			/* macOS implementation - use platform-specific EnumerateSerialDevices */
+			return EnumerateSerialDevices();
 #else
 			/* Unknown platform - return empty list */
 			return std::vector<SerialDeviceInfo>{};

@@ -56,3 +56,6 @@ add_sdk_test(test_wire_trace test_wire_trace.cpp)
 
 # EBL writer / wire-trace EBL mode tests (GIT-80)
 add_sdk_test(test_ebl_writer test_ebl_writer.cpp)
+
+# macOS enumerator composition tests (GIT-70) — pure C++, runs on all platforms
+add_sdk_test(test_enumerate_serial_devices_macos test_enumerate_serial_devices_macos.cpp)

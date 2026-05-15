@@ -71,6 +71,10 @@ set(SDK_SOURCES
     # Platform-specific
     $<$<PLATFORM_ID:Windows>:platform/windows/enumerate_serial_devices_windows.cpp>
     $<$<PLATFORM_ID:Linux>:platform/linux/enumerate_serial_devices_linux.cpp>
+    # macOS file is built on every platform so BuildSerialDeviceInfoList()
+    # (the pure-C++ composition helper) can be unit-tested without IOKit.
+    # The IOKit-using EnumerateSerialDevices() inside is gated to __APPLE__.
+    platform/macos/enumerate_serial_devices_macos.cpp
 )
 
 target_sources(actisense_sdk PRIVATE ${SDK_SOURCES})
@@ -85,6 +89,10 @@ endif()
 # Platform-specific libraries
 if(WIN32)
     target_link_libraries(actisense_sdk PRIVATE ws2_32)
+endif()
+
+if(APPLE)
+    target_link_libraries(actisense_sdk PRIVATE "-framework IOKit" "-framework CoreFoundation")
 endif()
 
 # ============================================================================
