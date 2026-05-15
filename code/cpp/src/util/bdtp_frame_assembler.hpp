@@ -19,6 +19,12 @@
              classify the partial-frame leading bytes of each chunk as
              unstructured binary (DESKTOP-332).
 
+             Bytes that arrive outside any DLE+STX...DLE+ETX bracket (boot
+             banners, error sentinels, framing glitches) are buffered
+             separately and surfaced via the optional unframed callback so
+             customer-support captures can show *everything* that hit the
+             wire, not just the cleanly-framed BST messages.
+
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
 
@@ -50,16 +56,34 @@ namespace Actisense
 			/** Per-frame callback. Span lifetime is the duration of the call. */
 			using FrameCallback = std::function<void(std::span<const uint8_t> frame)>;
 
-			/**
-			 * @brief      Feed bytes into the assembler
-			 * @param[in]  bytes    Bytes to consume
-			 * @param[in]  on_frame Invoked once per complete frame, with the
-			 *                      DLE-unescaped inner payload (BST_ID..checksum)
-			 */
-			void feed(std::span<const uint8_t> bytes, const FrameCallback& on_frame);
+			/** Per-unframed-chunk callback. Span lifetime is the duration of the call. */
+			using UnframedCallback = std::function<void(std::span<const uint8_t> bytes)>;
 
 			/**
-			 * @brief      Drop any in-flight partial frame and return to Idle
+			 * @brief      Feed bytes into the assembler
+			 * @param[in]  bytes        Bytes to consume
+			 * @param[in]  on_frame     Invoked once per complete frame, with
+			 *                          the DLE-unescaped inner payload
+			 *                          (BST_ID..checksum)
+			 * @param[in]  on_unframed  Optional. When provided, bytes that
+			 *                          arrive outside any DLE+STX..DLE+ETX
+			 *                          bracket are buffered and surfaced via
+			 *                          this callback. The callback fires:
+			 *                          (1) immediately before a frame starts,
+			 *                              with the garbage that preceded it,
+			 *                          (2) at the end of each feed() call,
+			 *                              with any unframed bytes accumulated
+			 *                              by that call.
+			 *                          Passing an empty callback (the default)
+			 *                          silently discards unframed bytes,
+			 *                          matching the pre-#16 behaviour.
+			 */
+			void feed(std::span<const uint8_t> bytes, const FrameCallback& on_frame,
+			          const UnframedCallback& on_unframed = {});
+
+			/**
+			 * @brief      Drop any in-flight partial frame and return to Idle.
+			 *             Any pending unframed bytes are discarded.
 			 */
 			void reset() noexcept;
 
@@ -80,8 +104,11 @@ namespace Actisense
 				InFrameGotDLE
 			};
 
+			void emitUnframed(const UnframedCallback& on_unframed);
+
 			State state_ = State::Idle;
 			std::vector<uint8_t> frame_;
+			std::vector<uint8_t> unframed_;
 		};
 
 	} /* namespace Sdk */

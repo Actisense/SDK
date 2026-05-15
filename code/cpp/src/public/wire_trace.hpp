@@ -53,6 +53,17 @@ namespace Actisense
 			std::size_t bytesPerLine = 16;				   ///< 8 or 16 typical
 			bool absoluteTimestamps = false; ///< false = HH:MM:SS.mmm local, true = ISO 8601 UTC
 			bool includeAscii = true;		 ///< Append |...| ASCII gutter (hex mode only)
+
+			/**************************************************************************/ /**
+			 \brief      Capture Rx bytes that arrive outside any BDTP frame
+			 \details    EBL mode only. Default true so customer-support
+			             captures show *every* byte that came off the wire,
+			             including boot banners, error sentinels, partial-frame
+			             debris and other out-of-frame traffic. Set false to
+			             omit those records and keep the EBL log to cleanly
+			             framed BST messages only.
+			 *******************************************************************************/
+			bool includeUnframedRxBytes = true;
 		};
 
 		/**************************************************************************/ /**

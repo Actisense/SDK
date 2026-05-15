@@ -304,6 +304,145 @@ TEST(BdtpFrameAssembler, NewStxMidFrameAbandonsCurrentFrame)
 	EXPECT_EQ(frames[0], expected);
 }
 
+/* ============================================================================
+ * Unframed-bytes callback (#16)
+ * ============================================================================ */
+
+namespace
+{
+	/* Drive the assembler with both callbacks active and return everything
+	   in arrival order so tests can assert on chronology. */
+	struct AssembleResult
+	{
+		std::vector<std::vector<uint8_t>> frames;
+		std::vector<std::vector<uint8_t>> unframed;
+	};
+
+	AssembleResult assembleWithUnframed(std::span<const uint8_t> bytes)
+	{
+		AssembleResult r;
+		BdtpFrameAssembler asm_;
+		asm_.feed(
+			bytes,
+			[&](std::span<const uint8_t> f) {
+				r.frames.emplace_back(f.begin(), f.end());
+			},
+			[&](std::span<const uint8_t> u) {
+				r.unframed.emplace_back(u.begin(), u.end());
+			});
+		return r;
+	}
+} /* namespace */
+
+TEST(BdtpFrameAssembler, GarbageBetweenFramesGoesToUnframedCallback)
+{
+	/* Garbage was previously silently discarded; with on_unframed wired it
+	   must instead surface verbatim, in the order it arrived relative to
+	   surrounding frames. */
+	const std::vector<uint8_t> payload = {0x93, 0x02, 0x11, 0x5A};
+	auto wire = wrap(payload);
+	wire.push_back(0xFF);
+	wire.push_back(0x00);
+	wire.push_back(0x99);
+	const auto wb = wrap(payload);
+	wire.insert(wire.end(), wb.begin(), wb.end());
+
+	const auto r = assembleWithUnframed(wire);
+
+	ASSERT_EQ(r.frames.size(), 2u);
+	EXPECT_EQ(r.frames[0], payload);
+	EXPECT_EQ(r.frames[1], payload);
+
+	/* The garbage must surface; it may arrive as one chunk (flushed at
+	   the next frame start) or two (frame-start + end-of-feed). */
+	ASSERT_FALSE(r.unframed.empty());
+	std::vector<uint8_t> flat;
+	for (const auto& chunk : r.unframed) {
+		flat.insert(flat.end(), chunk.begin(), chunk.end());
+	}
+	const std::vector<uint8_t> expectedGarbage = {0xFF, 0x00, 0x99};
+	EXPECT_EQ(flat, expectedGarbage);
+}
+
+TEST(BdtpFrameAssembler, TrailingGarbageWithNoFollowingFrameFlushesAtEndOfFeed)
+{
+	/* Bytes after the last frame, with no subsequent DLE+STX, must still
+	   be delivered: feed() flushes any pending unframed at the end so
+	   slow trickles of garbage don't sit in the buffer forever. */
+	const std::vector<uint8_t> payload = {0x93, 0x01, 0x55};
+	auto wire = wrap(payload);
+	wire.push_back('h');
+	wire.push_back('i');
+	wire.push_back('!');
+
+	const auto r = assembleWithUnframed(wire);
+
+	ASSERT_EQ(r.frames.size(), 1u);
+	ASSERT_EQ(r.unframed.size(), 1u);
+	const std::vector<uint8_t> expected = {'h', 'i', '!'};
+	EXPECT_EQ(r.unframed[0], expected);
+}
+
+TEST(BdtpFrameAssembler, FrameStartFlushesUnframedBeforeFrameCallback)
+{
+	/* Chronological ordering: an unframed flush MUST fire before the
+	   frame callback that triggered it, so an EBL consumer sees the
+	   boot banner before the frame in stream order. */
+	const std::vector<uint8_t> payload = {0x93, 0x01, 0x55};
+	std::vector<uint8_t> wire = {'B', 'O', 'O', 'T'};
+	const auto wb = wrap(payload);
+	wire.insert(wire.end(), wb.begin(), wb.end());
+
+	enum class Kind { Frame, Unframed };
+	std::vector<Kind> order;
+
+	BdtpFrameAssembler asm_;
+	asm_.feed(
+		wire,
+		[&](std::span<const uint8_t>) { order.push_back(Kind::Frame); },
+		[&](std::span<const uint8_t>) { order.push_back(Kind::Unframed); });
+
+	ASSERT_EQ(order.size(), 2u);
+	EXPECT_EQ(order[0], Kind::Unframed);
+	EXPECT_EQ(order[1], Kind::Frame);
+}
+
+TEST(BdtpFrameAssembler, DleNotFollowedByStxBecomesUnframedGarbage)
+{
+	/* A DLE outside a frame is ambiguous until the next byte arrives.
+	   When the next byte isn't STX, both the DLE and the following byte
+	   are garbage and must surface as such. */
+	const std::vector<uint8_t> wire = {BdtpChars::DLE, 0x42};
+	const auto r = assembleWithUnframed(wire);
+
+	EXPECT_TRUE(r.frames.empty());
+	ASSERT_EQ(r.unframed.size(), 1u);
+	const std::vector<uint8_t> expected = {BdtpChars::DLE, 0x42};
+	EXPECT_EQ(r.unframed[0], expected);
+}
+
+TEST(BdtpFrameAssembler, UnframedCallbackOmittedKeepsLegacyDiscardBehaviour)
+{
+	/* Passing no on_unframed callback (the default) preserves the
+	   pre-#16 behaviour: garbage is silently discarded. */
+	const std::vector<uint8_t> payload = {0x93, 0x01, 0x55};
+	auto wire = wrap(payload);
+	wire.push_back(0xAA);
+	wire.push_back(0xBB);
+
+	BdtpFrameAssembler asm_;
+	std::vector<std::vector<uint8_t>> frames;
+	/* Single-callback overload (default on_unframed = {}). */
+	asm_.feed(wire, [&](std::span<const uint8_t> f) {
+		frames.emplace_back(f.begin(), f.end());
+	});
+
+	ASSERT_EQ(frames.size(), 1u);
+	EXPECT_EQ(frames[0], payload);
+	/* No way to observe the discarded garbage — that's the point of
+	   this test: the legacy path must still compile and not crash. */
+}
+
 } /* namespace Test */
 } /* namespace Sdk */
 } /* namespace Actisense */

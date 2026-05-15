@@ -222,23 +222,45 @@ namespace Actisense
 						   the decoded N2KMsg ends up empty (rendered as
 						   "<Zero size array>"). Strip the last byte. */
 						if (state->rxAssembler) {
-							state->rxAssembler->feed(data,
-								[&](std::span<const uint8_t> frame) {
-									/* A valid BST datagram is at minimum
-									   BST_ID + Length + Checksum. Anything
-									   shorter cannot represent a real
-									   message — skip it silently rather
-									   than emit a degenerate EBLT_BstRawFrame
-									   that EBL Reader would render as a
-									   zero-size N2K message. */
-									if (frame.size() < 3) {
+							/* Frame callback: emit the cleanly-framed BST
+							   payload as an EBLT_BstRawFrame so EBL Reader
+							   can decode it statelessly. */
+							auto on_frame = [&](std::span<const uint8_t> frame) {
+								/* A valid BST datagram is at minimum
+								   BST_ID + Length + Checksum. Anything
+								   shorter cannot represent a real
+								   message — skip it silently rather
+								   than emit a degenerate EBLT_BstRawFrame
+								   that EBL Reader would render as a
+								   zero-size N2K message. */
+								if (frame.size() < 3) {
+									return;
+								}
+								state->eblWriter->writeTimeUtc(now);
+								state->eblWriter->writeDirectionMarker(dir);
+								state->eblWriter->writeBstRawFrame(
+									frame.first(frame.size() - 1));
+							};
+
+							/* Unframed callback (#16): bytes that arrived
+							   outside any DLE+STX..DLE+ETX get written as
+							   raw stream so support captures show boot
+							   banners, error sentinels and other
+							   out-of-frame traffic alongside the framed
+							   messages. Skipped when the user opts out. */
+							BdtpFrameAssembler::UnframedCallback on_unframed;
+							if (state->config.includeUnframedRxBytes) {
+								on_unframed = [&](std::span<const uint8_t> bytes) {
+									if (bytes.empty()) {
 										return;
 									}
 									state->eblWriter->writeTimeUtc(now);
 									state->eblWriter->writeDirectionMarker(dir);
-									state->eblWriter->writeBstRawFrame(
-										frame.first(frame.size() - 1));
-								});
+									state->eblWriter->writeRawStream(bytes);
+								};
+							}
+
+							state->rxAssembler->feed(data, on_frame, on_unframed);
 						}
 					}
 				}

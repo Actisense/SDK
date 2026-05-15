@@ -657,6 +657,125 @@ TEST_F(SessionEblWireTraceTest, BemCommandTxBytesMatchEncodedFrame)
 		<< "Tx raw stream must equal BemProtocol::encodeCommand output (GIT-82)";
 }
 
+TEST_F(SessionEblWireTraceTest, UnframedRxBytesAppearAsRawStreamByDefault)
+{
+	/* #16: by default (config.includeUnframedRxBytes = true), Rx bytes that
+	   arrive outside any DLE+STX..DLE+ETX bracket must be recorded as a
+	   raw-stream segment in the EBL so customer-support captures show
+	   boot banners and other out-of-frame traffic. Loopback echoes Tx
+	   bytes back as Rx — sending non-BDTP-framed bytes via asyncSend("raw")
+	   simulates a device emitting garbage outside any frame. */
+	std::mutex mtx;
+	std::vector<uint8_t> captured;
+
+	WireTraceConfig config;
+	config.format = WireTraceFormat::Ebl;
+	/* includeUnframedRxBytes defaults to true; assert that explicitly so
+	   a future default flip is caught here. */
+	ASSERT_TRUE(config.includeUnframedRxBytes);
+
+	session_->setWireTrace(config, [&](std::string_view bytes) {
+		std::lock_guard<std::mutex> lk(mtx);
+		captured.insert(captured.end(), bytes.begin(), bytes.end());
+	});
+
+	/* Bytes that look like a device boot banner — no DLE, no STX/ETX,
+	   pure ASCII. The BdtpFrameAssembler must treat the whole lot as
+	   unframed and surface it via the raw-stream path. */
+	const std::vector<uint8_t> garbage = {'B', 'O', 'O', 'T', ' ', 'O', 'K', '\n'};
+	session_->asyncSend("raw", garbage, nullptr);
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+	std::vector<uint8_t> capture_copy;
+	{
+		std::lock_guard<std::mutex> lk(mtx);
+		capture_copy = captured;
+	}
+
+	const auto events = parseEbl(capture_copy);
+
+	/* Find the Rx direction marker. The raw bytes immediately following it
+	   (i.e. the next contiguous RawByte run before the next RecordEvent)
+	   are the unframed-bytes record's content, ESC-destuffed by the parser. */
+	bool sawRxMarker = false;
+	std::vector<uint8_t> rxRawStream;
+	for (const auto& ev : events) {
+		if (auto* r = std::get_if<RecordEvent>(&ev)) {
+			if (sawRxMarker) {
+				break; /* Stop at next record after the Rx marker */
+			}
+			if (r->tag == EblTag::DirectionMarker && !r->payload.empty() &&
+			    r->payload[0] == kEblDirRx) {
+				sawRxMarker = true;
+			}
+		} else if (auto* b = std::get_if<RawByte>(&ev)) {
+			if (sawRxMarker) {
+				rxRawStream.push_back(b->value);
+			}
+		}
+	}
+
+	ASSERT_TRUE(sawRxMarker)
+		<< "Loopback echo of unframed bytes did not produce an Rx event";
+	ASSERT_GE(rxRawStream.size(), garbage.size());
+	EXPECT_TRUE(std::equal(garbage.begin(), garbage.end(), rxRawStream.begin()))
+		<< "Unframed Rx bytes must appear verbatim in the EBL raw stream";
+}
+
+TEST_F(SessionEblWireTraceTest, UnframedRxBytesSuppressedWhenFlagIsFalse)
+{
+	/* Opt-out: setting includeUnframedRxBytes = false restores the
+	   pre-#16 behaviour where unframed garbage is silently dropped.
+	   No EBLT_BstRawFrame either (the garbage isn't a valid BST datagram)
+	   so no Rx-direction record group should appear at all. */
+	std::mutex mtx;
+	std::vector<uint8_t> captured;
+
+	WireTraceConfig config;
+	config.format = WireTraceFormat::Ebl;
+	config.includeUnframedRxBytes = false;
+
+	session_->setWireTrace(config, [&](std::string_view bytes) {
+		std::lock_guard<std::mutex> lk(mtx);
+		captured.insert(captured.end(), bytes.begin(), bytes.end());
+	});
+
+	const std::size_t preamble_size = [&] {
+		std::lock_guard<std::mutex> lk(mtx);
+		return captured.size();
+	}();
+
+	const std::vector<uint8_t> garbage = {'B', 'O', 'O', 'T', '\n'};
+	session_->asyncSend("raw", garbage, nullptr);
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+	std::vector<uint8_t> per_event_bytes;
+	{
+		std::lock_guard<std::mutex> lk(mtx);
+		per_event_bytes.assign(captured.begin() + preamble_size, captured.end());
+	}
+
+	const auto events = parseEbl(per_event_bytes);
+
+	/* A Tx direction marker is still expected (Tx records are unaffected
+	   by this flag); an Rx direction marker is NOT, because the only Rx
+	   the loopback produces here is the unframed echo we just suppressed. */
+	bool sawRxMarker = false;
+	for (const auto& ev : events) {
+		if (auto* r = std::get_if<RecordEvent>(&ev)) {
+			if (r->tag == EblTag::DirectionMarker && !r->payload.empty() &&
+			    r->payload[0] == kEblDirRx) {
+				sawRxMarker = true;
+				break;
+			}
+		}
+	}
+	EXPECT_FALSE(sawRxMarker)
+		<< "Opt-out flag should have suppressed the Rx unframed record";
+}
+
 TEST_F(SessionEblWireTraceTest, ClearStopsEmissions)
 {
 	std::mutex mtx;

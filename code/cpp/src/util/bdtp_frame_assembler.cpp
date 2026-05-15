@@ -15,25 +15,50 @@ namespace Actisense
 	namespace Sdk
 	{
 		void BdtpFrameAssembler::feed(std::span<const uint8_t> bytes,
-		                              const FrameCallback& on_frame)
+		                              const FrameCallback& on_frame,
+		                              const UnframedCallback& on_unframed)
 		{
+			/* Helper: push a byte into the unframed buffer with the same
+			   overflow cap the frame buffer uses. The buffer is flushed at
+			   each frame start and at the end of feed(), so under normal
+			   conditions it never reaches the cap. */
+			const auto pushUnframed = [&](uint8_t b) {
+				if (unframed_.size() < kBdtpMaxFrameSize) {
+					unframed_.push_back(b);
+				}
+			};
+
 			for (const uint8_t byte : bytes) {
 				switch (state_) {
 					case State::Idle:
 						if (byte == BdtpChars::DLE) {
 							state_ = State::GotDLE;
 						}
-						/* Bytes outside any frame are discarded — see header note. */
+						else {
+							pushUnframed(byte);
+						}
 						break;
 
 					case State::GotDLE:
 						if (byte == BdtpChars::STX) {
+							/* Flush any unframed garbage that preceded this
+							   frame so it appears in chronological order
+							   before the frame in the EBL log. */
+							emitUnframed(on_unframed);
 							state_ = State::InFrame;
 							frame_.clear();
 						}
+						else if (byte == BdtpChars::DLE) {
+							/* Two DLEs outside a frame: the first was
+							   garbage; the second might still start a
+							   frame, so stay in GotDLE. */
+							pushUnframed(BdtpChars::DLE);
+						}
 						else {
-							/* Not a frame start — drop back to Idle. A double
-							   DLE outside a frame is invalid; treat as garbage. */
+							/* Not a frame start — both the buffered DLE
+							   and this byte are garbage. */
+							pushUnframed(BdtpChars::DLE);
+							pushUnframed(byte);
 							state_ = State::Idle;
 						}
 						break;
@@ -83,12 +108,31 @@ namespace Actisense
 						break;
 				}
 			}
+
+			/* End-of-feed flush: bytes accumulated since the last frame (or
+			   since the last flush) get emitted immediately so each EBL
+			   record carries a timestamp close to actual arrival. Without
+			   this, slow trickles of garbage with no following frame would
+			   sit in the buffer indefinitely. */
+			emitUnframed(on_unframed);
 		}
 
 		void BdtpFrameAssembler::reset() noexcept
 		{
 			state_ = State::Idle;
 			frame_.clear();
+			unframed_.clear();
+		}
+
+		void BdtpFrameAssembler::emitUnframed(const UnframedCallback& on_unframed)
+		{
+			if (unframed_.empty()) {
+				return;
+			}
+			if (on_unframed) {
+				on_unframed(std::span<const uint8_t>(unframed_));
+			}
+			unframed_.clear();
 		}
 
 	} /* namespace Sdk */
