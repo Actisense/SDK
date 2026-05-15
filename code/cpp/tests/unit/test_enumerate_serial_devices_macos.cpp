@@ -42,8 +42,7 @@ TEST(EnumerateSerialDevicesMacos, ManufacturerAndProductFormsFullFriendlyName) {
 		{MakeEntry("/dev/cu.usbserial-A1234", "FTDI", "USB Serial Converter")});
 	ASSERT_EQ(out.size(), 1u);
 	EXPECT_EQ(out[0].port_name, "/dev/cu.usbserial-A1234");
-	EXPECT_EQ(out[0].friendly_name,
-			  "FTDI USB Serial Converter (/dev/cu.usbserial-A1234)");
+	EXPECT_EQ(out[0].friendly_name, "FTDI USB Serial Converter (/dev/cu.usbserial-A1234)");
 }
 
 TEST(EnumerateSerialDevicesMacos, ProductOnlyFallsBackToProduct) {
@@ -55,15 +54,13 @@ TEST(EnumerateSerialDevicesMacos, ProductOnlyFallsBackToProduct) {
 TEST(EnumerateSerialDevicesMacos, ManufacturerOnlyDoesNotAppearAlone) {
 	/* Manufacturer without product is not a useful friendly name — the helper
 	 * leaves friendly_name empty rather than emitting just the vendor. */
-	const auto out =
-		BuildSerialDeviceInfoList({MakeEntry("/dev/cu.bare", "Vendor Only", "")});
+	const auto out = BuildSerialDeviceInfoList({MakeEntry("/dev/cu.bare", "Vendor Only", "")});
 	ASSERT_EQ(out.size(), 1u);
 	EXPECT_TRUE(out[0].friendly_name.empty());
 }
 
 TEST(EnumerateSerialDevicesMacos, InterfaceNameFallback) {
-	const auto out = BuildSerialDeviceInfoList(
-		{MakeEntry("/dev/cu.iface", "", "", "Generic CDC")});
+	const auto out = BuildSerialDeviceInfoList({MakeEntry("/dev/cu.iface", "", "", "Generic CDC")});
 	ASSERT_EQ(out.size(), 1u);
 	EXPECT_EQ(out[0].friendly_name, "Generic CDC (/dev/cu.iface)");
 }

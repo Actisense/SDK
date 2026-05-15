@@ -91,8 +91,7 @@ namespace Actisense
 				return std::string();
 			}
 			CFIndex len = CFStringGetLength(cf_str);
-			CFIndex max_size =
-				CFStringGetMaximumSizeForEncoding(len, kCFStringEncodingUTF8) + 1;
+			CFIndex max_size = CFStringGetMaximumSizeForEncoding(len, kCFStringEncodingUTF8) + 1;
 			std::string out(static_cast<size_t>(max_size), '\0');
 			if (!CFStringGetCString(cf_str, out.data(), max_size, kCFStringEncodingUTF8)) {
 				return std::string();
@@ -108,8 +107,7 @@ namespace Actisense
 		 \return     Property value as UTF-8 string, empty if missing or wrong type.
 		 *******************************************************************************/
 		static std::string ReadStringProperty(io_registry_entry_t entry, CFStringRef key) {
-			CFTypeRef value =
-				IORegistryEntryCreateCFProperty(entry, key, kCFAllocatorDefault, 0);
+			CFTypeRef value = IORegistryEntryCreateCFProperty(entry, key, kCFAllocatorDefault, 0);
 			if (value == nullptr) {
 				return std::string();
 			}
@@ -125,7 +123,7 @@ namespace Actisense
 		 \brief      Walk up the IOService plane looking for USB vendor / product
 					 strings, populating raw entry fields when found.
 		 \param[in]      leaf   Leaf registry entry (serial-BSD client service).
-					            Reference is borrowed: the caller retains ownership.
+								Reference is borrowed: the caller retains ownership.
 		 \param[in,out]  entry  Mutable raw entry to populate.
 		 *******************************************************************************/
 		static void PopulateFromUsbAncestor(io_registry_entry_t leaf, RawSerialEntry& entry) {
@@ -147,8 +145,7 @@ namespace Actisense
 			io_registry_entry_t current = leaf;
 			for (int i = 0; i < 10; ++i) {
 				io_registry_entry_t parent = MACH_PORT_NULL;
-				kern_return_t kr =
-					IORegistryEntryGetParentEntry(current, kIOServicePlane, &parent);
+				kern_return_t kr = IORegistryEntryGetParentEntry(current, kIOServicePlane, &parent);
 				if (current != leaf) {
 					IOObjectRelease(current);
 				}
@@ -185,8 +182,7 @@ namespace Actisense
 			if (matching == nullptr) {
 				return std::vector<SerialDeviceInfo>{};
 			}
-			CFDictionarySetValue(matching, CFSTR(kIOSerialBSDTypeKey),
-								 CFSTR(kIOSerialBSDAllTypes));
+			CFDictionarySetValue(matching, CFSTR(kIOSerialBSDTypeKey), CFSTR(kIOSerialBSDAllTypes));
 
 			io_iterator_t iterator = MACH_PORT_NULL;
 			/* IOServiceGetMatchingServices consumes one reference on `matching`

@@ -7,13 +7,13 @@
  \date       (Created on) 15/05/2026
  \brief      macOS serial device enumeration via IOKit.
  \details    Declares two entry points:
-              - BuildSerialDeviceInfoList(): pure-C++ helper that converts a
-                vector of IOKit-derived RawSerialEntry records into the public
-                SerialDeviceInfo list (composition, dedupe, sort). Exposed so
-                unit tests can verify the logic without IOKit available.
-              - EnumerateSerialDevices(): macOS-only runtime entry point that
-                walks the IOKit registry, populates RawSerialEntry records and
-                feeds them through BuildSerialDeviceInfoList.
+			  - BuildSerialDeviceInfoList(): pure-C++ helper that converts a
+				vector of IOKit-derived RawSerialEntry records into the public
+				SerialDeviceInfo list (composition, dedupe, sort). Exposed so
+				unit tests can verify the logic without IOKit available.
+			  - EnumerateSerialDevices(): macOS-only runtime entry point that
+				walks the IOKit registry, populates RawSerialEntry records and
+				feeds them through BuildSerialDeviceInfoList.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
