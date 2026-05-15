@@ -9,8 +9,10 @@
 /* Dependent includes ------------------------------------------------------- */
 #include "core/session_impl.hpp"
 
+#include <condition_variable>
 #include <cstring>
 #include <format>
+#include <mutex>
 #include <sstream>
 
 #include "protocols/bem/bem_commands/echo.hpp"
@@ -851,12 +853,21 @@ namespace Actisense
 		void SessionImpl::receiveThreadFunc() {
 			ACTISENSE_LOG_INFO("Session", "Receive thread started");
 
-			while (running_ && isConnected()) {
-				/* Use synchronous flag to track completion */
-				std::atomic<bool> completed{false};
+			/* Granularity for processTimeouts() polling while no Rx data is
+			   arriving. BEM timeouts are typically seconds; 50 ms is well
+			   below user-perceptible latency and avoids the 1 kHz wakeup
+			   the previous polled implementation produced. */
+			constexpr auto kTimeoutTickInterval = std::chrono::milliseconds(50);
 
-				/* Request data from transport - data arrives via callback */
-				transport_->asyncRecv([this, &completed](ErrorCode code, ConstByteSpan data) {
+			while (running_ && isConnected()) {
+				std::mutex completion_mtx;
+				std::condition_variable completion_cv;
+				bool completed = false;
+
+				/* Request data from transport — data arrives via callback. The
+				   lambda captures the completion primitives by reference; we
+				   must not leave this scope until `completed` becomes true. */
+				transport_->asyncRecv([&](ErrorCode code, ConstByteSpan data) {
 					if (code == ErrorCode::Ok && !data.empty()) {
 						{
 							std::ostringstream ss;
@@ -868,24 +879,35 @@ namespace Actisense
 						traceWire(WireTraceDirection::Rx, data);
 						processReceivedData(data);
 					}
-					completed.store(true, std::memory_order_release);
+					{
+						std::lock_guard<std::mutex> lk(completion_mtx);
+						completed = true;
+					}
+					completion_cv.notify_one();
 				});
 
-				/* Wait for the async operation to complete before continuing.
-				 * IMPORTANT: We must always wait for completed to become true,
-				 * even if running_ or isConnected() becomes false, because the
-				 * callback captures &completed by reference. The transport's
-				 * close() method will fire pending callbacks with TransportClosed,
-				 * which sets completed = true. */
-				while (!completed.load(std::memory_order_acquire)) {
-					if (running_ && isConnected()) {
-						/* Process any timeouts while waiting */
+				/* Wait until the asyncRecv callback signals completion. Ticking
+				   processTimeouts() every kTimeoutTickInterval keeps BEM
+				   request timeouts firing while no data is arriving. We MUST
+				   always wait until `completed` becomes true even if running_
+				   or isConnected() flip — the callback captures the
+				   completion primitives by reference, so leaving early would
+				   leave a stack-references-after-return time bomb. The
+				   transport's close() fires pending callbacks with
+				   TransportClosed, which sets completed = true. */
+				std::unique_lock<std::mutex> lk(completion_mtx);
+				while (!completed) {
+					completion_cv.wait_for(lk, kTimeoutTickInterval);
+					if (!completed && running_ && isConnected()) {
+						/* Drop the lock while invoking user-level code:
+						   processTimeouts() can fire user callbacks that
+						   may call back into SessionImpl. */
+						lk.unlock();
 						processTimeouts();
+						lk.lock();
 					}
-
-					/* Small sleep to prevent busy-waiting */
-					std::this_thread::sleep_for(std::chrono::milliseconds(1));
 				}
+				lk.unlock();
 
 				/* Additional timeout processing after completion */
 				processTimeouts();

@@ -10,6 +10,7 @@
 #include "protocols/bem/bem_protocol.hpp"
 #include "protocols/bem/bem_commands/echo.hpp"
 #include "protocols/bem/bem_commands/operating_mode.hpp"
+#include "util/endian.hpp"
 
 namespace Actisense
 {
@@ -108,8 +109,8 @@ namespace Actisense
 			/* SET request: port number (1) + session baud (4) + store baud (4) = 9 bytes */
 			cmd.data.resize(9);
 			cmd.data[0] = portNumber;
-			writeU32LE(&cmd.data[1], sessionBaud);
-			writeU32LE(&cmd.data[5], storeBaud);
+			writeLe<uint32_t>(&cmd.data[1], sessionBaud);
+			writeLe<uint32_t>(&cmd.data[5], storeBaud);
 
 			return encodeCommand(cmd, outFrame, outError);
 		}
@@ -145,7 +146,7 @@ namespace Actisense
 
 			/* GET request: PGN only (4 bytes, little-endian) */
 			cmd.data.resize(4);
-			writeU32LE(cmd.data.data(), pgn);
+			writeLe<uint32_t>(cmd.data.data(), pgn);
 
 			return encodeCommand(cmd, outFrame, outError);
 		}
@@ -159,7 +160,7 @@ namespace Actisense
 
 			/* SET request: PGN (4) + enable (1) = 5 bytes */
 			cmd.data.resize(5);
-			writeU32LE(cmd.data.data(), pgn);
+			writeLe<uint32_t>(cmd.data.data(), pgn);
 			cmd.data[4] = enable;
 
 			return encodeCommand(cmd, outFrame, outError);
@@ -174,9 +175,9 @@ namespace Actisense
 
 			/* SET request with mask: PGN (4) + enable (1) + mask (4) = 9 bytes */
 			cmd.data.resize(9);
-			writeU32LE(cmd.data.data(), pgn);
+			writeLe<uint32_t>(cmd.data.data(), pgn);
 			cmd.data[4] = enable;
-			writeU32LE(&cmd.data[5], mask);
+			writeLe<uint32_t>(&cmd.data[5], mask);
 
 			return encodeCommand(cmd, outFrame, outError);
 		}
@@ -189,7 +190,7 @@ namespace Actisense
 
 			/* GET request: PGN only (4 bytes, little-endian) */
 			cmd.data.resize(4);
-			writeU32LE(cmd.data.data(), pgn);
+			writeLe<uint32_t>(cmd.data.data(), pgn);
 
 			return encodeCommand(cmd, outFrame, outError);
 		}
@@ -203,7 +204,7 @@ namespace Actisense
 
 			/* SET request: PGN (4) + enable (1) = 5 bytes */
 			cmd.data.resize(5);
-			writeU32LE(cmd.data.data(), pgn);
+			writeLe<uint32_t>(cmd.data.data(), pgn);
 			cmd.data[4] = enable;
 
 			return encodeCommand(cmd, outFrame, outError);
@@ -218,9 +219,9 @@ namespace Actisense
 
 			/* SET request with rate: PGN (4) + enable (1) + txRate (4) = 9 bytes */
 			cmd.data.resize(9);
-			writeU32LE(cmd.data.data(), pgn);
+			writeLe<uint32_t>(cmd.data.data(), pgn);
 			cmd.data[4] = enable;
-			writeU32LE(&cmd.data[5], txRate);
+			writeLe<uint32_t>(&cmd.data[5], txRate);
 
 			return encodeCommand(cmd, outFrame, outError);
 		}
@@ -264,8 +265,8 @@ namespace Actisense
 
 			/* SET request: totalTime (4) + passkey (4) = 8 bytes */
 			cmd.data.resize(8);
-			writeU32LE(cmd.data.data(), totalTime);
-			writeU32LE(&cmd.data[4], passkey);
+			writeLe<uint32_t>(cmd.data.data(), totalTime);
+			writeLe<uint32_t>(&cmd.data[4], passkey);
 
 			return encodeCommand(cmd, outFrame, outError);
 		}
@@ -547,9 +548,9 @@ namespace Actisense
 			const auto& data = datagram.data;
 			response.header.bemId = data[kBemGP_OffBemId];
 			response.header.sequenceId = data[kBemGP_OffSeqId];
-			response.header.modelId = readU16LE(&data[kBemGP_OffModelId]);
-			response.header.serialNumber = readU32LE(&data[kBemGP_OffSerial]);
-			response.header.errorCode = readU32LE(&data[kBemGP_OffError]);
+			response.header.modelId = readLe<uint16_t>(&data[kBemGP_OffModelId]);
+			response.header.serialNumber = readLe<uint32_t>(&data[kBemGP_OffSerial]);
+			response.header.errorCode = readLe<uint32_t>(&data[kBemGP_OffError]);
 
 			/* Extract data payload if present */
 			if (data.size() > kBemGP_OffData) {
@@ -743,27 +744,6 @@ namespace Actisense
 		uint8_t BemProtocol::nextSequenceId() {
 			/* Note: mutex_ must be held by caller */
 			return sequence_counter_++;
-		}
-
-		uint16_t BemProtocol::readU16LE(const uint8_t* p) noexcept {
-			return static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
-		}
-
-		uint32_t BemProtocol::readU32LE(const uint8_t* p) noexcept {
-			return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) |
-				   (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
-		}
-
-		void BemProtocol::writeU16LE(uint8_t* p, uint16_t value) noexcept {
-			p[0] = static_cast<uint8_t>(value & 0xFF);
-			p[1] = static_cast<uint8_t>((value >> 8) & 0xFF);
-		}
-
-		void BemProtocol::writeU32LE(uint8_t* p, uint32_t value) noexcept {
-			p[0] = static_cast<uint8_t>(value & 0xFF);
-			p[1] = static_cast<uint8_t>((value >> 8) & 0xFF);
-			p[2] = static_cast<uint8_t>((value >> 16) & 0xFF);
-			p[3] = static_cast<uint8_t>((value >> 24) & 0xFF);
 		}
 
 	} /* namespace Sdk */

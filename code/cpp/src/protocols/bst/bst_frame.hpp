@@ -401,26 +401,6 @@ namespace Actisense
 			 *******************************************************************************/
 			static void extractPduFields(uint32_t pgn, uint8_t& pduf, uint8_t& pdus,
 										 uint8_t& data_page) noexcept;
-
-			/**************************************************************************/ /**
-			 \brief      Read little-endian 16-bit value
-			 *******************************************************************************/
-			[[nodiscard]] static uint16_t readU16LE(const uint8_t* p) noexcept;
-
-			/**************************************************************************/ /**
-			 \brief      Read little-endian 32-bit value
-			 *******************************************************************************/
-			[[nodiscard]] static uint32_t readU32LE(const uint8_t* p) noexcept;
-
-			/**************************************************************************/ /**
-			 \brief      Write little-endian 16-bit value
-			 *******************************************************************************/
-			static void writeU16LE(uint8_t* p, uint16_t value) noexcept;
-
-			/**************************************************************************/ /**
-			 \brief      Write little-endian 32-bit value
-			 *******************************************************************************/
-			static void writeU32LE(uint8_t* p, uint32_t value) noexcept;
 		};
 
 	} /* namespace Sdk */

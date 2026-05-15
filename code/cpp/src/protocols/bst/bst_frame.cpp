@@ -14,6 +14,7 @@
 #include <sstream>
 
 #include "public/events.hpp"
+#include "util/endian.hpp"
 
 namespace Actisense
 {
@@ -46,7 +47,7 @@ namespace Actisense
 		/* BST-95 field offsets */
 		static constexpr std::size_t kBst95MinPayload = 6; /* T0,T1,S,PDUS,PDUF,DPPC */
 		static constexpr std::size_t kBst95OffTimeL = 0;
-		/* kBst95OffTimeH = 1: not used directly, timestamp read via readU16LE */
+		/* kBst95OffTimeH = 1: not used directly, timestamp read via readLe<uint16_t> */
 		static constexpr std::size_t kBst95OffSrc = 2;
 		static constexpr std::size_t kBst95OffPdus = 3;
 		static constexpr std::size_t kBst95OffPduf = 4;
@@ -128,7 +129,7 @@ namespace Actisense
 
 			/* Timestamp (4 bytes LE) */
 			uint8_t ts[4];
-			writeU32LE(ts, timestamp);
+			writeLe<uint32_t>(ts, timestamp);
 			raw.insert(raw.end(), ts, ts + 4);
 
 			raw.push_back(data_len);
@@ -240,7 +241,7 @@ namespace Actisense
 
 			/* Timestamp (4 bytes LE) */
 			uint8_t ts[4];
-			writeU32LE(ts, timestamp);
+			writeLe<uint32_t>(ts, timestamp);
 			raw.insert(raw.end(), ts, ts + 4);
 
 			raw.insert(raw.end(), payload.begin(), payload.end());
@@ -476,12 +477,12 @@ namespace Actisense
 
 			switch (bst_id_) {
 				case BstId::Nmea2000_GatewayToPC:
-					return readU32LE(p + kBst93OffTime);
+					return readLe<uint32_t>(p + kBst93OffTime);
 				case BstId::Nmea2000_PCToGateway:
 					return 0; /* BST-94 has no timestamp */
 				case BstId::CanFrame: {
 					/* Convert 16-bit timestamp to 32-bit based on resolution */
-					const uint16_t ts16 = readU16LE(p + kBst95OffTimeL);
+					const uint16_t ts16 = readLe<uint16_t>(p + kBst95OffTimeL);
 					const auto res =
 						static_cast<TimestampResolution>((p[kBst95OffDppc] >> 5) & 0x03);
 					switch (res) {
@@ -498,7 +499,7 @@ namespace Actisense
 					}
 				}
 				case BstId::Nmea2000_D0:
-					return readU32LE(p + kBstD0OffTime);
+					return readLe<uint32_t>(p + kBstD0OffTime);
 				default:
 					return 0;
 			}
@@ -518,7 +519,7 @@ namespace Actisense
 				return 0;
 			}
 
-			return readU16LE(p + kBst95OffTimeL);
+			return readLe<uint16_t>(p + kBst95OffTimeL);
 		}
 
 		TimestampResolution BstFrame::timestampResolution() const noexcept {
@@ -546,11 +547,11 @@ namespace Actisense
 
 			switch (bst_id_) {
 				case BstId::Nmea2000_GatewayToPC:
-					return static_cast<uint64_t>(readU32LE(p + kBst93OffTime)) * 1000;
+					return static_cast<uint64_t>(readLe<uint32_t>(p + kBst93OffTime)) * 1000;
 				case BstId::Nmea2000_PCToGateway:
 					return 0;
 				case BstId::CanFrame: {
-					const uint16_t ts16 = readU16LE(p + kBst95OffTimeL);
+					const uint16_t ts16 = readLe<uint16_t>(p + kBst95OffTimeL);
 					const auto res =
 						static_cast<TimestampResolution>((p[kBst95OffDppc] >> 5) & 0x03);
 					switch (res) {
@@ -567,7 +568,7 @@ namespace Actisense
 					}
 				}
 				case BstId::Nmea2000_D0:
-					return static_cast<uint64_t>(readU32LE(p + kBstD0OffTime)) * 1000;
+					return static_cast<uint64_t>(readLe<uint32_t>(p + kBstD0OffTime)) * 1000;
 				default:
 					return 0;
 			}
@@ -785,7 +786,7 @@ namespace Actisense
 					if (raw_data_.size() < 3) {
 						return;
 					}
-					const uint16_t total_len = readU16LE(&raw_data_[1]);
+					const uint16_t total_len = readLe<uint16_t>(&raw_data_[1]);
 					/* total_len includes ID + Len bytes, so payload = total_len - 3 */
 					const auto payload_len =
 						static_cast<std::size_t>((total_len >= 3) ? (total_len - 3) : 0);
@@ -831,7 +832,7 @@ namespace Actisense
 				if (raw_data_.size() < 3) {
 					return 0;
 				}
-				const uint16_t total_len = readU16LE(&raw_data_[1]);
+				const uint16_t total_len = readLe<uint16_t>(&raw_data_[1]);
 				return (total_len >= 3) ? (total_len - 3) : 0;
 			}
 
@@ -864,27 +865,6 @@ namespace Actisense
 			} else {
 				pdus = 0; /* PDUS is destination for PDU1, not part of PGN */
 			}
-		}
-
-		uint16_t BstFrame::readU16LE(const uint8_t* p) noexcept {
-			return static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
-		}
-
-		uint32_t BstFrame::readU32LE(const uint8_t* p) noexcept {
-			return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) |
-				   (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
-		}
-
-		void BstFrame::writeU16LE(uint8_t* p, uint16_t value) noexcept {
-			p[0] = static_cast<uint8_t>(value & 0xFF);
-			p[1] = static_cast<uint8_t>((value >> 8) & 0xFF);
-		}
-
-		void BstFrame::writeU32LE(uint8_t* p, uint32_t value) noexcept {
-			p[0] = static_cast<uint8_t>(value & 0xFF);
-			p[1] = static_cast<uint8_t>((value >> 8) & 0xFF);
-			p[2] = static_cast<uint8_t>((value >> 16) & 0xFF);
-			p[3] = static_cast<uint8_t>((value >> 24) & 0xFF);
 		}
 
 	} /* namespace Sdk */
