@@ -8,6 +8,7 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include "protocols/bem/bem_protocol.hpp"
+#include "protocols/bem/bem_commands/can_info_fields.hpp"
 #include "protocols/bem/bem_commands/echo.hpp"
 #include "protocols/bem/bem_commands/operating_mode.hpp"
 #include "util/endian.hpp"
@@ -352,20 +353,12 @@ namespace Actisense
 		bool BemProtocol::buildSetCanInfoField1(const std::string& text,
 												std::vector<uint8_t>& outFrame,
 												std::string& outError) {
-			if (text.length() > 70) {
-				outError = "CAN Info Field 1 text too long: max 70 characters, got " +
-						   std::to_string(text.length());
-				return false;
-			}
-
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::GetSetCanInfoField1;
 
-			/* SET request: text padded with 0xFF to 70 bytes */
-			cmd.data.resize(70, 0xFF);
-			for (std::size_t i = 0; i < text.length(); ++i) {
-				cmd.data[i] = static_cast<uint8_t>(text[i]);
+			if (!encodeCanInfoFieldSetRequest(text, cmd.data, outError)) {
+				return false;
 			}
 
 			return encodeCommand(cmd, outFrame, outError);
@@ -381,20 +374,12 @@ namespace Actisense
 		bool BemProtocol::buildSetCanInfoField2(const std::string& text,
 												std::vector<uint8_t>& outFrame,
 												std::string& outError) {
-			if (text.length() > 70) {
-				outError = "CAN Info Field 2 text too long: max 70 characters, got " +
-						   std::to_string(text.length());
-				return false;
-			}
-
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::GetSetCanInfoField2;
 
-			/* SET request: text padded with 0xFF to 70 bytes */
-			cmd.data.resize(70, 0xFF);
-			for (std::size_t i = 0; i < text.length(); ++i) {
-				cmd.data[i] = static_cast<uint8_t>(text[i]);
+			if (!encodeCanInfoFieldSetRequest(text, cmd.data, outError)) {
+				return false;
 			}
 
 			return encodeCommand(cmd, outFrame, outError);

@@ -40,15 +40,14 @@ namespace Actisense
 				return cmd;
 			}
 
-			/* CAN Info Field 1/2 setter payload: kCanInfoFieldMaxLen bytes
-			 * of 0xFF with the user text copied in at the front. Returned
-			 * by value; NRVO elides the copy at the call site. */
+			/* CAN Info Field 1/2 setter payload: [totalLen][encoding=1][text].
+			 * Length is range-checked by the caller (setCanInfoFieldN) before
+			 * this runs, so encodeCanInfoFieldSetRequest cannot fail here.
+			 * Returned by value; NRVO elides the copy at the call site. */
 			BemCommand buildCanInfoFieldSet(const std::string& text, BemCommandId bemId) {
 				BemCommand cmd = makeBemA1(bemId);
-				cmd.data.assign(kCanInfoFieldMaxLen, 0xFF);
-				for (std::size_t i = 0; i < text.length(); ++i) {
-					cmd.data[i] = static_cast<uint8_t>(text[i]);
-				}
+				std::string ignored;
+				(void)encodeCanInfoFieldSetRequest(text, cmd.data, ignored);
 				return cmd;
 			}
 		} /* anonymous namespace */

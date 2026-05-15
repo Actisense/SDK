@@ -12,8 +12,14 @@
 			 - 0x44: Installation Description 2 (Get/Set)
 			 - 0x45: Manufacturer Information (Get only, read-only)
 
-			 These are variable-length ASCII strings (max 70 characters)
-			 padded with 0xFF.
+			 These are variable-length ASCII strings (max 70 characters).
+
+			 On-wire SET payload layout (after the BEM ID byte):
+			   byte 0:     total length (= 2 + textLen)
+			   byte 1:     encoding type (1 = ASCII, 0 = Unicode; SDK uses ASCII)
+			   bytes 2..N: text bytes (no padding)
+
+			 GET responses use the same [len][encoding][text] structure.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -35,6 +41,13 @@ namespace Actisense
 
 		/// CAN Info Field maximum string length (70 characters)
 		static constexpr std::size_t kCanInfoFieldMaxLen = 70;
+
+		/// SET/response payload header size: [totalLen(1)][encoding(1)] = 2 bytes
+		static constexpr std::size_t kCanInfoFieldHeaderSize = 2;
+
+		/// Encoding type byte values
+		static constexpr uint8_t kCanInfoFieldEncodingUnicode = 0;
+		static constexpr uint8_t kCanInfoFieldEncodingAscii = 1;
 
 		/* Enumerations --------------------------------------------------------- */
 
@@ -64,43 +77,57 @@ namespace Actisense
 		/* Helper Functions ----------------------------------------------------- */
 
 		/**************************************************************************/ /**
-		 \brief      Convert 0xFF-padded info field to string
-		 \param[in]  data       Buffer containing padded string
-		 \param[in]  dataSize   Size of the buffer
-		 \return     Converted string (trimmed of 0xFF padding)
-		 *******************************************************************************/
-		[[nodiscard]] inline std::string decodeCanInfoFieldString(const uint8_t* data,
-																  std::size_t dataSize) {
-			std::string result;
-			result.reserve(dataSize);
-
-			for (std::size_t i = 0; i < dataSize; ++i) {
-				if (data[i] == 0xFF || data[i] == 0x00) {
-					break; /* End of string */
-				}
-				result += static_cast<char>(data[i]);
-			}
-
-			return result;
-		}
-
-		/**************************************************************************/ /**
 		 \brief      Decode CAN Info Field response from BEM data payload
-		 \param[in]  data       BEM response data (after 12-byte header)
+		 \param[in]  data       BEM response data (after the BEM response header)
 		 \param[in]  field      Which field this response is for
 		 \param[out] response   Decoded response structure
 		 \param[out] outError   Error message if decoding fails
 		 \return     True on success, false on error
+		 \details    Expected payload layout (matches the SET payload):
+					  byte 0:     total length (= 2 + textLen)
+					  byte 1:     encoding type (1 = ASCII, 0 = Unicode)
+					  bytes 2..N: text bytes
+					 ASCII encoding is the only form the SDK supports — Unicode
+					 responses are rejected with an explanatory error.
 		 *******************************************************************************/
 		[[nodiscard]] inline bool decodeCanInfoFieldResponse(std::span<const uint8_t> data,
 															 CanInfoField field,
 															 CanInfoFieldResponse& response,
 															 std::string& outError) {
-			(void)outError; /* No error conditions for decoding */
-
 			response.field = field;
-			response.text = decodeCanInfoFieldString(data.data(), data.size());
+			response.text.clear();
 
+			if (data.size() < kCanInfoFieldHeaderSize) {
+				outError = "CAN Info Field response too short: expected at least " +
+						   std::to_string(kCanInfoFieldHeaderSize) + " bytes, got " +
+						   std::to_string(data.size());
+				return false;
+			}
+
+			const uint8_t totalLen = data[0];
+			const uint8_t encoding = data[1];
+
+			if (totalLen < kCanInfoFieldHeaderSize ||
+				totalLen > kCanInfoFieldHeaderSize + kCanInfoFieldMaxLen) {
+				outError = "CAN Info Field response has invalid total length: " +
+						   std::to_string(totalLen);
+				return false;
+			}
+			if (totalLen > data.size()) {
+				outError = "CAN Info Field response truncated: header says " +
+						   std::to_string(totalLen) + " bytes but only " +
+						   std::to_string(data.size()) + " bytes received";
+				return false;
+			}
+			if (encoding != kCanInfoFieldEncodingAscii) {
+				outError = "CAN Info Field response uses unsupported encoding type: " +
+						   std::to_string(encoding) + " (only ASCII is supported)";
+				return false;
+			}
+
+			const std::size_t textLen = totalLen - kCanInfoFieldHeaderSize;
+			response.text.assign(reinterpret_cast<const char*>(data.data() + kCanInfoFieldHeaderSize),
+								 textLen);
 			return true;
 		}
 
@@ -115,10 +142,14 @@ namespace Actisense
 
 		/**************************************************************************/ /**
 		 \brief      Encode CAN Info Field SET request data
-		 \param[in]  text       Text to set (max 70 characters, truncated if longer)
-		 \param[out] outData    Encoded request data
+		 \param[in]  text       Text to set (max 70 characters)
+		 \param[out] outData    Encoded request data: [totalLen][encoding=1][text]
 		 \param[out] outError   Error message if encoding fails
 		 \return     True on success, false on error
+		 \details    Produces the on-wire payload (excluding the BEM ID byte):
+					   byte 0:     total length = 2 + text.length()
+					   byte 1:     encoding type = 1 (ASCII)
+					   bytes 2..N: text bytes (no padding)
 		 *******************************************************************************/
 		[[nodiscard]] inline bool encodeCanInfoFieldSetRequest(const std::string& text,
 															   std::vector<uint8_t>& outData,
@@ -131,16 +162,15 @@ namespace Actisense
 			}
 
 			outData.clear();
-			outData.reserve(kCanInfoFieldMaxLen);
+			outData.reserve(kCanInfoFieldHeaderSize + text.length());
 
-			/* Copy text */
+			/* Total length byte: 2 (header) + text length */
+			outData.push_back(static_cast<uint8_t>(kCanInfoFieldHeaderSize + text.length()));
+			/* Encoding type: ASCII */
+			outData.push_back(kCanInfoFieldEncodingAscii);
+			/* Text bytes (no padding) */
 			for (char c : text) {
 				outData.push_back(static_cast<uint8_t>(c));
-			}
-
-			/* Pad with 0xFF to max length */
-			while (outData.size() < kCanInfoFieldMaxLen) {
-				outData.push_back(0xFF);
 			}
 
 			return true;
