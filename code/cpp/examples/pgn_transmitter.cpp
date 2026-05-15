@@ -61,6 +61,10 @@ Examples:
 
 #ifdef _WIN32
 #include <conio.h>
+#else
+#include <poll.h>
+#include <termios.h>
+#include <unistd.h>
 #endif
 
 using namespace Actisense::Sdk;
@@ -117,16 +121,61 @@ static void signalHandler(int /*signal*/) {
 	g_running = false;
 }
 
+#ifndef _WIN32
+/* RAII helper: put stdin into non-canonical, non-echoing mode for the
+ * lifetime of this scope so that keyPressed() / readKey() can poll a
+ * tty without blocking on a newline. The destructor restores the
+ * original terminal settings, including on a normal Ctrl+C exit
+ * (handled via std::atexit-style RAII rather than a signal handler).
+ * If stdin is not a tty (e.g. piped input) the helper is a no-op. */
+class TerminalRawMode
+{
+public:
+	TerminalRawMode() {
+		if (!isatty(STDIN_FILENO)) {
+			return;
+		}
+		if (tcgetattr(STDIN_FILENO, &original_) != 0) {
+			return;
+		}
+		termios raw = original_;
+		raw.c_lflag &= ~(ICANON | ECHO);
+		/* Leave ISIG enabled so Ctrl+C still raises SIGINT. */
+		raw.c_cc[VMIN] = 0;
+		raw.c_cc[VTIME] = 0;
+		if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0) {
+			active_ = true;
+		}
+	}
+
+	~TerminalRawMode() {
+		if (active_) {
+			tcsetattr(STDIN_FILENO, TCSANOW, &original_);
+		}
+	}
+
+	TerminalRawMode(const TerminalRawMode&) = delete;
+	TerminalRawMode& operator=(const TerminalRawMode&) = delete;
+
+private:
+	termios original_{};
+	bool active_ = false;
+};
+#endif
+
 static bool keyPressed() {
 #ifdef _WIN32
 	return _kbhit() != 0;
 #else
-	int ch = std::getchar();
-	if (ch != EOF) {
-		std::ungetc(ch, stdin);
-		return true;
-	}
-	return false;
+	/* poll() with a 0 ms timeout: returns immediately, > 0 iff stdin
+	 * has a byte ready. Requires TerminalRawMode (or an external
+	 * caller) to have already disabled canonical mode, otherwise the
+	 * byte stays buffered until the user presses Enter. */
+	pollfd pfd{};
+	pfd.fd = STDIN_FILENO;
+	pfd.events = POLLIN;
+	const int r = ::poll(&pfd, 1, 0);
+	return r > 0 && (pfd.revents & POLLIN) != 0;
 #endif
 }
 
@@ -134,7 +183,9 @@ static char readKey() {
 #ifdef _WIN32
 	return static_cast<char>(_getch());
 #else
-	return static_cast<char>(std::getchar());
+	char c = 0;
+	const ssize_t n = ::read(STDIN_FILENO, &c, 1);
+	return (n == 1) ? c : '\0';
 #endif
 }
 
@@ -275,6 +326,10 @@ int main(int argc, char* argv[]) {
 	std::signal(SIGINT, signalHandler);
 #if !defined(_WIN32)
 	std::signal(SIGTERM, signalHandler);
+	/* Put stdin into non-canonical mode so the keyPressed()/readKey()
+	 * poll-then-read pair below works on POSIX terminals. Destructor
+	 * restores the original termios on every return path. */
+	TerminalRawMode rawModeGuard;
 #endif
 
 	std::cout << "========================================\n";

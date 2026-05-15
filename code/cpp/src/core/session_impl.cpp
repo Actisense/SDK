@@ -19,6 +19,7 @@
 #include "protocols/bst/bst_frame.hpp"
 #include "transport/serial/serial_transport.hpp"
 #include "util/debug_log.hpp"
+#include "util/endian.hpp"
 
 namespace Actisense
 {
@@ -45,17 +46,20 @@ namespace Actisense
 
 			std::vector<uint8_t> frame;
 
-			if (protocol == "bdtp" || protocol == "bst") {
+			if (protocol == "bst") {
 				/* BST datagrams require a trailing zero-sum checksum byte:
 				 * sum(ID + length + payload + checksum) must be 0 mod 256.
-				 * Without it the device's BDTP parser drops the frame. */
+				 * Without it the device's BDTP parser drops the frame. The
+				 * SDK appends the checksum and applies DLE+STX/DLE+ETX
+				 * framing so callers pass only the raw BST bytes
+				 * (ID + length + data). */
 				std::vector<uint8_t> bstPayload(payload.begin(), payload.end());
 				const uint8_t checksum =
 					static_cast<uint8_t>(-BdtpProtocol::calculateChecksum(bstPayload));
 				bstPayload.push_back(checksum);
 				BdtpProtocol::encodeFrame(bstPayload, frame);
 			} else {
-				/* Raw send */
+				/* "raw" or any other value: pass the bytes through verbatim. */
 				frame.assign(payload.begin(), payload.end());
 			}
 
@@ -192,7 +196,14 @@ namespace Actisense
 						if (state->rxAssembler) {
 							state->rxAssembler->feed(data,
 								[&](std::span<const uint8_t> frame) {
-									if (frame.empty()) {
+									/* A valid BST datagram is at minimum
+									   BST_ID + Length + Checksum. Anything
+									   shorter cannot represent a real
+									   message — skip it silently rather
+									   than emit a degenerate EBLT_BstRawFrame
+									   that EBL Reader would render as a
+									   zero-size N2K message. */
+									if (frame.size() < 3) {
 										return;
 									}
 									state->eblWriter->writeTimeUtc(now);
@@ -373,18 +384,10 @@ namespace Actisense
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::GetSetPortBaudrate;
-			cmd.data.resize(9);
-			cmd.data[0] = portNumber;
-			/* Session baud: 4 bytes, little-endian */
-			cmd.data[1] = static_cast<uint8_t>(sessionBaud & 0xFF);
-			cmd.data[2] = static_cast<uint8_t>((sessionBaud >> 8) & 0xFF);
-			cmd.data[3] = static_cast<uint8_t>((sessionBaud >> 16) & 0xFF);
-			cmd.data[4] = static_cast<uint8_t>((sessionBaud >> 24) & 0xFF);
-			/* Store baud: 4 bytes, little-endian */
-			cmd.data[5] = static_cast<uint8_t>(storeBaud & 0xFF);
-			cmd.data[6] = static_cast<uint8_t>((storeBaud >> 8) & 0xFF);
-			cmd.data[7] = static_cast<uint8_t>((storeBaud >> 16) & 0xFF);
-			cmd.data[8] = static_cast<uint8_t>((storeBaud >> 24) & 0xFF);
+			cmd.data.reserve(9);
+			cmd.data.push_back(portNumber);
+			appendLe<uint32_t>(cmd.data, sessionBaud);
+			appendLe<uint32_t>(cmd.data, storeBaud);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
@@ -423,11 +426,7 @@ namespace Actisense
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::GetSetRxPgnEnable;
-			cmd.data.resize(4);
-			cmd.data[0] = static_cast<uint8_t>(pgn & 0xFF);
-			cmd.data[1] = static_cast<uint8_t>((pgn >> 8) & 0xFF);
-			cmd.data[2] = static_cast<uint8_t>((pgn >> 16) & 0xFF);
-			cmd.data[3] = static_cast<uint8_t>((pgn >> 24) & 0xFF);
+			appendLe<uint32_t>(cmd.data, pgn);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
@@ -438,12 +437,9 @@ namespace Actisense
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::GetSetRxPgnEnable;
-			cmd.data.resize(5);
-			cmd.data[0] = static_cast<uint8_t>(pgn & 0xFF);
-			cmd.data[1] = static_cast<uint8_t>((pgn >> 8) & 0xFF);
-			cmd.data[2] = static_cast<uint8_t>((pgn >> 16) & 0xFF);
-			cmd.data[3] = static_cast<uint8_t>((pgn >> 24) & 0xFF);
-			cmd.data[4] = enable;
+			cmd.data.reserve(5);
+			appendLe<uint32_t>(cmd.data, pgn);
+			cmd.data.push_back(enable);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
@@ -454,16 +450,10 @@ namespace Actisense
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::GetSetRxPgnEnable;
-			cmd.data.resize(9);
-			cmd.data[0] = static_cast<uint8_t>(pgn & 0xFF);
-			cmd.data[1] = static_cast<uint8_t>((pgn >> 8) & 0xFF);
-			cmd.data[2] = static_cast<uint8_t>((pgn >> 16) & 0xFF);
-			cmd.data[3] = static_cast<uint8_t>((pgn >> 24) & 0xFF);
-			cmd.data[4] = enable;
-			cmd.data[5] = static_cast<uint8_t>(mask & 0xFF);
-			cmd.data[6] = static_cast<uint8_t>((mask >> 8) & 0xFF);
-			cmd.data[7] = static_cast<uint8_t>((mask >> 16) & 0xFF);
-			cmd.data[8] = static_cast<uint8_t>((mask >> 24) & 0xFF);
+			cmd.data.reserve(9);
+			appendLe<uint32_t>(cmd.data, pgn);
+			cmd.data.push_back(enable);
+			appendLe<uint32_t>(cmd.data, mask);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
@@ -473,11 +463,7 @@ namespace Actisense
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::GetSetTxPgnEnable;
-			cmd.data.resize(4);
-			cmd.data[0] = static_cast<uint8_t>(pgn & 0xFF);
-			cmd.data[1] = static_cast<uint8_t>((pgn >> 8) & 0xFF);
-			cmd.data[2] = static_cast<uint8_t>((pgn >> 16) & 0xFF);
-			cmd.data[3] = static_cast<uint8_t>((pgn >> 24) & 0xFF);
+			appendLe<uint32_t>(cmd.data, pgn);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
@@ -488,12 +474,9 @@ namespace Actisense
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::GetSetTxPgnEnable;
-			cmd.data.resize(5);
-			cmd.data[0] = static_cast<uint8_t>(pgn & 0xFF);
-			cmd.data[1] = static_cast<uint8_t>((pgn >> 8) & 0xFF);
-			cmd.data[2] = static_cast<uint8_t>((pgn >> 16) & 0xFF);
-			cmd.data[3] = static_cast<uint8_t>((pgn >> 24) & 0xFF);
-			cmd.data[4] = enable;
+			cmd.data.reserve(5);
+			appendLe<uint32_t>(cmd.data, pgn);
+			cmd.data.push_back(enable);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
@@ -504,16 +487,10 @@ namespace Actisense
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::GetSetTxPgnEnable;
-			cmd.data.resize(9);
-			cmd.data[0] = static_cast<uint8_t>(pgn & 0xFF);
-			cmd.data[1] = static_cast<uint8_t>((pgn >> 8) & 0xFF);
-			cmd.data[2] = static_cast<uint8_t>((pgn >> 16) & 0xFF);
-			cmd.data[3] = static_cast<uint8_t>((pgn >> 24) & 0xFF);
-			cmd.data[4] = enable;
-			cmd.data[5] = static_cast<uint8_t>(txRate & 0xFF);
-			cmd.data[6] = static_cast<uint8_t>((txRate >> 8) & 0xFF);
-			cmd.data[7] = static_cast<uint8_t>((txRate >> 16) & 0xFF);
-			cmd.data[8] = static_cast<uint8_t>((txRate >> 24) & 0xFF);
+			cmd.data.reserve(9);
+			appendLe<uint32_t>(cmd.data, pgn);
+			cmd.data.push_back(enable);
+			appendLe<uint32_t>(cmd.data, txRate);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
@@ -566,17 +543,9 @@ namespace Actisense
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::GetSetTotalTime;
-			cmd.data.resize(8);
-			/* Total time: 4 bytes, little-endian */
-			cmd.data[0] = static_cast<uint8_t>(totalTime & 0xFF);
-			cmd.data[1] = static_cast<uint8_t>((totalTime >> 8) & 0xFF);
-			cmd.data[2] = static_cast<uint8_t>((totalTime >> 16) & 0xFF);
-			cmd.data[3] = static_cast<uint8_t>((totalTime >> 24) & 0xFF);
-			/* Passkey: 4 bytes, little-endian */
-			cmd.data[4] = static_cast<uint8_t>(passkey & 0xFF);
-			cmd.data[5] = static_cast<uint8_t>((passkey >> 8) & 0xFF);
-			cmd.data[6] = static_cast<uint8_t>((passkey >> 16) & 0xFF);
-			cmd.data[7] = static_cast<uint8_t>((passkey >> 24) & 0xFF);
+			cmd.data.reserve(8);
+			appendLe<uint32_t>(cmd.data, totalTime);
+			appendLe<uint32_t>(cmd.data, passkey);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
@@ -638,17 +607,9 @@ namespace Actisense
 			BemCommand cmd;
 			cmd.bstId = BstId::Bem_PG_A1;
 			cmd.bemId = BemCommandId::GetSetCanConfig;
-			cmd.data.resize(9);
-			/* NAME: 8 bytes, little-endian */
-			cmd.data[0] = static_cast<uint8_t>(name & 0xFF);
-			cmd.data[1] = static_cast<uint8_t>((name >> 8) & 0xFF);
-			cmd.data[2] = static_cast<uint8_t>((name >> 16) & 0xFF);
-			cmd.data[3] = static_cast<uint8_t>((name >> 24) & 0xFF);
-			cmd.data[4] = static_cast<uint8_t>((name >> 32) & 0xFF);
-			cmd.data[5] = static_cast<uint8_t>((name >> 40) & 0xFF);
-			cmd.data[6] = static_cast<uint8_t>((name >> 48) & 0xFF);
-			cmd.data[7] = static_cast<uint8_t>((name >> 56) & 0xFF);
-			cmd.data[8] = sourceAddress;
+			cmd.data.reserve(9);
+			appendLe<uint64_t>(cmd.data, name);
+			cmd.data.push_back(sourceAddress);
 
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
@@ -938,12 +899,12 @@ namespace Actisense
 			bdtp_.parse(
 				data,
 				[this](const ParsedMessageEvent& event) {
-					/* BDTP emits BST datagrams */
-					try {
-						const auto& datagram = std::any_cast<const BstDatagram&>(event.payload);
-						handleBstDatagram(datagram);
-					} catch (const std::bad_any_cast&) {
-						/* Not a BST datagram, ignore */
+					/* BDTP emits BST datagrams. Use the non-throwing
+					   pointer form of any_cast so a non-BST payload is a
+					   cheap null check instead of an exception. */
+					if (const auto* datagram =
+							std::any_cast<BstDatagram>(&event.payload)) {
+						handleBstDatagram(*datagram);
 					}
 				},
 				[this](ErrorCode code, std::string_view message) {

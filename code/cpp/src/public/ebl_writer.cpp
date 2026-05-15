@@ -8,7 +8,8 @@
 /* Dependent includes ------------------------------------------------------- */
 #include "public/ebl_writer.hpp"
 
-#include <cstring>
+#include "util/endian.hpp"
+
 #include <vector>
 
 namespace Actisense
@@ -21,19 +22,6 @@ namespace Actisense
 			   the Unix epoch (1970-01-01 UTC). Multiplied by 10^7 gives the
 			   offset in 100-ns ticks. */
 			constexpr uint64_t kFileTimeEpochOffset100ns = 116444736000000000ULL;
-
-			void appendU32Le(std::vector<uint8_t>& out, uint32_t value) {
-				out.push_back(static_cast<uint8_t>(value & 0xFF));
-				out.push_back(static_cast<uint8_t>((value >> 8) & 0xFF));
-				out.push_back(static_cast<uint8_t>((value >> 16) & 0xFF));
-				out.push_back(static_cast<uint8_t>((value >> 24) & 0xFF));
-			}
-
-			void appendU64Le(std::vector<uint8_t>& out, uint64_t value) {
-				for (int i = 0; i < 8; ++i) {
-					out.push_back(static_cast<uint8_t>((value >> (i * 8)) & 0xFF));
-				}
-			}
 		} /* anonymous namespace */
 
 		/* ============================================================================
@@ -76,7 +64,7 @@ namespace Actisense
 		void EblWriter::writeVersion() {
 			std::vector<uint8_t> payload;
 			payload.reserve(4);
-			appendU32Le(payload, kEblVersionU32);
+			appendLe<uint32_t>(payload, kEblVersionU32);
 			writeRecord(EblTag::Version, payload);
 		}
 
@@ -93,7 +81,7 @@ namespace Actisense
 		void EblWriter::writeTimeUtcRaw(uint64_t fileTimeTicks) {
 			std::vector<uint8_t> payload;
 			payload.reserve(8);
-			appendU64Le(payload, fileTimeTicks);
+			appendLe<uint64_t>(payload, fileTimeTicks);
 			writeRecord(EblTag::TimeUtc, payload);
 		}
 

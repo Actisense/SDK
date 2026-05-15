@@ -82,11 +82,11 @@ namespace Actisense
 		/* Factory Methods - Parsing -------------------------------------------- */
 
 		std::optional<BstFrame> BstFrame::fromParsedEvent(const ParsedMessageEvent& event) {
-			/* Try to extract BstFrame directly */
-			try {
-				return std::any_cast<BstFrame>(event.payload);
-			} catch (const std::bad_any_cast&) {}
-
+			/* Non-throwing pointer form: returns nullptr if the payload
+			   holds anything other than a BstFrame. */
+			if (const auto* frame = std::any_cast<BstFrame>(&event.payload)) {
+				return *frame;
+			}
 			return std::nullopt;
 		}
 
