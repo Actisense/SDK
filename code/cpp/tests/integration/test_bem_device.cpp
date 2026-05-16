@@ -1054,6 +1054,18 @@ TEST_F(BemDeviceTest, GetTxPgnEnableListF2)
 	std::cout << formatTxPgnEnableListF2(txResp);
 }
 
+/* The F1 enum values BemCommandId::GetSetRxPgnEnableListF1 and
+   GetSetTxPgnEnableListF1 are [[deprecated]]; these legacy integration
+   tests still exercise the codec on devices that respond to F1
+   (NGT-1 / NGW-1) until removal. Silence the deprecation warning locally. */
+#if defined(__GNUC__) || defined(__clang__)
+#	pragma GCC diagnostic push
+#	pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#	pragma warning(push)
+#	pragma warning(disable : 4996)
+#endif
+
 TEST_F(BemDeviceTest, GetRxPgnEnableListF1_Message0)
 {
 	if (!deviceSupportsPgnListF1()) {
@@ -1200,6 +1212,12 @@ TEST_F(BemDeviceTest, GetTxPgnEnableListF1_Message3)
 	}
 }
 
+#if defined(__GNUC__) || defined(__clang__)
+#	pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#	pragma warning(pop)
+#endif
+
 /* ========================================================================== */
 /* GIT-74: PGN List Wire-Format Diagnostic                                    */
 /* ========================================================================== */
@@ -1321,7 +1339,16 @@ TEST_F(BemDeviceTest, PgnListWireDiagnostic)
 	             sendSync(makeGetCommand(BemCommandId::GetSetTxPgnEnableListF2)));
 
 	/* 0x48 / 0x49 F1 — gated on model: NGX-1 won't respond. NGT/NGW will
-	   serve up multi-message chunks indexed 0/1 (Rx) and 0..3 (Tx). */
+	   serve up multi-message chunks indexed 0/1 (Rx) and 0..3 (Tx). The F1
+	   enum values are [[deprecated]] but this diagnostic still exercises
+	   them intentionally; silence the warning locally. */
+#if defined(__GNUC__) || defined(__clang__)
+#	pragma GCC diagnostic push
+#	pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#	pragma warning(push)
+#	pragma warning(disable : 4996)
+#endif
 	if (deviceSupportsPgnListF1()) {
 		for (uint8_t msg = 0; msg < 2; ++msg) {
 			char label[64];
@@ -1338,6 +1365,11 @@ TEST_F(BemDeviceTest, PgnListWireDiagnostic)
 	} else {
 		std::cout << "=== F1 (0x48/0x49) skipped on this model ===\n";
 	}
+#if defined(__GNUC__) || defined(__clang__)
+#	pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#	pragma warning(pop)
+#endif
 
 	std::cout << "----- end PGN List Wire Diagnostic -----\n\n";
 }

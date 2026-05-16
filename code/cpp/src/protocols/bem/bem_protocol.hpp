@@ -437,23 +437,29 @@ namespace Actisense
 			   0x47 (buildSetTxPgnEnable) instead. */
 
 			/**************************************************************************/ /**
-			 \brief      Build Get Rx PGN Enable List F1 command (legacy)
+			 \brief      Build Get Rx PGN Enable List F1 command (deprecated)
 			 \param[in]  messageIndex  Message to request (0 or 1)
 			 \param[out] outFrame      Complete BDTP-framed message
 			 \param[out] outError      Error message if encoding fails
 			 \return     True on success
+			 \deprecated F1 is superseded by F2; use buildGetRxPgnEnableListF2().
+			             Slated for removal in a future release.
 			 *******************************************************************************/
+			[[deprecated("F1 is superseded by F2; use buildGetRxPgnEnableListF2().")]]
 			[[nodiscard]] bool buildGetRxPgnEnableListF1(uint8_t messageIndex,
 														 std::vector<uint8_t>& outFrame,
 														 std::string& outError);
 
 			/**************************************************************************/ /**
-			 \brief      Build Get Tx PGN Enable List F1 command (legacy)
+			 \brief      Build Get Tx PGN Enable List F1 command (deprecated)
 			 \param[in]  messageIndex  Message to request (0-3)
 			 \param[out] outFrame      Complete BDTP-framed message
 			 \param[out] outError      Error message if encoding fails
 			 \return     True on success
+			 \deprecated F1 is superseded by F2; use buildGetTxPgnEnableListF2().
+			             Slated for removal in a future release.
 			 *******************************************************************************/
+			[[deprecated("F1 is superseded by F2; use buildGetTxPgnEnableListF2().")]]
 			[[nodiscard]] bool buildGetTxPgnEnableListF1(uint8_t messageIndex,
 														 std::vector<uint8_t>& outFrame,
 														 std::string& outError);

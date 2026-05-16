@@ -445,6 +445,16 @@ namespace Actisense
 									   outFrame, outError);
 		}
 
+/* The F1 builders below are themselves [[deprecated]], so calling out the
+   deprecated enum values from within their own bodies is intentional. */
+#if defined(__GNUC__) || defined(__clang__)
+#	pragma GCC diagnostic push
+#	pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#	pragma warning(push)
+#	pragma warning(disable : 4996)
+#endif
+
 		bool BemProtocol::buildGetRxPgnEnableListF1(uint8_t messageIndex,
 													std::vector<uint8_t>& outFrame,
 													std::string& outError) {
@@ -476,6 +486,12 @@ namespace Actisense
 
 			return encodeCommand(cmd, outFrame, outError);
 		}
+
+#if defined(__GNUC__) || defined(__clang__)
+#	pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#	pragma warning(pop)
+#endif
 		bool BemProtocol::isBemResponse(const BstDatagram& datagram) const {
 			return Actisense::Sdk::isBemResponse(static_cast<BstId>(datagram.bstId));
 		}

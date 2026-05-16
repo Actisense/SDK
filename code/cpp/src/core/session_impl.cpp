@@ -660,38 +660,28 @@ namespace Actisense
 
 		/* PGN List Management Commands ----------------------------------------- */
 
-		void SessionImpl::getRxPgnEnableListF1(uint8_t messageIndex,
-											   std::chrono::milliseconds timeout,
+		/* F1 helpers are deprecated. Every firmware that ever responded to F1
+		   (NGT-1 / NGW-1, since 2015) also responds to F2, and AMKLib-based
+		   products (NGX-1, W2K-1) never implemented F1. The helpers short-
+		   circuit to ErrorCode::UnsupportedOperation without touching the wire so
+		   existing callers compile and link but get a clear runtime signal
+		   to migrate to F2. Slated for removal in a future release. */
+		void SessionImpl::getRxPgnEnableListF1([[maybe_unused]] uint8_t messageIndex,
+											   [[maybe_unused]] std::chrono::milliseconds timeout,
 											   BemResponseCallback callback) {
-			if (messageIndex > 1) {
-				if (callback) {
-					callback(std::nullopt, ErrorCode::InvalidArgument,
-							 "Invalid message index for Rx F1: must be 0 or 1");
-				}
-				return;
+			if (callback) {
+				callback(std::nullopt, ErrorCode::UnsupportedOperation,
+						 "F1 PGN-list commands are deprecated; use getRxPgnEnableListF2()");
 			}
-
-			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnableListF1);
-			cmd.data.push_back(messageIndex);
-
-			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
-		void SessionImpl::getTxPgnEnableListF1(uint8_t messageIndex,
-											   std::chrono::milliseconds timeout,
+		void SessionImpl::getTxPgnEnableListF1([[maybe_unused]] uint8_t messageIndex,
+											   [[maybe_unused]] std::chrono::milliseconds timeout,
 											   BemResponseCallback callback) {
-			if (messageIndex > 3) {
-				if (callback) {
-					callback(std::nullopt, ErrorCode::InvalidArgument,
-							 "Invalid message index for Tx F1: must be 0-3");
-				}
-				return;
+			if (callback) {
+				callback(std::nullopt, ErrorCode::UnsupportedOperation,
+						 "F1 PGN-list commands are deprecated; use getTxPgnEnableListF2()");
 			}
-
-			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnableListF1);
-			cmd.data.push_back(messageIndex);
-
-			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
 		void SessionImpl::getRxPgnEnableListF2(std::chrono::milliseconds timeout,

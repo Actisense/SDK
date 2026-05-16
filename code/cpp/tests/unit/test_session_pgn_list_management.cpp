@@ -107,22 +107,26 @@ protected:
 
 /* GET helpers -------------------------------------------------------------- */
 
-TEST_F(SessionPgnListManagementTest, GetRxPgnEnableListF1_SendsCommand)
-{
-	session_->getRxPgnEnableListF1(/*messageIndex=*/1, kTimeout, nullptr);
+/* The F1 session helpers are [[deprecated]]; calling them in tests is
+   intentional, so silence the warning locally. */
+#if defined(__GNUC__) || defined(__clang__)
+#	pragma GCC diagnostic push
+#	pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#	pragma warning(push)
+#	pragma warning(disable : 4996)
+#endif
 
-	const auto dgm = captureSentDatagram();
-	EXPECT_EQ(dgm.bstId, static_cast<uint8_t>(BstId::Bem_PG_A1));
-	ASSERT_GE(dgm.data.size(), 2u);
-	EXPECT_EQ(dgm.data[0], static_cast<uint8_t>(BemCommandId::GetSetRxPgnEnableListF1));
-	EXPECT_EQ(dgm.data[1], 1);
-}
-
-TEST_F(SessionPgnListManagementTest, GetRxPgnEnableListF1_RejectsInvalidIndex)
+/* F1 helpers now short-circuit to ErrorCode::UnsupportedOperation without touching
+   the wire (every firmware that responds to F1 also responds to F2; see
+   GIT follow-up to GIT-74). The previous behaviour — encode the BEM command
+   onto the wire and validate messageIndex — is gone, so these tests now
+   assert the short-circuit contract instead. */
+TEST_F(SessionPgnListManagementTest, GetRxPgnEnableListF1_ReportsNotSupportedAndSendsNothing)
 {
 	bool called = false;
 	ErrorCode reportedCode = ErrorCode::Ok;
-	session_->getRxPgnEnableListF1(/*messageIndex=*/2, kTimeout,
+	session_->getRxPgnEnableListF1(/*messageIndex=*/1, kTimeout,
 		[&](const std::optional<BemResponse>& resp, ErrorCode code, std::string_view) {
 			called = true;
 			reportedCode = code;
@@ -130,35 +134,31 @@ TEST_F(SessionPgnListManagementTest, GetRxPgnEnableListF1_RejectsInvalidIndex)
 		});
 
 	EXPECT_TRUE(called);
-	EXPECT_EQ(reportedCode, ErrorCode::InvalidArgument);
+	EXPECT_EQ(reportedCode, ErrorCode::UnsupportedOperation);
 	EXPECT_EQ(transport_->bytesAvailable(), 0u);
 }
 
-TEST_F(SessionPgnListManagementTest, GetTxPgnEnableListF1_SendsCommand)
-{
-	session_->getTxPgnEnableListF1(/*messageIndex=*/3, kTimeout, nullptr);
-
-	const auto dgm = captureSentDatagram();
-	EXPECT_EQ(dgm.bstId, static_cast<uint8_t>(BstId::Bem_PG_A1));
-	ASSERT_GE(dgm.data.size(), 2u);
-	EXPECT_EQ(dgm.data[0], static_cast<uint8_t>(BemCommandId::GetSetTxPgnEnableListF1));
-	EXPECT_EQ(dgm.data[1], 3);
-}
-
-TEST_F(SessionPgnListManagementTest, GetTxPgnEnableListF1_RejectsInvalidIndex)
+TEST_F(SessionPgnListManagementTest, GetTxPgnEnableListF1_ReportsNotSupportedAndSendsNothing)
 {
 	bool called = false;
 	ErrorCode reportedCode = ErrorCode::Ok;
-	session_->getTxPgnEnableListF1(/*messageIndex=*/4, kTimeout,
-		[&](const std::optional<BemResponse>&, ErrorCode code, std::string_view) {
+	session_->getTxPgnEnableListF1(/*messageIndex=*/3, kTimeout,
+		[&](const std::optional<BemResponse>& resp, ErrorCode code, std::string_view) {
 			called = true;
 			reportedCode = code;
+			EXPECT_FALSE(resp.has_value());
 		});
 
 	EXPECT_TRUE(called);
-	EXPECT_EQ(reportedCode, ErrorCode::InvalidArgument);
+	EXPECT_EQ(reportedCode, ErrorCode::UnsupportedOperation);
 	EXPECT_EQ(transport_->bytesAvailable(), 0u);
 }
+
+#if defined(__GNUC__) || defined(__clang__)
+#	pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#	pragma warning(pop)
+#endif
 
 TEST_F(SessionPgnListManagementTest, GetRxPgnEnableListF2_SendsCommand)
 {

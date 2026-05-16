@@ -486,6 +486,18 @@ TEST_F(PgnListManagementTest, RxPgnEnableListF1_DecodeResponse)
 	EXPECT_EQ(response.pgns[1], 20000u);
 }
 
+/* The buildGet*PgnEnableListF1 protocol helpers are [[deprecated]] in favour
+   of the F2 variants, but the underlying codec still works and these tests
+   are the only thing guarding it against regression until removal. Silence
+   the deprecation warning locally so the suite still builds clean. */
+#if defined(__GNUC__) || defined(__clang__)
+#	pragma GCC diagnostic push
+#	pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#	pragma warning(push)
+#	pragma warning(disable : 4996)
+#endif
+
 TEST_F(PgnListManagementTest, RxPgnEnableListF1_BuilderValid)
 {
 	EXPECT_TRUE(m_protocol.buildGetRxPgnEnableListF1(0, m_frame, m_error));
@@ -577,6 +589,12 @@ TEST_F(PgnListManagementTest, TxPgnEnableListF1_BuilderInvalid)
 	EXPECT_FALSE(m_error.empty());
 }
 
+#if defined(__GNUC__) || defined(__clang__)
+#	pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#	pragma warning(pop)
+#endif
+
 /* Constants Tests ---------------------------------------------------------- */
 
 TEST_F(PgnListManagementTest, Constants)
@@ -596,8 +614,20 @@ TEST_F(PgnListManagementTest, Constants)
 TEST_F(PgnListManagementTest, BemCommandIdToString)
 {
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetSupportedPgnList), "GetSupportedPgnList");
+#if defined(__GNUC__) || defined(__clang__)
+#	pragma GCC diagnostic push
+#	pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#	pragma warning(push)
+#	pragma warning(disable : 4996)
+#endif
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetSetRxPgnEnableListF1), "GetSetRxPgnEnableListF1");
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetSetTxPgnEnableListF1), "GetSetTxPgnEnableListF1");
+#if defined(__GNUC__) || defined(__clang__)
+#	pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#	pragma warning(pop)
+#endif
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::DeletePgnEnableLists), "DeletePgnEnableLists");
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::ActivatePgnEnableLists), "ActivatePgnEnableLists");
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::DefaultPgnEnableList), "DefaultPgnEnableList");

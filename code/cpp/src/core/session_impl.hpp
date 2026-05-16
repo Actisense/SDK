@@ -367,24 +367,36 @@ namespace Actisense
 			/* PGN List Management Commands ----------------------------------------- */
 
 			/**************************************************************************/ /**
-			 \brief      Send Get Rx PGN Enable List F1 command (legacy, NGT/NGW)
+			 \brief      Send Get Rx PGN Enable List F1 command (deprecated)
 			 \param[in]  messageIndex  Message segment to request (0 or 1)
 			 \param[in]  timeout       Timeout for response
 			 \param[in]  callback      Callback invoked on response or timeout
-			 \note       Legacy F1 protocol; not supported by NGX. Prefer F2 for
-						 new code.
+			 \deprecated F1 is superseded by F2. Every firmware that supports the F1
+						 paged format (NGT-1 / NGW-1, since 2015) also supports F2,
+						 and AMKLib-based products (NGX-1, W2K-1) never implemented
+						 F1. This helper now returns ErrorCode::UnsupportedOperation without
+						 touching the wire and will be removed in a future release.
+						 Use getRxPgnEnableListF2() instead.
 			 *******************************************************************************/
+			[[deprecated("F1 is superseded by F2; use getRxPgnEnableListF2(). Returns "
+						 "ErrorCode::UnsupportedOperation; will be removed in a future release.")]]
 			void getRxPgnEnableListF1(uint8_t messageIndex, std::chrono::milliseconds timeout,
 									  BemResponseCallback callback);
 
 			/**************************************************************************/ /**
-			 \brief      Send Get Tx PGN Enable List F1 command (legacy, NGT/NGW)
+			 \brief      Send Get Tx PGN Enable List F1 command (deprecated)
 			 \param[in]  messageIndex  Message segment to request (0-3)
 			 \param[in]  timeout       Timeout for response
 			 \param[in]  callback      Callback invoked on response or timeout
-			 \note       Legacy F1 protocol; not supported by NGX. Prefer F2 for
-						 new code.
+			 \deprecated F1 is superseded by F2. Every firmware that supports the F1
+						 paged format (NGT-1 / NGW-1, since 2015) also supports F2,
+						 and AMKLib-based products (NGX-1, W2K-1) never implemented
+						 F1. This helper now returns ErrorCode::UnsupportedOperation without
+						 touching the wire and will be removed in a future release.
+						 Use getTxPgnEnableListF2() instead.
 			 *******************************************************************************/
+			[[deprecated("F1 is superseded by F2; use getTxPgnEnableListF2(). Returns "
+						 "ErrorCode::UnsupportedOperation; will be removed in a future release.")]]
 			void getTxPgnEnableListF1(uint8_t messageIndex, std::chrono::milliseconds timeout,
 									  BemResponseCallback callback);
 
