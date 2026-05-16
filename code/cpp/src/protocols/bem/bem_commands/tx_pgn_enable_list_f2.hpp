@@ -245,50 +245,17 @@ namespace Actisense
 
 		/**************************************************************************/ /**
 		 \brief      Encode an empty GET request payload.
+		 \details    The firmware ignores any payload bytes; the SDK sends none.
 		 *******************************************************************************/
 		inline void encodeTxPgnEnableListF2GetRequest(std::vector<uint8_t>& outData) {
 			outData.clear();
 		}
 
-		/**************************************************************************/ /**
-		 \brief      Encode a 0x4F SET request payload for the standard variant.
-		 \param[in]  transferId       Transfer ID (0 to let device assign)
-		 \param[in]  totalListSize    Total entries in application's full list
-		 \param[in]  firstSubIdx      Index of the first entry in this sub-list
-		 \param[in]  entries          Sub-list contents (max 48)
-		 \param[out] outData          Encoded payload
-		 \param[out] outError         Error message on failure
-		 *******************************************************************************/
-		[[nodiscard]] inline bool encodeTxPgnEnableListF2StdSetRequest(
-			uint8_t transferId, uint8_t totalListSize, uint8_t firstSubIdx,
-			const std::vector<TxPgnEnableEntry>& entries, std::vector<uint8_t>& outData,
-			std::string& outError) {
-			if (entries.size() > kTxPgnEnableListF2StdMaxEntriesPerSubList) {
-				outError = "Too many entries in Tx F2 std sub-list: " +
-						   std::to_string(entries.size()) + " exceeds max " +
-						   std::to_string(kTxPgnEnableListF2StdMaxEntriesPerSubList);
-				return false;
-			}
-
-			outData.clear();
-			outData.reserve(kTxPgnEnableListF2StdHeaderSize +
-							entries.size() * kTxPgnEnableListF2StdEntrySize);
-			outData.push_back(transferId);
-			outData.push_back(static_cast<uint8_t>(kTxPgnEnableListF2StdSvId & 0xFF));
-			outData.push_back(static_cast<uint8_t>((kTxPgnEnableListF2StdSvId >> 8) & 0xFF));
-			outData.push_back(static_cast<uint8_t>((kTxPgnEnableListF2StdSvId >> 16) & 0xFF));
-			outData.push_back(static_cast<uint8_t>((kTxPgnEnableListF2StdSvId >> 24) & 0xFF));
-			outData.push_back(totalListSize);
-			outData.push_back(firstSubIdx);
-			outData.push_back(static_cast<uint8_t>(entries.size()));
-			for (const auto& e : entries) {
-				outData.push_back(e.pgnIndex);
-				outData.push_back(e.priority);
-				outData.push_back(static_cast<uint8_t>(e.rateMs & 0xFF));
-				outData.push_back(static_cast<uint8_t>((e.rateMs >> 8) & 0xFF));
-			}
-			return true;
-		}
+		/* Note: 0x4F has no SET handler in the firmware (AMKLib BemCommandTxPGNEnableListF2
+		   only implements the read path, emitting both the std variant (one or more
+		   messages) and a final proprietary-variant message with sequenceId=2). To
+		   change Tx enable state, priority, or rate for a PGN use the per-PGN BEM
+		   command 0x47 (TxPgnEnable) — see tx_pgn_enable.hpp. */
 
 		/**************************************************************************/ /**
 		 \brief      Format helper.

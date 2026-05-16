@@ -417,10 +417,14 @@ namespace Actisense
 									   outFrame, outError);
 		}
 
-		bool BemProtocol::buildDefaultPgnEnableList(std::vector<uint8_t>& outFrame,
+		bool BemProtocol::buildDefaultPgnEnableList(DeletePgnListSelector selector,
+													std::vector<uint8_t>& outFrame,
 													std::string& outError) {
-			return encodeSimpleCommand(BemCommandId::DefaultPgnEnableList, BstId::Bem_PG_A1,
-									   outFrame, outError);
+			BemCommand cmd;
+			cmd.bstId = BstId::Bem_PG_A1;
+			cmd.bemId = BemCommandId::DefaultPgnEnableList;
+			cmd.data.push_back(static_cast<uint8_t>(selector));
+			return encodeCommand(cmd, outFrame, outError);
 		}
 
 		bool BemProtocol::buildGetParamsPgnEnableLists(std::vector<uint8_t>& outFrame,
@@ -435,50 +439,10 @@ namespace Actisense
 									   outFrame, outError);
 		}
 
-		bool BemProtocol::buildSetRxPgnEnableListF2(
-			uint8_t transferId, uint8_t totalListSize, uint8_t firstSubIdx,
-			const std::vector<RxPgnEnableEntry>& entries, std::vector<uint8_t>& outFrame,
-			std::string& outError) {
-			std::string encodeError;
-			std::vector<uint8_t> data;
-			if (!encodeRxPgnEnableListF2SetRequest(transferId, totalListSize, firstSubIdx,
-												   entries, data, encodeError)) {
-				outError = encodeError;
-				return false;
-			}
-
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetRxPgnEnableListF2;
-			cmd.data = std::move(data);
-
-			return encodeCommand(cmd, outFrame, outError);
-		}
-
 		bool BemProtocol::buildGetTxPgnEnableListF2(std::vector<uint8_t>& outFrame,
 													std::string& outError) {
 			return encodeSimpleCommand(BemCommandId::GetSetTxPgnEnableListF2, BstId::Bem_PG_A1,
 									   outFrame, outError);
-		}
-
-		bool BemProtocol::buildSetTxPgnEnableListF2(
-			uint8_t transferId, uint8_t totalListSize, uint8_t firstSubIdx,
-			const std::vector<TxPgnEnableEntry>& entries, std::vector<uint8_t>& outFrame,
-			std::string& outError) {
-			std::string encodeError;
-			std::vector<uint8_t> data;
-			if (!encodeTxPgnEnableListF2StdSetRequest(transferId, totalListSize, firstSubIdx,
-													  entries, data, encodeError)) {
-				outError = encodeError;
-				return false;
-			}
-
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetTxPgnEnableListF2;
-			cmd.data = std::move(data);
-
-			return encodeCommand(cmd, outFrame, outError);
 		}
 
 		bool BemProtocol::buildGetRxPgnEnableListF1(uint8_t messageIndex,

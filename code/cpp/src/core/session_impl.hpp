@@ -396,21 +396,8 @@ namespace Actisense
 			void getRxPgnEnableListF2(std::chrono::milliseconds timeout,
 									  BemResponseCallback callback);
 
-			/**************************************************************************/ /**
-			 \brief      Send Set Rx PGN Enable List F2 command (single sub-list)
-			 \param[in]  transferId      Transfer ID for this transfer (0 to let the
-									     device assign)
-			 \param[in]  totalListSize   Total entries in the application's full list
-			 \param[in]  firstSubIdx     Index of this sub-list's first entry
-			 \param[in]  entries         Sub-list contents (max 96)
-			 \param[in]  timeout         Timeout for response
-			 \param[in]  callback        Callback invoked on response or timeout
-			 *******************************************************************************/
-			void setRxPgnEnableListF2(uint8_t transferId, uint8_t totalListSize,
-									  uint8_t firstSubIdx,
-									  const std::vector<RxPgnEnableEntry>& entries,
-									  std::chrono::milliseconds timeout,
-									  BemResponseCallback callback);
+			/* Note: 0x4E has no firmware SET handler. To change Rx enable state,
+			   use the per-PGN command via setRxPgnEnable (0x46). */
 
 			/**************************************************************************/ /**
 			 \brief      Send Get Tx PGN Enable List F2 command
@@ -420,23 +407,8 @@ namespace Actisense
 			void getTxPgnEnableListF2(std::chrono::milliseconds timeout,
 									  BemResponseCallback callback);
 
-			/**************************************************************************/ /**
-			 \brief      Send Set Tx PGN Enable List F2 command (standard sub-list)
-			 \param[in]  transferId      Transfer ID for this transfer (0 to let the
-									     device assign)
-			 \param[in]  totalListSize   Total std entries in application's full list
-			 \param[in]  firstSubIdx     Index of this sub-list's first entry
-			 \param[in]  entries         Sub-list contents (max 48)
-			 \param[in]  timeout         Timeout for response
-			 \param[in]  callback        Callback invoked on response or timeout
-			 \details    The proprietary variant (SVID 0x1103) cannot currently be
-						 written by this SDK; this method only emits the std variant.
-			 *******************************************************************************/
-			void setTxPgnEnableListF2(uint8_t transferId, uint8_t totalListSize,
-									  uint8_t firstSubIdx,
-									  const std::vector<TxPgnEnableEntry>& entries,
-									  std::chrono::milliseconds timeout,
-									  BemResponseCallback callback);
+			/* Note: 0x4F has no firmware SET handler. To change Tx enable state,
+			   priority, or rate use the per-PGN command via setTxPgnEnable (0x47). */
 
 			/**************************************************************************/ /**
 			 \brief      Send Delete PGN Enable Lists command
@@ -456,11 +428,16 @@ namespace Actisense
 										BemResponseCallback callback);
 
 			/**************************************************************************/ /**
-			 \brief      Send Default PGN Enable List command (restore factory defaults)
+			 \brief      Send Default PGN Enable List command (restore the operating
+						 mode's default Rx/Tx enable list).
+			 \param[in]  selector  Which list(s) to restore (Rx, Tx, or Both)
 			 \param[in]  timeout   Timeout for response
 			 \param[in]  callback  Callback invoked on response or timeout
+			 \details    Firmware requires the selector payload; an empty payload
+						 returns ES10_BST_INVALID_PARAMETER_LEN.
 			 *******************************************************************************/
-			void defaultPgnEnableList(std::chrono::milliseconds timeout,
+			void defaultPgnEnableList(DeletePgnListSelector selector,
+									  std::chrono::milliseconds timeout,
 									  BemResponseCallback callback);
 
 			/**************************************************************************/ /**

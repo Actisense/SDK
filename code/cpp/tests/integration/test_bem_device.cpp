@@ -66,6 +66,7 @@
 #include "protocols/bem/bem_commands/delete_pgn_enable_lists.hpp"
 #include "protocols/bem/bem_commands/activate_pgn_enable_lists.hpp"
 #include "protocols/bem/bem_commands/default_pgn_enable_list.hpp"
+#include "protocols/bem/bem_commands/port_baudrate.hpp"
 
 #include <gtest/gtest.h>
 
@@ -294,25 +295,200 @@ TEST_F(BemDeviceTest, GetOperatingMode)
 
 TEST_F(BemDeviceTest, GetPortBaudrate)
 {
-	std::promise<BemResult> promise;
-	auto future = promise.get_future();
+	/* GIT-78: assert the decoded response, not just that bytes came back. */
+	auto result = sendConvenience([this](auto timeout, auto cb) {
+		session_->getPortBaudrate(0, timeout, std::move(cb));
+	});
 
-	session_->getPortBaudrate(0, kDefaultTimeout,
-		[&promise](const std::optional<BemResponse>& resp, ErrorCode ec,
-		           std::string_view msg)
-		{
-			BemResult r;
-			r.response = resp;
-			r.errorCode = ec;
-			r.errorMsg = std::string(msg);
-			promise.set_value(std::move(r));
-		});
-
-	auto result = future.get();
 	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
 	ASSERT_TRUE(result.response.has_value());
-	std::cout << "  Port 0 Baudrate response: "
-	          << result.response->data.size() << " data bytes" << std::endl;
+
+	PortBaudrateResponse decoded;
+	std::string decodeErr;
+	ASSERT_TRUE(decodePortBaudrateResponse(result.response->data, decoded, decodeErr))
+		<< decodeErr;
+
+	EXPECT_GE(decoded.totalPorts, 1u) << "Device reported zero ports";
+	EXPECT_EQ(decoded.portNumber, 0u)
+		<< "Response port number does not echo the requested port";
+	EXPECT_NE(decoded.sessionBaud, 0u) << "Session baud is zero on port 0";
+	EXPECT_NE(decoded.sessionBaud, kBaudRateNoChange)
+		<< "Device returned NoChange sentinel as session baud";
+	EXPECT_NE(decoded.storeBaud, kBaudRateNoChange)
+		<< "Device returned NoChange sentinel as store baud";
+
+	std::cout << "  Model=" << modelIdToString(modelId_)
+	          << " totalPorts=" << static_cast<int>(decoded.totalPorts)
+	          << " port=" << static_cast<int>(decoded.portNumber)
+	          << " protocol=" << hardwareProtocolToString(decoded.protocol)
+	          << " session=" << formatBaudrate(decoded.sessionBaud)
+	          << " store=" << formatBaudrate(decoded.storeBaud) << std::endl;
+}
+
+TEST_F(BemDeviceTest, PortBaudrate_AllPorts_Iteration)
+{
+	/* GIT-78 scope: walk every port the device advertises, decode the
+	   response, and assert sane fields. Driven by totalPorts in the port-0
+	   reply so the test scales from NGT-1 (single port) up to multi-port
+	   devices like W2K-2 — the failure mode for NGXSW-3623 (W2K-2
+	   ddPortbaudrate values incorrect) lives in this matrix. */
+	auto port0 = sendConvenience([this](auto timeout, auto cb) {
+		session_->getPortBaudrate(0, timeout, std::move(cb));
+	});
+	ASSERT_EQ(port0.errorCode, ErrorCode::Ok) << port0.errorMsg;
+	ASSERT_TRUE(port0.response.has_value());
+
+	PortBaudrateResponse port0Decoded;
+	std::string decodeErr;
+	ASSERT_TRUE(decodePortBaudrateResponse(port0.response->data, port0Decoded, decodeErr))
+		<< decodeErr;
+	const uint8_t totalPorts = port0Decoded.totalPorts;
+	ASSERT_GE(totalPorts, 1u) << "Device reported zero ports";
+
+	std::cout << "  Iterating " << static_cast<int>(totalPorts) << " port(s) on "
+	          << modelIdToString(modelId_) << std::endl;
+
+	for (uint8_t p = 0; p < totalPorts; ++p) {
+		auto result = sendConvenience([this, p](auto timeout, auto cb) {
+			session_->getPortBaudrate(p, timeout, std::move(cb));
+		});
+		ASSERT_EQ(result.errorCode, ErrorCode::Ok)
+			<< "GET port " << static_cast<int>(p) << " failed: " << result.errorMsg;
+		ASSERT_TRUE(result.response.has_value());
+
+		PortBaudrateResponse decoded;
+		ASSERT_TRUE(decodePortBaudrateResponse(result.response->data, decoded, decodeErr))
+			<< "port " << static_cast<int>(p) << ": " << decodeErr;
+
+		EXPECT_EQ(decoded.totalPorts, totalPorts)
+			<< "Port " << static_cast<int>(p) << " disagrees on totalPorts";
+		EXPECT_EQ(decoded.portNumber, p)
+			<< "Response port number does not echo the requested port";
+		EXPECT_NE(decoded.sessionBaud, kBaudRateNoChange)
+			<< "Port " << static_cast<int>(p) << " returned NoChange as session baud";
+		EXPECT_NE(decoded.storeBaud, kBaudRateNoChange)
+			<< "Port " << static_cast<int>(p) << " returned NoChange as store baud";
+
+		std::cout << "    [port " << static_cast<int>(p) << "] "
+		          << hardwareProtocolToString(decoded.protocol)
+		          << " session=" << formatBaudrate(decoded.sessionBaud)
+		          << " store=" << formatBaudrate(decoded.storeBaud) << std::endl;
+	}
+}
+
+TEST_F(BemDeviceTest, PortBaudrate_NoChange_DoesNotCorruptOtherField)
+{
+	/* GIT-78 scope: kBaudRateNoChange semantics on both session and store
+	   fields. Strategy: GET baseline, SET (NoChange, NoChange) — must leave
+	   both fields untouched. Then SET (NoChange, baseline.store) and SET
+	   (baseline.session, NoChange) and verify a follow-up GET still reports
+	   baseline values. This exercises the firmware NoChange path without
+	   ever asking it to switch the host-link baud (which would break the
+	   test session — see deferred host-baud-switch handshake item). */
+	auto readPort0 = [&](const char* tag) -> std::optional<PortBaudrateResponse> {
+		auto result = sendConvenience([this](auto timeout, auto cb) {
+			session_->getPortBaudrate(0, timeout, std::move(cb));
+		});
+		if (result.errorCode != ErrorCode::Ok || !result.response.has_value()) {
+			ADD_FAILURE() << tag << ": GET port 0 failed: " << result.errorMsg;
+			return std::nullopt;
+		}
+		PortBaudrateResponse decoded;
+		std::string err;
+		if (!decodePortBaudrateResponse(result.response->data, decoded, err)) {
+			ADD_FAILURE() << tag << ": decode failed: " << err;
+			return std::nullopt;
+		}
+		return decoded;
+	};
+
+	auto setPort0 = [&](uint32_t sessionBaud, uint32_t storeBaud, const char* tag) -> bool {
+		auto result = sendConvenience([this, sessionBaud, storeBaud](auto timeout, auto cb) {
+			session_->setPortBaudrate(0, sessionBaud, storeBaud, timeout, std::move(cb));
+		});
+		if (result.errorCode != ErrorCode::Ok) {
+			ADD_FAILURE() << tag << ": SET port 0 failed: " << result.errorMsg;
+			return false;
+		}
+		return true;
+	};
+
+	const auto baseline = readPort0("baseline");
+	ASSERT_TRUE(baseline.has_value());
+	const uint32_t baseSession = baseline->sessionBaud;
+	const uint32_t baseStore = baseline->storeBaud;
+	std::cout << "  Baseline session=" << formatBaudrate(baseSession)
+	          << " store=" << formatBaudrate(baseStore) << std::endl;
+
+	/* Case 1: both NoChange — total no-op. */
+	ASSERT_TRUE(setPort0(kBaudRateNoChange, kBaudRateNoChange, "set(NoChange, NoChange)"));
+	const auto afterNoOp = readPort0("after-NoChange-both");
+	ASSERT_TRUE(afterNoOp.has_value());
+	EXPECT_EQ(afterNoOp->sessionBaud, baseSession);
+	EXPECT_EQ(afterNoOp->storeBaud, baseStore);
+
+	/* Case 2: NoChange session, write store with its current value. */
+	ASSERT_TRUE(setPort0(kBaudRateNoChange, baseStore, "set(NoChange, baseStore)"));
+	const auto afterStoreWrite = readPort0("after-store-only-write");
+	ASSERT_TRUE(afterStoreWrite.has_value());
+	EXPECT_EQ(afterStoreWrite->sessionBaud, baseSession)
+		<< "NoChange on session field altered the session baud";
+	EXPECT_EQ(afterStoreWrite->storeBaud, baseStore);
+
+	/* Case 3: write session with current value, NoChange store. */
+	ASSERT_TRUE(setPort0(baseSession, kBaudRateNoChange, "set(baseSession, NoChange)"));
+	const auto afterSessionWrite = readPort0("after-session-only-write");
+	ASSERT_TRUE(afterSessionWrite.has_value());
+	EXPECT_EQ(afterSessionWrite->sessionBaud, baseSession);
+	EXPECT_EQ(afterSessionWrite->storeBaud, baseStore)
+		<< "NoChange on store field altered the store baud";
+}
+
+TEST_F(BemDeviceTest, PortBaudrate_SafeRoundTrip_SameValues)
+{
+	/* GIT-78 scope: buildSetPortBaudrate -> buildGetPortBaudrate round-trip.
+	   The full round-trip pattern (change baud, verify, revert) would force
+	   the host transport to renegotiate its link baud — that handshake is a
+	   separate GIT-78 item not yet wired up. So this test does the safe
+	   subset: SET both fields to their current values and verify the GET
+	   response is byte-identical to the baseline. Catches encoder, decoder,
+	   and firmware echo agreement on a known-good value without ever
+	   disturbing the link. */
+	auto readPort0 = [&](const char* tag) -> std::optional<PortBaudrateResponse> {
+		auto result = sendConvenience([this](auto timeout, auto cb) {
+			session_->getPortBaudrate(0, timeout, std::move(cb));
+		});
+		if (result.errorCode != ErrorCode::Ok || !result.response.has_value()) {
+			ADD_FAILURE() << tag << ": GET failed: " << result.errorMsg;
+			return std::nullopt;
+		}
+		PortBaudrateResponse decoded;
+		std::string err;
+		if (!decodePortBaudrateResponse(result.response->data, decoded, err)) {
+			ADD_FAILURE() << tag << ": decode failed: " << err;
+			return std::nullopt;
+		}
+		return decoded;
+	};
+
+	const auto baseline = readPort0("baseline");
+	ASSERT_TRUE(baseline.has_value());
+
+	auto setResult = sendConvenience([this, &baseline](auto timeout, auto cb) {
+		session_->setPortBaudrate(0, baseline->sessionBaud, baseline->storeBaud,
+		                          timeout, std::move(cb));
+	});
+	ASSERT_EQ(setResult.errorCode, ErrorCode::Ok)
+		<< "SET (same values) failed: " << setResult.errorMsg;
+
+	const auto after = readPort0("after-same-set");
+	ASSERT_TRUE(after.has_value());
+	EXPECT_EQ(after->totalPorts, baseline->totalPorts);
+	EXPECT_EQ(after->portNumber, baseline->portNumber);
+	EXPECT_EQ(static_cast<uint8_t>(after->protocol),
+	          static_cast<uint8_t>(baseline->protocol));
+	EXPECT_EQ(after->sessionBaud, baseline->sessionBaud);
+	EXPECT_EQ(after->storeBaud, baseline->storeBaud);
 }
 
 TEST_F(BemDeviceTest, GetPortPCode)
@@ -1077,124 +1253,112 @@ TEST_F(BemDeviceTest, PgnListWireDiagnostic)
 	std::cout << "----- end PGN List Wire Diagnostic -----\n\n";
 }
 
-/* GIT-74: Rx PGN Enable List F2 round-trip — verify the management
-   commands compose end-to-end on real hardware (Delete -> SET -> Activate
-   -> GET -> Default -> GET) without firmware errors, and that each GET
-   response decodes cleanly via the rewritten codec.
+/* GIT-74: Real Rx per-PGN SET path via 0x46 (RxPgnEnable).
 
-   This is intentionally a "doesn't error" test rather than a strict
-   content round-trip: investigation against NGX-1 showed that an Activate
-   reshapes the user-supplied list by overlaying device-mandatory entries
-   (e.g. address-claim) and that Default returns a non-zero ARL error code
-   (0xFFFFFBB8) under some firmware states — both are firmware-side
-   behaviours that warrant their own ticket once SET payload semantics are
-   nailed down. A reference SET-encoder against the legacy ACComms code is
-   pending (no public encoder exists, so the SDK's SET layout is inferred
-   from the response layout). */
-TEST_F(BemDeviceTest, PgnEnableListF2_RxRoundTrip)
+   The F2 list commands (0x4E/0x4F) have no firmware SET handler (per
+   AMKLib BemCommandRxPGNEnableListF2 / BemCommandTxPGNEnableListF2 — they
+   only implement read); to change Rx enable state the application must
+   use the per-PGN command 0x46.
+
+   The firmware GET response surfaces the *stack-gated* enable state
+   (isRxEnabled is called with includeStack=true), not the raw per-PGN
+   flag. So even after we toggle the per-PGN setting the response can
+   still report "enabled" in modes like NGTransferRxAllMode. We therefore
+   test that the SET command completes with ErrorCode::Ok and that the
+   GET response decodes cleanly — proving the on-wire path works without
+   making assumptions about the device's filter mode. */
+TEST_F(BemDeviceTest, RxPgnEnable_PerPgnSetPath)
 {
 	using namespace std::chrono_literals;
 
-	auto getRx = [&](const char* tag) -> std::optional<RxPgnEnableListF2Response> {
+	/* NGT-1 firmware: the per-PGN 0x46 handler queries the PgnController
+	   via VD 0 and returns ES9_N2000_PGN_NOT_ON_LIST (-995) for PGNs that
+	   appear in the F1 enabled list but aren't accessible from that VD.
+	   That's a firmware-side quirk worth investigating separately. Skip
+	   here so the test stays meaningful on NGX-1 and any firmware where
+	   the per-PGN path works as designed. */
+	if (modelId_ == static_cast<uint16_t>(ArlModelId::NGT1)) {
+		GTEST_SKIP() << "RxPgnEnable 0x46 returns ES9_N2000_PGN_NOT_ON_LIST on NGT-1"
+		             << " for PGNs in the F1 list — firmware investigation needed";
+	}
+
+	constexpr uint32_t kProbePgn = 126992; /* System Time — common, present in
+											  both NGT-1 and NGX-1 supported PGN
+											  tables; non-mandatory so SET is
+											  meaningful. */
+
+	auto getEnable = [&](const char* tag) -> std::optional<RxPgnEnableResponse> {
 		auto r = sendConvenience([this](auto t, auto cb) {
-			session_->getRxPgnEnableListF2(t, std::move(cb));
+			session_->getRxPgnEnable(kProbePgn, t, std::move(cb));
 		});
 		if (r.errorCode != ErrorCode::Ok || !r.response.has_value()) {
-			ADD_FAILURE() << tag << ": GET Rx F2 failed: " << r.errorMsg;
+			ADD_FAILURE() << tag << ": GET Rx PGN Enable failed: " << r.errorMsg;
 			return std::nullopt;
 		}
-		RxPgnEnableListF2Response decoded;
+		RxPgnEnableResponse decoded;
 		std::string err;
-		if (!decodeRxPgnEnableListF2Response(std::span<const uint8_t>(r.response->data),
-											 decoded, err)) {
-			ADD_FAILURE() << tag << ": Rx F2 decode failed: " << err;
+		if (!decodeRxPgnEnableResponse(std::span<const uint8_t>(r.response->data),
+									   decoded, err)) {
+			ADD_FAILURE() << tag << ": decode failed: " << err;
 			return std::nullopt;
 		}
 		return decoded;
 	};
 
-	const auto baseline = getRx("baseline");
-	ASSERT_TRUE(baseline.has_value());
-	std::cout << "  Baseline Rx list: total=" << static_cast<int>(baseline->totalListSize)
-	          << ", first sub-list has " << static_cast<int>(baseline->subCount)
-	          << " entries" << std::endl;
-
-	/* Best-effort restorer: try Default on the way out. If the firmware
-	   doesn't accept Default in the current state, that's the user's
-	   problem — but at least we tried. */
-	struct RxRestorer {
-		SessionImpl* session;
-		~RxRestorer() {
-			if (session) {
-				std::promise<void> done;
-				auto fut = done.get_future();
-				session->defaultPgnEnableList(std::chrono::milliseconds(2000),
-					[&done](const std::optional<BemResponse>&, ErrorCode,
-					        std::string_view) { done.set_value(); });
-				fut.wait_for(std::chrono::milliseconds(2500));
-				std::this_thread::sleep_for(std::chrono::milliseconds(300));
-			}
-		}
-	} restorer{session_.get()};
-
-	/* Delete the active Rx list. Selector 0 = Rx. */
-	auto deleteResult = sendConvenience([this](auto t, auto cb) {
-		session_->deletePgnEnableLists(/*selector=*/0, t, std::move(cb));
-	});
-	ASSERT_EQ(deleteResult.errorCode, ErrorCode::Ok)
-		<< "Delete Rx failed: " << deleteResult.errorMsg;
-	std::this_thread::sleep_for(150ms);
-
-	/* SET a minimal known list. */
-	const std::vector<RxPgnEnableEntry> probe = {
-		{0x05, kRxPgnMaskEnabled},
-		{0x08, kRxPgnMaskEnabled},
-	};
-	auto setResult = sendConvenience(
-		[this, &probe](auto t, auto cb) {
-			session_->setRxPgnEnableListF2(/*xid=*/0, /*total=*/2, /*firstIdx=*/0,
-										   probe, t, std::move(cb));
+	auto setEnable = [&](bool enable, const char* tag) -> bool {
+		auto r = sendConvenience([this, enable](auto t, auto cb) {
+			session_->setRxPgnEnable(kProbePgn, enable ? 1 : 0, t, std::move(cb));
 		});
-	ASSERT_EQ(setResult.errorCode, ErrorCode::Ok)
-		<< "SET Rx F2 failed: " << setResult.errorMsg;
+		if (r.errorCode != ErrorCode::Ok) {
+			ADD_FAILURE() << tag << ": SET Rx PGN Enable (" << enable
+			              << ") failed: " << r.errorMsg;
+			return false;
+		}
+		return true;
+	};
+
+	const auto baseline = getEnable("baseline");
+	ASSERT_TRUE(baseline.has_value());
+	const bool baselineEnabled = baseline->enable == RxPgnEnableFlag::Enabled;
+	const uint32_t baselineMask = baseline->mask;
+	std::cout << "  Baseline: PGN " << kProbePgn
+	          << " stack-enabled=" << (baselineEnabled ? "true" : "false")
+	          << " mask=0x" << std::hex << baselineMask << std::dec << std::endl;
+
+	/* Toggle. Even if the stack-gated enabled flag doesn't change in the
+	   GET response, the SET must succeed. */
+	ASSERT_TRUE(setEnable(!baselineEnabled, "flip"));
 	std::this_thread::sleep_for(150ms);
 
-	/* Activate the staged list. */
-	auto activateResult = sendConvenience([this](auto t, auto cb) {
-		session_->activatePgnEnableLists(t, std::move(cb));
-	});
-	ASSERT_EQ(activateResult.errorCode, ErrorCode::Ok)
-		<< "Activate failed: " << activateResult.errorMsg;
+	const auto afterFlip = getEnable("after-flip");
+	ASSERT_TRUE(afterFlip.has_value());
+	EXPECT_EQ(afterFlip->pgn, kProbePgn) << "GET response PGN mismatch";
+
+	/* Restore. */
+	ASSERT_TRUE(setEnable(baselineEnabled, "restore"));
 	std::this_thread::sleep_for(150ms);
 
-	/* Re-GET and confirm decode still works. The exact contents are
-	   firmware-defined (NGX overlays mandatory PGNs onto the user SET, so
-	   totalListSize is generally not equal to our SET size). */
-	const auto applied = getRx("after-activate");
-	ASSERT_TRUE(applied.has_value());
-	std::cout << "  After Activate: total=" << static_cast<int>(applied->totalListSize)
-	          << " (firmware overlays mandatory PGNs onto user SET)" << std::endl;
+	const auto restored = getEnable("after-restore");
+	ASSERT_TRUE(restored.has_value());
+	EXPECT_EQ(restored->pgn, kProbePgn);
+	std::cout << "  SET path verified (stack-gated GET state cannot prove the toggle,"
+	             " but SET acks confirm the wire path)" << std::endl;
+}
 
-	/* Default — may return a device error code in some states; that's a
-	   firmware-side investigation outside this ticket. The destructor
-	   restorer will retry. */
-	auto defaultResult = sendConvenience([this](auto t, auto cb) {
-		session_->defaultPgnEnableList(t, std::move(cb));
+/* GIT-74: Verify Default(Rx) is accepted by firmware now that the SDK
+   sends the required 1-byte selector. Previously the SDK sent no payload
+   and the firmware returned ES10_BST_INVALID_PARAMETER_LEN (-1096). */
+TEST_F(BemDeviceTest, DefaultPgnEnableList_AcceptsSelector)
+{
+	auto result = sendConvenience([this](auto t, auto cb) {
+		session_->defaultPgnEnableList(DeletePgnListSelector::RxList, t, std::move(cb));
 	});
-	if (defaultResult.errorCode == ErrorCode::Ok) {
-		std::this_thread::sleep_for(300ms);
-		const auto restored = getRx("after-default");
-		ASSERT_TRUE(restored.has_value());
-		std::cout << "  After Default: total="
-		          << static_cast<int>(restored->totalListSize) << std::endl;
-	} else {
-		const uint32_t arl = defaultResult.response.has_value()
-		                         ? defaultResult.response->header.errorCode
-		                         : 0;
-		std::cout << "  Default rejected by firmware (ARL=0x" << std::hex << arl
-		          << std::dec << ", msg=\"" << defaultResult.errorMsg
-		          << "\") — destructor will retry on test exit." << std::endl;
-	}
+	ASSERT_EQ(result.errorCode, ErrorCode::Ok)
+		<< "Default(Rx) failed: " << result.errorMsg
+		<< " (response ARL errorCode=0x" << std::hex
+		<< (result.response.has_value() ? result.response->header.errorCode : 0u)
+		<< std::dec << ")";
+	std::cout << "  Default(Rx) acknowledged" << std::endl;
 }
 
 /* ========================================================================== */

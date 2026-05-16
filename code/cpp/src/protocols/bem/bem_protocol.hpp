@@ -16,6 +16,7 @@
 #include <span>
 
 #include "protocols/bdtp/bdtp_protocol.hpp"
+#include "protocols/bem/bem_commands/delete_pgn_enable_lists.hpp"
 #include "protocols/bem/bem_types.hpp"
 
 namespace Actisense
@@ -393,11 +394,13 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Build Default PGN Enable List command
+			 \param[in]  selector   Which list(s) to restore (Rx, Tx, or Both)
 			 \param[out] outFrame   Complete BDTP-framed message
 			 \param[out] outError   Error message if encoding fails
 			 \return     True on success
 			 *******************************************************************************/
-			[[nodiscard]] bool buildDefaultPgnEnableList(std::vector<uint8_t>& outFrame,
+			[[nodiscard]] bool buildDefaultPgnEnableList(DeletePgnListSelector selector,
+														 std::vector<uint8_t>& outFrame,
 														 std::string& outError);
 
 			/**************************************************************************/ /**
@@ -418,20 +421,8 @@ namespace Actisense
 			[[nodiscard]] bool buildGetRxPgnEnableListF2(std::vector<uint8_t>& outFrame,
 														 std::string& outError);
 
-			/**************************************************************************/ /**
-			 \brief      Build Set Rx PGN Enable List F2 command
-			 \param[in]  transferId      Transfer ID
-			 \param[in]  totalListSize   Total entries in full Rx list
-			 \param[in]  firstSubIdx     Index of first entry in this sub-list
-			 \param[in]  entries         Sub-list entries (max 96)
-			 \param[out] outFrame        Complete BDTP-framed message
-			 \param[out] outError        Error message if encoding fails
-			 \return     True on success
-			 *******************************************************************************/
-			[[nodiscard]] bool buildSetRxPgnEnableListF2(
-				uint8_t transferId, uint8_t totalListSize, uint8_t firstSubIdx,
-				const std::vector<RxPgnEnableEntry>& entries,
-				std::vector<uint8_t>& outFrame, std::string& outError);
+			/* Note: 0x4E has no firmware SET handler. Use the per-PGN command
+			   0x46 (buildSetRxPgnEnable) instead. */
 
 			/**************************************************************************/ /**
 			 \brief      Build Get Tx PGN Enable List F2 command
@@ -442,21 +433,8 @@ namespace Actisense
 			[[nodiscard]] bool buildGetTxPgnEnableListF2(std::vector<uint8_t>& outFrame,
 														 std::string& outError);
 
-			/**************************************************************************/ /**
-			 \brief      Build Set Tx PGN Enable List F2 command (standard variant)
-			 \param[in]  transferId      Transfer ID
-			 \param[in]  totalListSize   Total std entries in full list
-			 \param[in]  firstSubIdx     Index of first entry in this sub-list
-			 \param[in]  entries         Sub-list entries (max 48)
-			 \param[out] outFrame        Complete BDTP-framed message
-			 \param[out] outError        Error message if encoding fails
-			 \return     True on success
-			 *******************************************************************************/
-			[[nodiscard]] bool
-			buildSetTxPgnEnableListF2(uint8_t transferId, uint8_t totalListSize,
-									  uint8_t firstSubIdx,
-									  const std::vector<TxPgnEnableEntry>& entries,
-									  std::vector<uint8_t>& outFrame, std::string& outError);
+			/* Note: 0x4F has no firmware SET handler. Use the per-PGN command
+			   0x47 (buildSetTxPgnEnable) instead. */
 
 			/**************************************************************************/ /**
 			 \brief      Build Get Rx PGN Enable List F1 command (legacy)

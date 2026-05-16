@@ -190,60 +190,9 @@ TEST_F(SessionPgnListManagementTest, GetParamsPgnEnableLists_SendsCommand)
 	EXPECT_EQ(dgm.data[0], static_cast<uint8_t>(BemCommandId::ParamsPgnEnableLists));
 }
 
-/* SET helpers -------------------------------------------------------------- */
-
-TEST_F(SessionPgnListManagementTest, SetRxPgnEnableListF2_EncodesSubList)
-{
-	const std::vector<RxPgnEnableEntry> entries = {
-		{0x00, kRxPgnMaskEnabled},
-		{0x05, kRxPgnMaskEnabled},
-		{0x14, kRxPgnMaskDisabled},
-	};
-	session_->setRxPgnEnableListF2(/*xid=*/1, /*total=*/3, /*firstIdx=*/0, entries,
-								   kTimeout, nullptr);
-
-	const auto dgm = captureSentDatagram();
-	EXPECT_EQ(dgm.bstId, static_cast<uint8_t>(BstId::Bem_PG_A1));
-	/* Header: BEM ID + xid(1) + SVID(4) + total(1) + first(1) + sub(1) = 9 bytes,
-	   then 3 entries × 2 bytes = 6, total 15. */
-	ASSERT_EQ(dgm.data.size(), 1u + kRxPgnEnableListF2ResponseHeaderSize + 3 * 2);
-	EXPECT_EQ(dgm.data[0], static_cast<uint8_t>(BemCommandId::GetSetRxPgnEnableListF2));
-	EXPECT_EQ(dgm.data[1], 1u);             /* xid */
-	EXPECT_EQ(dgm.data[2], 0x01);           /* SVID LE byte 0 */
-	EXPECT_EQ(dgm.data[6], 3u);             /* total */
-	EXPECT_EQ(dgm.data[7], 0u);             /* firstIdx */
-	EXPECT_EQ(dgm.data[8], 3u);             /* subCount */
-	EXPECT_EQ(dgm.data[9], 0x00);           /* first entry pgnIdx */
-	EXPECT_EQ(dgm.data[10], kRxPgnMaskEnabled);
-}
-
-TEST_F(SessionPgnListManagementTest, SetTxPgnEnableListF2_EncodesStdEntries)
-{
-	std::vector<TxPgnEnableEntry> entries;
-	entries.push_back({/*pgnIndex=*/0x05, /*priority=*/3, /*rateMs=*/100});
-
-	session_->setTxPgnEnableListF2(/*xid=*/1, /*total=*/1, /*firstIdx=*/0, entries,
-								   kTimeout, nullptr);
-
-	const auto dgm = captureSentDatagram();
-	EXPECT_EQ(dgm.bstId, static_cast<uint8_t>(BstId::Bem_PG_A1));
-	/* BEM ID + 8-byte header + 4-byte entry = 13 bytes. */
-	ASSERT_EQ(dgm.data.size(), 1u + kTxPgnEnableListF2StdHeaderSize +
-								   kTxPgnEnableListF2StdEntrySize);
-	EXPECT_EQ(dgm.data[0], static_cast<uint8_t>(BemCommandId::GetSetTxPgnEnableListF2));
-	EXPECT_EQ(dgm.data[1], 1u);   /* xid */
-	EXPECT_EQ(dgm.data[2], 0x02); /* SVID LE byte 0 — Std variant */
-	EXPECT_EQ(dgm.data[3], 0x11);
-	EXPECT_EQ(dgm.data[6], 1u);   /* total */
-	EXPECT_EQ(dgm.data[7], 0u);   /* firstIdx */
-	EXPECT_EQ(dgm.data[8], 1u);   /* subCount */
-
-	/* Entry layout: pgnIndex(1) + priority(1) + rateMs(2 LE). */
-	EXPECT_EQ(dgm.data[9], 0x05);  /* pgnIndex */
-	EXPECT_EQ(dgm.data[10], 3);    /* priority */
-	EXPECT_EQ(dgm.data[11], 100);  /* rate LE lo (100) */
-	EXPECT_EQ(dgm.data[12], 0);    /* rate LE hi */
-}
+/* Note: F2 list SET commands (0x4E/0x4F) have no firmware handler. To
+   change Rx/Tx enable state, use the per-PGN commands 0x46/0x47
+   (test_rx_pgn_enable.cpp / test_tx_pgn_enable.cpp). */
 
 /* Management commands ------------------------------------------------------ */
 
@@ -283,14 +232,15 @@ TEST_F(SessionPgnListManagementTest, ActivatePgnEnableLists_SendsCommand)
 	EXPECT_EQ(dgm.data[0], static_cast<uint8_t>(BemCommandId::ActivatePgnEnableLists));
 }
 
-TEST_F(SessionPgnListManagementTest, DefaultPgnEnableList_SendsCommand)
+TEST_F(SessionPgnListManagementTest, DefaultPgnEnableList_EncodesSelector)
 {
-	session_->defaultPgnEnableList(kTimeout, nullptr);
+	session_->defaultPgnEnableList(DeletePgnListSelector::Both, kTimeout, nullptr);
 
 	const auto dgm = captureSentDatagram();
 	EXPECT_EQ(dgm.bstId, static_cast<uint8_t>(BstId::Bem_PG_A1));
-	ASSERT_GE(dgm.data.size(), 1u);
+	ASSERT_GE(dgm.data.size(), 2u);
 	EXPECT_EQ(dgm.data[0], static_cast<uint8_t>(BemCommandId::DefaultPgnEnableList));
+	EXPECT_EQ(dgm.data[1], 0x02);  /* Both */
 }
 
 } /* namespace Test */

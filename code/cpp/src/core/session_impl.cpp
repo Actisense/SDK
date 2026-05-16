@@ -700,52 +700,10 @@ namespace Actisense
 						   std::move(callback));
 		}
 
-		void SessionImpl::setRxPgnEnableListF2(uint8_t transferId, uint8_t totalListSize,
-											   uint8_t firstSubIdx,
-											   const std::vector<RxPgnEnableEntry>& entries,
-											   std::chrono::milliseconds timeout,
-											   BemResponseCallback callback) {
-			std::string error;
-			std::vector<uint8_t> data;
-			if (!encodeRxPgnEnableListF2SetRequest(transferId, totalListSize, firstSubIdx,
-												   entries, data, error)) {
-				if (callback) {
-					callback(std::nullopt, ErrorCode::InvalidArgument, error);
-				}
-				return;
-			}
-
-			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnableListF2);
-			cmd.data = std::move(data);
-
-			sendBemCommand(cmd, timeout, std::move(callback));
-		}
-
 		void SessionImpl::getTxPgnEnableListF2(std::chrono::milliseconds timeout,
 											   BemResponseCallback callback) {
 			sendBemCommand(makeBemA1(BemCommandId::GetSetTxPgnEnableListF2), timeout,
 						   std::move(callback));
-		}
-
-		void SessionImpl::setTxPgnEnableListF2(uint8_t transferId, uint8_t totalListSize,
-											   uint8_t firstSubIdx,
-											   const std::vector<TxPgnEnableEntry>& entries,
-											   std::chrono::milliseconds timeout,
-											   BemResponseCallback callback) {
-			std::string error;
-			std::vector<uint8_t> data;
-			if (!encodeTxPgnEnableListF2StdSetRequest(transferId, totalListSize, firstSubIdx,
-													  entries, data, error)) {
-				if (callback) {
-					callback(std::nullopt, ErrorCode::InvalidArgument, error);
-				}
-				return;
-			}
-
-			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnableListF2);
-			cmd.data = std::move(data);
-
-			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
 		void SessionImpl::deletePgnEnableLists(uint8_t selector, std::chrono::milliseconds timeout,
@@ -770,10 +728,12 @@ namespace Actisense
 						   std::move(callback));
 		}
 
-		void SessionImpl::defaultPgnEnableList(std::chrono::milliseconds timeout,
+		void SessionImpl::defaultPgnEnableList(DeletePgnListSelector selector,
+											   std::chrono::milliseconds timeout,
 											   BemResponseCallback callback) {
-			sendBemCommand(makeBemA1(BemCommandId::DefaultPgnEnableList), timeout,
-						   std::move(callback));
+			BemCommand cmd = makeBemA1(BemCommandId::DefaultPgnEnableList);
+			cmd.data.push_back(static_cast<uint8_t>(selector));
+			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
 		void SessionImpl::getParamsPgnEnableLists(std::chrono::milliseconds timeout,

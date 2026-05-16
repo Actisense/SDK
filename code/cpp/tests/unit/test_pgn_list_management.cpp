@@ -231,18 +231,27 @@ TEST_F(PgnListManagementTest, ActivatePgnEnableLists_Builder)
 
 /* Default PGN Enable List (0x4C) Tests ------------------------------------- */
 
-TEST_F(PgnListManagementTest, DefaultPgnEnableList_EncodeRequest)
+TEST_F(PgnListManagementTest, DefaultPgnEnableList_EncodeRequestRx)
 {
 	std::vector<uint8_t> data;
-	encodeDefaultPgnEnableListRequest(data);
+	encodeDefaultPgnEnableListRequest(DeletePgnListSelector::RxList, data);
 
-	EXPECT_EQ(data.size(), kDefaultPgnEnableListRequestSize);
-	EXPECT_TRUE(data.empty());
+	ASSERT_EQ(data.size(), kDefaultPgnEnableListRequestSize);
+	EXPECT_EQ(data[0], 0x00);
+}
+
+TEST_F(PgnListManagementTest, DefaultPgnEnableList_EncodeRequestTx)
+{
+	std::vector<uint8_t> data;
+	encodeDefaultPgnEnableListRequest(DeletePgnListSelector::TxList, data);
+
+	ASSERT_EQ(data.size(), kDefaultPgnEnableListRequestSize);
+	EXPECT_EQ(data[0], 0x01);
 }
 
 TEST_F(PgnListManagementTest, DefaultPgnEnableList_Builder)
 {
-	EXPECT_TRUE(m_protocol.buildDefaultPgnEnableList(m_frame, m_error));
+	EXPECT_TRUE(m_protocol.buildDefaultPgnEnableList(DeletePgnListSelector::Both, m_frame, m_error));
 	EXPECT_TRUE(m_error.empty());
 	EXPECT_FALSE(m_frame.empty());
 }
@@ -330,32 +339,7 @@ TEST_F(PgnListManagementTest, RxPgnEnableListF2_EncodeGetRequest)
 	EXPECT_TRUE(data.empty());
 }
 
-TEST_F(PgnListManagementTest, RxPgnEnableListF2_EncodeSetRequest)
-{
-	const std::vector<RxPgnEnableEntry> entries = {
-		{0x00, kRxPgnMaskEnabled},
-		{0x05, kRxPgnMaskEnabled},
-		{0x14, kRxPgnMaskDisabled},
-	};
-	std::vector<uint8_t> data;
-
-	EXPECT_TRUE(encodeRxPgnEnableListF2SetRequest(
-		/*xid=*/1, /*total=*/3, /*firstIdx=*/0, entries, data, m_error));
-	EXPECT_TRUE(m_error.empty());
-
-	/* Header: xid + SVID + total + first + sub = 8 bytes, then 3 entries × 2 */
-	ASSERT_EQ(data.size(), kRxPgnEnableListF2ResponseHeaderSize + entries.size() * 2);
-	EXPECT_EQ(data[0], 1u);              /* xid */
-	EXPECT_EQ(data[1], 0x01);            /* SVID byte 0 */
-	EXPECT_EQ(data[2], 0x11);
-	EXPECT_EQ(data[3], 0x00);
-	EXPECT_EQ(data[4], 0x00);
-	EXPECT_EQ(data[5], 3u);              /* total */
-	EXPECT_EQ(data[6], 0u);              /* firstIdx */
-	EXPECT_EQ(data[7], 3u);              /* subCount */
-	EXPECT_EQ(data[8], 0x00);            /* first entry pgnIdx */
-	EXPECT_EQ(data[9], kRxPgnMaskEnabled);
-}
+/* Note: 0x4E has no firmware SET handler; use the per-PGN 0x46 command. */
 
 TEST_F(PgnListManagementTest, RxPgnEnableListF2_DecodeResponse)
 {
@@ -394,15 +378,6 @@ TEST_F(PgnListManagementTest, RxPgnEnableListF2_DecodeRejectsWrongSvId)
 TEST_F(PgnListManagementTest, RxPgnEnableListF2_Builder)
 {
 	EXPECT_TRUE(m_protocol.buildGetRxPgnEnableListF2(m_frame, m_error));
-	EXPECT_TRUE(m_error.empty());
-	EXPECT_FALSE(m_frame.empty());
-}
-
-TEST_F(PgnListManagementTest, RxPgnEnableListF2_SetBuilder)
-{
-	std::vector<RxPgnEnableEntry> entries = {{0, kRxPgnMaskEnabled}, {10, kRxPgnMaskEnabled}};
-	EXPECT_TRUE(m_protocol.buildSetRxPgnEnableListF2(/*xid=*/1, /*total=*/2, /*firstIdx=*/0,
-													 entries, m_frame, m_error));
 	EXPECT_TRUE(m_error.empty());
 	EXPECT_FALSE(m_frame.empty());
 }
@@ -469,25 +444,7 @@ TEST_F(PgnListManagementTest, TxPgnEnableListF2_DecodeRejectsUnknownSvId)
 	EXPECT_FALSE(decodeTxPgnEnableListF2Response(data, response, m_error));
 }
 
-TEST_F(PgnListManagementTest, TxPgnEnableListF2_EncodeStdSet)
-{
-	std::vector<TxPgnEnableEntry> entries = {
-		{0x03, 6, 1000},
-		{0x04, 7, kTxPgnRateDisabled},
-	};
-	std::vector<uint8_t> data;
-	EXPECT_TRUE(encodeTxPgnEnableListF2StdSetRequest(
-		/*xid=*/1, /*total=*/2, /*firstIdx=*/0, entries, data, m_error));
-
-	ASSERT_EQ(data.size(), kTxPgnEnableListF2StdHeaderSize +
-							   entries.size() * kTxPgnEnableListF2StdEntrySize);
-	EXPECT_EQ(data[1], 0x02);  /* SVID byte 0 */
-	EXPECT_EQ(data[2], 0x11);
-	EXPECT_EQ(data[8], 0x03);  /* first entry pgnIdx */
-	EXPECT_EQ(data[9], 6);     /* prio */
-	EXPECT_EQ(data[10], 0xE8); /* rate LE lo */
-	EXPECT_EQ(data[11], 0x03); /* rate LE hi */
-}
+/* Note: 0x4F has no firmware SET handler; use the per-PGN 0x47 command. */
 
 TEST_F(PgnListManagementTest, TxPgnEnableListF2_Builder)
 {
@@ -626,7 +583,7 @@ TEST_F(PgnListManagementTest, Constants)
 {
 	EXPECT_EQ(kDeletePgnEnableListsRequestSize, 1u);
 	EXPECT_EQ(kActivatePgnEnableListsRequestSize, 0u);
-	EXPECT_EQ(kDefaultPgnEnableListRequestSize, 0u);
+	EXPECT_EQ(kDefaultPgnEnableListRequestSize, 1u);
 	EXPECT_EQ(kParamsPgnEnableListsResponseSize, 14u);
 	EXPECT_EQ(kRxPgnEnableListF2MaxEntriesPerSubList, 96u);
 	EXPECT_EQ(kTxPgnEnableListF2StdMaxEntriesPerSubList, 48u);

@@ -151,59 +151,15 @@ namespace Actisense
 
 		/**************************************************************************/ /**
 		 \brief      Encode a 0x4E GET request payload (empty).
-		 \details    Current firmware ignores any payload — kept for symmetry.
+		 \details    The firmware ignores any payload bytes; the SDK sends none.
 		 *******************************************************************************/
 		inline void encodeRxPgnEnableListF2GetRequest(std::vector<uint8_t>& outData) {
 			outData.clear();
 		}
 
-		/**************************************************************************/ /**
-		 \brief      Encode a 0x4E SET request payload.
-		 \details    Layout:
-					   transferId, SVID, totalListSize, firstSubIdx, subCount,
-					   [pgnIndex u8, rxMask u8] × subCount
-		 \param[in]  transferId  Transfer ID (0 to let device assign)
-		 \param[in]  totalListSize  Total entries in the application's full list
-		 \param[in]  firstSubIdx    Index of the first entry in this sub-list
-		 \param[in]  entries        Sub-list contents
-		 \param[out] outData        Encoded payload
-		 \param[out] outError       Error message on failure
-		 \return     True on success
-		 *******************************************************************************/
-		[[nodiscard]] inline bool encodeRxPgnEnableListF2SetRequest(
-			uint8_t transferId, uint8_t totalListSize, uint8_t firstSubIdx,
-			const std::vector<RxPgnEnableEntry>& entries, std::vector<uint8_t>& outData,
-			std::string& outError) {
-			if (entries.size() > kRxPgnEnableListF2MaxEntriesPerSubList) {
-				outError = "Too many entries in Rx F2 sub-list: " +
-						   std::to_string(entries.size()) + " exceeds max " +
-						   std::to_string(kRxPgnEnableListF2MaxEntriesPerSubList);
-				return false;
-			}
-			if (totalListSize > kRxPgnEnableListF2MaxTotalEntries) {
-				outError = "Rx F2 totalListSize " + std::to_string(totalListSize) +
-						   " exceeds max " +
-						   std::to_string(kRxPgnEnableListF2MaxTotalEntries);
-				return false;
-			}
-
-			outData.clear();
-			outData.reserve(kRxPgnEnableListF2ResponseHeaderSize +
-							entries.size() * kRxPgnEnableListF2EntrySize);
-			outData.push_back(transferId);
-			outData.push_back(static_cast<uint8_t>(kRxPgnEnableListF2SvId & 0xFF));
-			outData.push_back(static_cast<uint8_t>((kRxPgnEnableListF2SvId >> 8) & 0xFF));
-			outData.push_back(static_cast<uint8_t>((kRxPgnEnableListF2SvId >> 16) & 0xFF));
-			outData.push_back(static_cast<uint8_t>((kRxPgnEnableListF2SvId >> 24) & 0xFF));
-			outData.push_back(totalListSize);
-			outData.push_back(firstSubIdx);
-			outData.push_back(static_cast<uint8_t>(entries.size()));
-			for (const auto& e : entries) {
-				outData.push_back(e.pgnIndex);
-				outData.push_back(e.rxMask);
-			}
-			return true;
-		}
+		/* Note: 0x4E has no SET handler in the firmware (AMKLib BemCommandRxPGNEnableListF2
+		   only implements the read path). To change Rx enable state for a PGN, use
+		   the per-PGN BEM command 0x46 (RxPgnEnable) — see rx_pgn_enable.hpp. */
 
 		/**************************************************************************/ /**
 		 \brief      Format helper.
