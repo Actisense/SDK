@@ -1482,6 +1482,269 @@ TEST_F(BemDeviceTest, DefaultPgnEnableList_AcceptsSelector)
 	std::cout << "  Default(Rx) acknowledged" << std::endl;
 }
 
+/* GIT-77 sign-off coverage: mirror RxPgnEnable_PerPgnSetPath for the Tx
+   path (0x47). Same VD-0 firmware quirk affects NGT-1 (see NGXSW-4186), so
+   skip there until the firmware fix lands; runs on NGX-1 and confirms the
+   SET ack + GET round-trip. */
+TEST_F(BemDeviceTest, TxPgnEnable_PerPgnSetPath)
+{
+	using namespace std::chrono_literals;
+
+	if (modelId_ == static_cast<uint16_t>(ArlModelId::NGT1)) {
+		GTEST_SKIP() << "TxPgnEnable 0x47 expected to hit the same VD-0 quirk as 0x46"
+		             << " on NGT-1 — NGXSW-4186";
+	}
+
+	constexpr uint32_t kProbePgn = 126992; /* System Time — same PGN as the Rx
+	                                          test for symmetry; transmittable
+	                                          and non-mandatory. */
+
+	auto getEnable = [&](const char* tag) -> std::optional<TxPgnEnableResponse> {
+		auto r = sendConvenience([this](auto t, auto cb) {
+			session_->getTxPgnEnable(kProbePgn, t, std::move(cb));
+		});
+		if (r.errorCode != ErrorCode::Ok || !r.response.has_value()) {
+			ADD_FAILURE() << tag << ": GET Tx PGN Enable failed: " << r.errorMsg;
+			return std::nullopt;
+		}
+		TxPgnEnableResponse decoded;
+		std::string err;
+		if (!decodeTxPgnEnableResponse(std::span<const uint8_t>(r.response->data),
+									   decoded, err)) {
+			ADD_FAILURE() << tag << ": decode failed: " << err;
+			return std::nullopt;
+		}
+		return decoded;
+	};
+
+	auto setEnable = [&](bool enable, const char* tag) -> bool {
+		auto r = sendConvenience([this, enable](auto t, auto cb) {
+			session_->setTxPgnEnable(kProbePgn, enable ? 1 : 0, t, std::move(cb));
+		});
+		if (r.errorCode != ErrorCode::Ok) {
+			ADD_FAILURE() << tag << ": SET Tx PGN Enable (" << enable
+			              << ") failed: " << r.errorMsg;
+			return false;
+		}
+		return true;
+	};
+
+	const auto baseline = getEnable("baseline");
+	ASSERT_TRUE(baseline.has_value());
+	const bool baselineEnabled = baseline->enable == TxPgnEnableFlag::Enabled;
+	std::cout << "  Baseline: PGN " << kProbePgn
+	          << " stack-enabled=" << (baselineEnabled ? "true" : "false")
+	          << " rate=" << baseline->txRate
+	          << " priority=" << static_cast<int>(baseline->txPriority) << std::endl;
+
+	ASSERT_TRUE(setEnable(!baselineEnabled, "flip"));
+	std::this_thread::sleep_for(150ms);
+
+	const auto afterFlip = getEnable("after-flip");
+	ASSERT_TRUE(afterFlip.has_value());
+	EXPECT_EQ(afterFlip->pgn, kProbePgn) << "GET response PGN mismatch";
+
+	ASSERT_TRUE(setEnable(baselineEnabled, "restore"));
+	std::this_thread::sleep_for(150ms);
+
+	const auto restored = getEnable("after-restore");
+	ASSERT_TRUE(restored.has_value());
+	EXPECT_EQ(restored->pgn, kProbePgn);
+	std::cout << "  Tx SET path verified (stack-gated GET state cannot prove the toggle,"
+	             " but SET acks confirm the wire path)" << std::endl;
+}
+
+/* GIT-77 sign-off coverage: exercise every Delete selector (Rx / Tx / Both).
+   Delete is a list-level operation that does not go through the per-PGN
+   VD-0 path, so it works on both NGT-1 and NGX-1 for the Rx/Tx selectors.
+   The legacy NGT-1 firmware rejects selector Both (0x02) with ARL error
+   0xFFFFFC23 — only the AMKLib firmware (NGX-1) implements that selector.
+   Test follows up with Default(Both) to put the device back into a known
+   state for the rest of the suite. */
+TEST_F(BemDeviceTest, DeletePgnEnableLists_AllSelectors)
+{
+	using namespace std::chrono_literals;
+
+	auto issueDelete = [&](DeletePgnListSelector selector, const char* tag) {
+		auto r = sendConvenience([this, selector](auto t, auto cb) {
+			/* deletePgnEnableLists takes a raw uint8_t selector; mirror the
+			   DeletePgnListSelector enum so the wire payload is identical to
+			   what the encoder would produce. */
+			session_->deletePgnEnableLists(static_cast<uint8_t>(selector), t,
+										   std::move(cb));
+		});
+		ASSERT_EQ(r.errorCode, ErrorCode::Ok)
+			<< tag << " Delete(" << deletePgnListSelectorToString(selector)
+			<< ") failed: " << r.errorMsg
+			<< " (response ARL errorCode=0x" << std::hex
+			<< (r.response.has_value() ? r.response->header.errorCode : 0u)
+			<< std::dec << ")";
+		std::cout << "  Delete(" << deletePgnListSelectorToString(selector)
+		          << ") acknowledged" << std::endl;
+	};
+
+	issueDelete(DeletePgnListSelector::RxList, "rx");
+	std::this_thread::sleep_for(100ms);
+	issueDelete(DeletePgnListSelector::TxList, "tx");
+	std::this_thread::sleep_for(100ms);
+
+	/* Selector Both (0x02) is AMKLib-only; the legacy NGT-1 firmware rejects
+	   it with ARL error 0xFFFFFC23. Don't issue it against NGT-1. */
+	if (modelId_ != static_cast<uint16_t>(ArlModelId::NGT1)) {
+		issueDelete(DeletePgnListSelector::Both, "both");
+		std::this_thread::sleep_for(100ms);
+	} else {
+		std::cout << "  [info] Skipping Delete(Both) on NGT-1 — selector 0x02 unsupported"
+		          << std::endl;
+	}
+
+	/* Restore both lists to their factory defaults so subsequent tests in
+	   the suite see a populated device. */
+	auto restore = sendConvenience([this](auto t, auto cb) {
+		session_->defaultPgnEnableList(DeletePgnListSelector::Both, t, std::move(cb));
+	});
+	EXPECT_EQ(restore.errorCode, ErrorCode::Ok)
+		<< "Default(Both) restore failed: " << restore.errorMsg;
+}
+
+/* GIT-77 sign-off coverage: 0x4B Activate is a no-op-acknowledge command at
+   the BEM layer; the side effect is that the session-side enable list is
+   promoted to the active list. Confirm via Params (0x4D) that the device
+   accepts Activate and reports the post-activate counts. Runs on both
+   devices. */
+TEST_F(BemDeviceTest, ActivatePgnEnableLists_ParamsReflectsActivation)
+{
+	auto activate = sendConvenience([this](auto t, auto cb) {
+		session_->activatePgnEnableLists(t, std::move(cb));
+	});
+	ASSERT_EQ(activate.errorCode, ErrorCode::Ok)
+		<< "Activate failed: " << activate.errorMsg;
+	std::cout << "  Activate acknowledged" << std::endl;
+
+	auto params = sendConvenience([this](auto t, auto cb) {
+		session_->getParamsPgnEnableLists(t, std::move(cb));
+	});
+	ASSERT_EQ(params.errorCode, ErrorCode::Ok);
+	ASSERT_TRUE(params.response.has_value());
+
+	ParamsPgnEnableListsResponse decoded;
+	std::string err;
+	ASSERT_TRUE(decodeParamsPgnEnableListsResponse(
+		std::span<const uint8_t>(params.response->data), decoded, err))
+		<< "Params decode failed: " << err;
+
+	std::cout << "  Post-activate: Rx active=" << decoded.rxListActiveCount
+	          << " session=" << decoded.rxListSessionCount
+	          << " | Tx active=" << decoded.txListActiveCount
+	          << " session=" << decoded.txListSessionCount
+	          << " | rxSync=" << static_cast<int>(decoded.rxSyncStatus)
+	          << " txSync=" << static_cast<int>(decoded.txSyncStatus) << std::endl;
+
+	/* Active counts must be non-zero on any device that ships with a
+	   factory-default Rx/Tx list. Sync-flag semantics are firmware-specific
+	   and not stable across products (NGX-1 reports rxSync=1 / txSync=1
+	   even immediately after Activate with no pending changes); don't
+	   assert on them here. The SDK contract this test covers is "Activate
+	   ack'd + Params GET decoded cleanly post-Activate." */
+	EXPECT_GT(decoded.rxListActiveCount, 0u);
+	EXPECT_GT(decoded.txListActiveCount, 0u);
+}
+
+/* GIT-77 sign-off coverage: full PGN-enable lifecycle on NGX. Walks the
+   Delete -> per-PGN SET -> Activate -> Params(count) -> Default -> Params
+   path the GIT-74 description originally called for. NGT-1 is skipped
+   because the per-PGN SET segment hits the VD-0 quirk (NGXSW-4186); lift
+   the skip once that firmware ticket is fixed. */
+TEST_F(BemDeviceTest, PgnEnableLifecycle_DeleteSetActivateDefault)
+{
+	using namespace std::chrono_literals;
+
+	if (modelId_ == static_cast<uint16_t>(ArlModelId::NGT1)) {
+		GTEST_SKIP() << "Lifecycle requires per-PGN SET, blocked on NGT-1 by NGXSW-4186";
+	}
+
+	constexpr uint32_t kProbePgn = 126992; /* System Time */
+
+	auto fetchParams = [&](const char* tag) -> std::optional<ParamsPgnEnableListsResponse> {
+		auto r = sendConvenience([this](auto t, auto cb) {
+			session_->getParamsPgnEnableLists(t, std::move(cb));
+		});
+		if (r.errorCode != ErrorCode::Ok || !r.response.has_value()) {
+			ADD_FAILURE() << tag << ": Params GET failed: " << r.errorMsg;
+			return std::nullopt;
+		}
+		ParamsPgnEnableListsResponse decoded;
+		std::string err;
+		if (!decodeParamsPgnEnableListsResponse(std::span<const uint8_t>(r.response->data),
+											    decoded, err)) {
+			ADD_FAILURE() << tag << ": Params decode failed: " << err;
+			return std::nullopt;
+		}
+		return decoded;
+	};
+
+	/* 1. Snapshot baseline. */
+	const auto before = fetchParams("baseline");
+	ASSERT_TRUE(before.has_value());
+	std::cout << "  Lifecycle baseline: Rx active=" << before->rxListActiveCount
+	          << " session=" << before->rxListSessionCount << std::endl;
+
+	/* 2. Delete the Rx session list. */
+	{
+		auto r = sendConvenience([this](auto t, auto cb) {
+			session_->deletePgnEnableLists(
+				static_cast<uint8_t>(DeletePgnListSelector::RxList), t, std::move(cb));
+		});
+		ASSERT_EQ(r.errorCode, ErrorCode::Ok) << "Delete(Rx) failed: " << r.errorMsg;
+	}
+	std::this_thread::sleep_for(100ms);
+
+	/* 3. Stage a per-PGN SET into the now-empty session list. */
+	{
+		auto r = sendConvenience([this](auto t, auto cb) {
+			session_->setRxPgnEnable(kProbePgn, 1, t, std::move(cb));
+		});
+		ASSERT_EQ(r.errorCode, ErrorCode::Ok)
+			<< "setRxPgnEnable(" << kProbePgn << ") failed: " << r.errorMsg;
+	}
+	std::this_thread::sleep_for(100ms);
+
+	/* 4. Activate; lists move from session to active. */
+	{
+		auto r = sendConvenience([this](auto t, auto cb) {
+			session_->activatePgnEnableLists(t, std::move(cb));
+		});
+		ASSERT_EQ(r.errorCode, ErrorCode::Ok) << "Activate failed: " << r.errorMsg;
+	}
+	std::this_thread::sleep_for(100ms);
+
+	/* 5. Confirm Params still decodes after the Activate. Don't assert
+	   specific count/sync semantics — those are firmware-specific and not
+	   what this test is here to verify; this test exercises the SDK's
+	   ability to drive the Delete -> SET -> Activate -> Params -> Default
+	   wire path without any link in the chain returning an error. */
+	const auto afterActivate = fetchParams("after-activate");
+	ASSERT_TRUE(afterActivate.has_value());
+	std::cout << "  After activate: Rx active=" << afterActivate->rxListActiveCount
+	          << " session=" << afterActivate->rxListSessionCount
+	          << " | rxSync=" << static_cast<int>(afterActivate->rxSyncStatus)
+	          << " txSync=" << static_cast<int>(afterActivate->txSyncStatus) << std::endl;
+
+	/* 6. Restore factory defaults so the suite leaves the device clean. */
+	{
+		auto r = sendConvenience([this](auto t, auto cb) {
+			session_->defaultPgnEnableList(DeletePgnListSelector::Both, t, std::move(cb));
+		});
+		ASSERT_EQ(r.errorCode, ErrorCode::Ok) << "Default(Both) failed: " << r.errorMsg;
+	}
+	std::this_thread::sleep_for(100ms);
+
+	const auto afterDefault = fetchParams("after-default");
+	ASSERT_TRUE(afterDefault.has_value());
+	std::cout << "  After default: Rx active=" << afterDefault->rxListActiveCount
+	          << " session=" << afterDefault->rxListSessionCount << std::endl;
+}
+
 /* ========================================================================== */
 /* Safe SET Tests                                                             */
 /* ========================================================================== */
