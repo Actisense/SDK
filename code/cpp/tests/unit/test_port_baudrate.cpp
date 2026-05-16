@@ -256,6 +256,68 @@ TEST_F(PortBaudrateTest, FormatBaudrate_SpecialValues)
 	EXPECT_EQ(formatBaudrate(230400), "230400 bps");
 }
 
+/* Cross-Model Wire-Trace Agreement (GIT-78) -------------------------------- */
+/*
+ * Scope: prove the decoder yields structurally identical output for an
+ * NGT-1 and an NGX-1 reply to the same Get Port Baudrate query, since the
+ * on-wire format is the same across firmware families. Until real captures
+ * from both devices are dropped in below, the fixtures hold synthesised
+ * payloads that match the spec (single port, BST protocol, 115200 baud) —
+ * the structure is in place so a real capture from each model can replace
+ * the bytes verbatim with no other changes. To do so:
+ *   1. Run actisense_console against an NGT-1, issue GetPortBaudrate(0),
+ *      copy the 11-byte response payload (after the 12-byte BEM header)
+ *      into kCaptureNgt1Port0.
+ *   2. Repeat against an NGX-1, copy into kCaptureNgx1Port0.
+ *   3. Drop the kIsSyntheticPlaceholder flag.
+ * The test then becomes a meaningful regression guard against firmware
+ * format drift between models.
+ */
+namespace
+{
+	constexpr bool kIsSyntheticPlaceholder = true;
+
+	/* Placeholder — replace with real NGT-1 wire capture of port-0 reply. */
+	constexpr std::array<uint8_t, 11> kCaptureNgt1Port0 = {
+		0x01,                   /* totalPorts = 1 */
+		0x00,                   /* portNumber = 0 */
+		0x00,                   /* protocol = BST */
+		0x00, 0xC2, 0x01, 0x00, /* sessionBaud = 115200 */
+		0x00, 0xC2, 0x01, 0x00  /* storeBaud   = 115200 */
+	};
+
+	/* Placeholder — replace with real NGX-1 wire capture of port-0 reply. */
+	constexpr std::array<uint8_t, 11> kCaptureNgx1Port0 = {
+		0x01,                   /* totalPorts = 1 */
+		0x00,                   /* portNumber = 0 */
+		0x00,                   /* protocol = BST */
+		0x00, 0xC2, 0x01, 0x00, /* sessionBaud = 115200 */
+		0x00, 0xC2, 0x01, 0x00  /* storeBaud   = 115200 */
+	};
+} /* anonymous namespace */
+
+TEST_F(PortBaudrateTest, WireTrace_NgtAndNgxResponsesDecodeIdentically)
+{
+	if (kIsSyntheticPlaceholder) {
+		GTEST_SKIP() << "Real NGT-1 / NGX-1 wire captures not yet dropped in — "
+		                "see header comment in this file (GIT-78).";
+	}
+
+	PortBaudrateResponse ngt;
+	std::string ngtErr;
+	ASSERT_TRUE(decodePortBaudrateResponse(kCaptureNgt1Port0, ngt, ngtErr)) << ngtErr;
+
+	PortBaudrateResponse ngx;
+	std::string ngxErr;
+	ASSERT_TRUE(decodePortBaudrateResponse(kCaptureNgx1Port0, ngx, ngxErr)) << ngxErr;
+
+	EXPECT_EQ(ngt.totalPorts, ngx.totalPorts);
+	EXPECT_EQ(ngt.portNumber, ngx.portNumber);
+	EXPECT_EQ(static_cast<uint8_t>(ngt.protocol), static_cast<uint8_t>(ngx.protocol));
+	EXPECT_EQ(ngt.sessionBaud, ngx.sessionBaud);
+	EXPECT_EQ(ngt.storeBaud, ngx.storeBaud);
+}
+
 /* Constants Tests ---------------------------------------------------------- */
 
 TEST_F(PortBaudrateTest, Constants)

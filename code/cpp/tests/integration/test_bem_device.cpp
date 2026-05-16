@@ -52,6 +52,7 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include "core/session_impl.hpp"
+#include "public/wire_trace.hpp"
 #include "protocols/bem/bem_commands/bem_commands.hpp"
 #include "protocols/bem/bem_commands/total_time.hpp"
 #include "protocols/bem/bem_commands/echo.hpp"
@@ -187,6 +188,27 @@ protected:
 	bool deviceIsNgx() const noexcept
 	{
 		return static_cast<ArlModelId>(modelId_) == ArlModelId::NGX1;
+	}
+
+	/* Number of physical hardware comm ports the Port Baudrate (0x17) /
+	   HardwareBaud (0x16) commands should report for this model. Wi-Fi / IP
+	   streams have no real baud rate and are explicitly NOT in scope for
+	   these commands — see NGXSW-3623. Returns std::nullopt for models we
+	   have no canonical figure for (W2K-2 is missing from ArlModelId today,
+	   so it lands here until a code point is added). */
+	std::optional<uint8_t> expectedHardwarePortCount() const noexcept
+	{
+		switch (static_cast<ArlModelId>(modelId_)) {
+			case ArlModelId::NGT1:
+			case ArlModelId::NGT1_USB:
+				return 1; /* serial only */
+			case ArlModelId::NGW1:
+				return 1; /* serial only */
+			case ArlModelId::NGX1:
+				return 2; /* CAN + serial */
+			default:
+				return std::nullopt;
+		}
 	}
 
 	void TearDown() override
@@ -344,6 +366,25 @@ TEST_F(BemDeviceTest, PortBaudrate_AllPorts_Iteration)
 		<< decodeErr;
 	const uint8_t totalPorts = port0Decoded.totalPorts;
 	ASSERT_GE(totalPorts, 1u) << "Device reported zero ports";
+
+	/* Hardware-port-only scope (NGXSW-3623): totalPorts must equal the
+	   physical comm-port count for the connected model. Wi-Fi / IP streams
+	   are out of scope for this command and must not be counted by firmware.
+	   For models we have a canonical figure for (NGT/NGW/NGX) assert
+	   strictly; otherwise emit a diagnostic and fall through to the looser
+	   per-port shape checks. */
+	if (const auto expected = expectedHardwarePortCount(); expected.has_value()) {
+		EXPECT_EQ(totalPorts, *expected)
+			<< "Firmware reports " << static_cast<int>(totalPorts)
+			<< " ports on " << modelIdToString(modelId_)
+			<< " but the model has " << static_cast<int>(*expected)
+			<< " hardware comm port(s). Wi-Fi / IP streams must not be"
+			<< " included in 0x17 responses — see NGXSW-3623.";
+	} else {
+		std::cout << "  [info] No canonical hardware-port count for "
+		          << modelIdToString(modelId_) << " — skipping strict equality"
+		          << std::endl;
+	}
 
 	std::cout << "  Iterating " << static_cast<int>(totalPorts) << " port(s) on "
 	          << modelIdToString(modelId_) << std::endl;
@@ -1169,6 +1210,54 @@ TEST_F(BemDeviceTest, GetTxPgnEnableListF1_Message3)
    ACTISENSE_TEST_PGN_DIAG=1 so the regular suite never runs it (it produces
    a lot of stdout). Run on each available device port and diff the
    output. */
+/* GIT-74 follow-up: capture ALL response messages for a single 0x4F GET
+   so we can see the sequenceId pattern on each response (the SDK's BEM
+   correlator only delivers the first to the test callback, so we wire up
+   a Session::setWireTrace sink to capture every byte off the wire).
+
+   Per NGXSW-3324: post-fix firmware should produce seq=1 for std-variant
+   messages and seq=2 for the proprietary-variant message. Pre-fix
+   v1.397 firmware auto-increments per message (1, 2, 3, ...). The NGX
+   on COM5 is reportedly built off commit feff7128e7 so we expect the
+   post-fix pattern. Gated on ACTISENSE_TEST_PGN_DIAG=1. */
+TEST_F(BemDeviceTest, TxF2_SequenceIdWireDump)
+{
+	const char* diagOn = std::getenv("ACTISENSE_TEST_PGN_DIAG");
+	if (!diagOn || std::string(diagOn) != "1") {
+		GTEST_SKIP() << "ACTISENSE_TEST_PGN_DIAG!=1 — diagnostic skipped";
+	}
+
+	std::mutex mtx;
+	std::string captured;
+	WireTraceConfig cfg;
+	cfg.format = WireTraceFormat::Hex;
+	cfg.bytesPerLine = 16;
+	cfg.includeAscii = false;
+	session_->setWireTrace(cfg, [&](std::string_view text) {
+		std::lock_guard<std::mutex> lk(mtx);
+		captured.append(text);
+	});
+
+	std::cout << "\n----- 0x4F TxF2 sequenceId trace on "
+	          << modelIdToString(modelId_) << " -----\n";
+
+	/* Issue the GET. Don't worry about decoding the (first) response here —
+	   the wire trace will capture every byte regardless of correlator
+	   matching, including responses that the SDK drops as orphans. */
+	auto _result = sendSync(makeGetCommand(BemCommandId::GetSetTxPgnEnableListF2));
+
+	/* Give the device time to emit any further response messages that the
+	   correlator dropped. Firmware loops addResponseMessage() back-to-back,
+	   so 500ms is generous. */
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+	session_->clearWireTrace();
+
+	std::lock_guard<std::mutex> lk(mtx);
+	std::cout << captured;
+	std::cout << "----- end TxF2 trace -----\n";
+}
+
 TEST_F(BemDeviceTest, PgnListWireDiagnostic)
 {
 	const char* diagOn = std::getenv("ACTISENSE_TEST_PGN_DIAG");
