@@ -5,15 +5,34 @@
  \file       rx_pgn_enable_list_f2.hpp
  \author     (Created) Claude Code
  \date       (Created) 28/01/2026
- \brief      Rx PGN Enable List Format 2 BEM command types and helpers
- \details    Structures and functions for encoding/decoding Rx PGN Enable List
-			 Format 2 (0x4E) BEM commands. This is the current format supporting
-			 up to 255 PGNs with PGN Index encoding.
+ \brief      Rx PGN Enable List Format 2 (BEM 0x4E) types and helpers
+ \details    Format 2 Rx enable list. Each entry is a device-local pgnIndex
+			 (u8, mapped to a PGN via the Supported PGN List 0x40) plus a
+			 u8 rxMask describing the per-PGN enable state.
 
-			 PGN Index Encoding:
-			 - Index 1-255: Standard PGNs 0-254
-			 - Index 256-767: Proprietary PGNs 0xFF000000-0xFF0001FF
-			 - Index 0: Reserved/invalid
+			 On-wire response payload (after the BEM response header):
+			 - byte 0:    transferId (u8)
+			 - bytes 1..4:structureVariantId (u32 LE, expected 0x00001101)
+			 - byte 5:    totalListSize (u8, total Rx PGNs)
+			 - byte 6:    firstSubIdx (u8)
+			 - byte 7:    subCount (u8, entries in this sub-list, 0..96)
+			 - bytes 8+:  [pgnIndex(u8), rxMask(u8)] × subCount
+
+			 SET payload uses the same shape minus the BEM response header
+			 fields — the device expects the application to re-send the
+			 full sub-list header it would generate.
+
+			 NOTE on multi-message: the firmware on current NGT/NGX devices
+			 does not honour any GET continuation parameter and returns the
+			 same first sub-list on every call (transferId increments). The
+			 SDK therefore exposes a single sub-list per GET; if totalListSize
+			 exceeds subCount the remaining entries are not retrievable via
+			 this command on these devices.
+
+			 Wire format reverse-engineered against live NGT-1 / NGX-1
+			 hardware under GIT-74 and matched against the legacy ACComps
+			 decoder at LibDev/ACCompLib/Codec-M/DecodeBEMCoreCmdResp.cpp
+			 DecodeRxPGNEnableList.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -30,86 +49,54 @@ namespace Actisense
 	{
 		/* Constants ------------------------------------------------------------ */
 
-		/// Maximum Rx PGNs in Format 2 list
-		static constexpr std::size_t kRxPgnEnableListF2MaxPgns = 255;
+		/// Structure Variant ID expected in 0x4E responses
+		static constexpr uint32_t kRxPgnEnableListF2SvId = 0x00001101;
 
-		/// Rx PGN Enable List F2 GET request size (no data payload)
-		static constexpr std::size_t kRxPgnEnableListF2GetRequestSize = 0;
+		/// Response header size (transferId + SVID + total + first + sub)
+		static constexpr std::size_t kRxPgnEnableListF2ResponseHeaderSize = 8;
 
-		/// Rx PGN Enable List F2 response header size (before PGN index list)
-		static constexpr std::size_t kRxPgnEnableListF2ResponseHeaderSize = 2;
+		/// Each entry: [pgnIndex u8][rxMask u8] = 2 bytes
+		static constexpr std::size_t kRxPgnEnableListF2EntrySize = 2;
 
-		/// PGN Index encoding constants
-		static constexpr uint16_t kPgnIndexMinStandard = 1;
-		static constexpr uint16_t kPgnIndexMaxStandard = 255;
-		static constexpr uint16_t kPgnIndexMinProprietary = 256;
-		static constexpr uint16_t kPgnIndexMaxProprietary = 767;
+		/// Max entries per sub-list (firmware limit)
+		static constexpr std::size_t kRxPgnEnableListF2MaxEntriesPerSubList = 96;
 
-		/// Proprietary PGN base address
-		static constexpr uint32_t kProprietaryPgnBase = 0xFF000000;
+		/// Max total entries (totalListSize is u8 → 255)
+		static constexpr std::size_t kRxPgnEnableListF2MaxTotalEntries = 255;
+
+		/// Rx mask: 0 = disabled, non-zero = enabled (bits are reserved for
+		/// per-filter flags but the firmware only uses 0/1 today).
+		static constexpr uint8_t kRxPgnMaskDisabled = 0x00;
+		static constexpr uint8_t kRxPgnMaskEnabled = 0x01;
 
 		/* Data Structures ------------------------------------------------------ */
 
 		/**************************************************************************/ /**
-		 \brief      Rx PGN Enable List F2 response structure
-		 \details    Decoded list of enabled Rx PGNs using Format 2 encoding
+		 \brief      One row in the Rx Enable List.
+		 *******************************************************************************/
+		struct RxPgnEnableEntry
+		{
+			uint8_t pgnIndex = 0; ///< Device-local PGN index (see SupportedPgnList)
+			uint8_t rxMask = 0;   ///< 0 = disabled, non-zero = enabled
+		};
+
+		/**************************************************************************/ /**
+		 \brief      Rx PGN Enable List F2 response (single sub-list message).
 		 *******************************************************************************/
 		struct RxPgnEnableListF2Response
 		{
-			uint16_t pgnCount = 0;		///< Number of enabled PGNs
-			std::vector<uint32_t> pgns; ///< List of enabled PGNs (decoded from indices)
+			uint8_t  transferId = 0;
+			uint32_t structureVariantId = 0;
+			uint8_t  totalListSize = 0;
+			uint8_t  firstSubIdx = 0;
+			uint8_t  subCount = 0;
+			std::vector<RxPgnEnableEntry> entries;
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
 
 		/**************************************************************************/ /**
-		 \brief      Convert PGN Index to actual PGN value
-		 \param[in]  index      PGN Index (1-767)
-		 \param[out] pgn        Decoded PGN value
-		 \return     True if valid index, false otherwise
-		 *******************************************************************************/
-		[[nodiscard]] inline bool pgnIndexToPgn(uint16_t index, uint32_t& pgn) noexcept {
-			if (index >= kPgnIndexMinStandard && index <= kPgnIndexMaxStandard) {
-				/* Standard PGN: index 1-255 -> PGN 0-254 */
-				pgn = static_cast<uint32_t>(index - 1);
-				return true;
-			} else if (index >= kPgnIndexMinProprietary && index <= kPgnIndexMaxProprietary) {
-				/* Proprietary PGN: index 256-767 -> PGN 0xFF000000-0xFF0001FF */
-				pgn = kProprietaryPgnBase + static_cast<uint32_t>(index - kPgnIndexMinProprietary);
-				return true;
-			}
-			return false;
-		}
-
-		/**************************************************************************/ /**
-		 \brief      Convert actual PGN value to PGN Index
-		 \param[in]  pgn        PGN value
-		 \param[out] index      Encoded PGN Index
-		 \return     True if valid PGN, false otherwise
-		 *******************************************************************************/
-		[[nodiscard]] inline bool pgnToPgnIndex(uint32_t pgn, uint16_t& index) noexcept {
-			if (pgn <= 254) {
-				/* Standard PGN: PGN 0-254 -> index 1-255 */
-				index = static_cast<uint16_t>(pgn + 1);
-				return true;
-			} else if (pgn >= kProprietaryPgnBase && pgn <= (kProprietaryPgnBase + 0x1FF)) {
-				/* Proprietary PGN: PGN 0xFF000000-0xFF0001FF -> index 256-767 */
-				index =
-					static_cast<uint16_t>(kPgnIndexMinProprietary + (pgn - kProprietaryPgnBase));
-				return true;
-			}
-			return false;
-		}
-
-		/**************************************************************************/ /**
-		 \brief      Decode Rx PGN Enable List F2 response from BEM data payload
-		 \param[in]  data       BEM response data (after 12-byte header)
-		 \param[out] response   Decoded response structure
-		 \param[out] outError   Error message if decoding fails
-		 \return     True on success, false on error
-		 \details    Response format:
-					 - Bytes 0-1: PGN count (uint16_t LE)
-					 - Bytes 2+: PGN indices (uint16_t LE each)
+		 \brief      Decode a 0x4E response payload.
 		 *******************************************************************************/
 		[[nodiscard]] inline bool
 		decodeRxPgnEnableListF2Response(std::span<const uint8_t> data,
@@ -117,121 +104,123 @@ namespace Actisense
 										std::string& outError) {
 			if (data.size() < kRxPgnEnableListF2ResponseHeaderSize) {
 				outError = "Rx PGN Enable List F2 response too short for header: expected " +
-						   std::to_string(kRxPgnEnableListF2ResponseHeaderSize) + " bytes, got " +
-						   std::to_string(data.size());
+						   std::to_string(kRxPgnEnableListF2ResponseHeaderSize) +
+						   " bytes, got " + std::to_string(data.size());
 				return false;
 			}
 
-			/* PGN count: bytes 0-1, little-endian */
-			response.pgnCount =
-				static_cast<uint16_t>(data[0]) | (static_cast<uint16_t>(data[1]) << 8);
+			response.transferId = data[0];
+			response.structureVariantId =
+				static_cast<uint32_t>(data[1]) | (static_cast<uint32_t>(data[2]) << 8) |
+				(static_cast<uint32_t>(data[3]) << 16) | (static_cast<uint32_t>(data[4]) << 24);
 
-			/* Calculate expected data size */
+			if (response.structureVariantId != kRxPgnEnableListF2SvId) {
+				outError = "Unexpected Structure Variant ID in Rx F2 response: 0x" +
+						   std::to_string(response.structureVariantId);
+				return false;
+			}
+
+			response.totalListSize = data[5];
+			response.firstSubIdx = data[6];
+			response.subCount = data[7];
+
 			const std::size_t expectedSize = kRxPgnEnableListF2ResponseHeaderSize +
-											 (static_cast<std::size_t>(response.pgnCount) * 2);
-
+											 static_cast<std::size_t>(response.subCount) *
+												 kRxPgnEnableListF2EntrySize;
 			if (data.size() < expectedSize) {
-				outError = "Rx PGN Enable List F2 response too short for " +
-						   std::to_string(response.pgnCount) + " PGNs: expected " +
+				outError = "Rx PGN Enable List F2 response truncated: subCount=" +
+						   std::to_string(response.subCount) + " expects " +
 						   std::to_string(expectedSize) + " bytes, got " +
 						   std::to_string(data.size());
 				return false;
 			}
 
-			/* Decode PGN indices */
-			response.pgns.clear();
-			response.pgns.reserve(response.pgnCount);
-
+			response.entries.clear();
+			response.entries.reserve(response.subCount);
 			std::size_t offset = kRxPgnEnableListF2ResponseHeaderSize;
-			for (uint16_t i = 0; i < response.pgnCount; ++i) {
-				const uint16_t index = static_cast<uint16_t>(data[offset]) |
-									   (static_cast<uint16_t>(data[offset + 1]) << 8);
-				offset += 2;
-
-				uint32_t pgn;
-				if (pgnIndexToPgn(index, pgn)) {
-					response.pgns.push_back(pgn);
-				} else {
-					outError = "Invalid PGN index " + std::to_string(index) + " at position " +
-							   std::to_string(i);
-					return false;
-				}
+			for (uint8_t i = 0; i < response.subCount; ++i) {
+				RxPgnEnableEntry entry;
+				entry.pgnIndex = data[offset];
+				entry.rxMask = data[offset + 1];
+				response.entries.push_back(entry);
+				offset += kRxPgnEnableListF2EntrySize;
 			}
 
 			return true;
 		}
 
 		/**************************************************************************/ /**
-		 \brief      Encode Rx PGN Enable List F2 GET request data
-		 \param[out] outData    Encoded request data (empty)
+		 \brief      Encode a 0x4E GET request payload (empty).
+		 \details    Current firmware ignores any payload — kept for symmetry.
 		 *******************************************************************************/
 		inline void encodeRxPgnEnableListF2GetRequest(std::vector<uint8_t>& outData) {
 			outData.clear();
-			/* No payload for GET request */
 		}
 
 		/**************************************************************************/ /**
-		 \brief      Encode Rx PGN Enable List F2 SET request data
-		 \param[in]  pgns       List of PGNs to enable
-		 \param[out] outData    Encoded request data
-		 \param[out] outError   Error message if encoding fails
-		 \return     True on success, false on error
+		 \brief      Encode a 0x4E SET request payload.
+		 \details    Layout:
+					   transferId, SVID, totalListSize, firstSubIdx, subCount,
+					   [pgnIndex u8, rxMask u8] × subCount
+		 \param[in]  transferId  Transfer ID (0 to let device assign)
+		 \param[in]  totalListSize  Total entries in the application's full list
+		 \param[in]  firstSubIdx    Index of the first entry in this sub-list
+		 \param[in]  entries        Sub-list contents
+		 \param[out] outData        Encoded payload
+		 \param[out] outError       Error message on failure
+		 \return     True on success
 		 *******************************************************************************/
-		[[nodiscard]] inline bool
-		encodeRxPgnEnableListF2SetRequest(const std::vector<uint32_t>& pgns,
-										  std::vector<uint8_t>& outData, std::string& outError) {
-			if (pgns.size() > kRxPgnEnableListF2MaxPgns) {
-				outError = "Too many PGNs: " + std::to_string(pgns.size()) + " exceeds max " +
-						   std::to_string(kRxPgnEnableListF2MaxPgns);
+		[[nodiscard]] inline bool encodeRxPgnEnableListF2SetRequest(
+			uint8_t transferId, uint8_t totalListSize, uint8_t firstSubIdx,
+			const std::vector<RxPgnEnableEntry>& entries, std::vector<uint8_t>& outData,
+			std::string& outError) {
+			if (entries.size() > kRxPgnEnableListF2MaxEntriesPerSubList) {
+				outError = "Too many entries in Rx F2 sub-list: " +
+						   std::to_string(entries.size()) + " exceeds max " +
+						   std::to_string(kRxPgnEnableListF2MaxEntriesPerSubList);
+				return false;
+			}
+			if (totalListSize > kRxPgnEnableListF2MaxTotalEntries) {
+				outError = "Rx F2 totalListSize " + std::to_string(totalListSize) +
+						   " exceeds max " +
+						   std::to_string(kRxPgnEnableListF2MaxTotalEntries);
 				return false;
 			}
 
 			outData.clear();
-			outData.reserve(2 + pgns.size() * 2);
-
-			/* PGN count: 2 bytes, little-endian */
-			const uint16_t count = static_cast<uint16_t>(pgns.size());
-			outData.push_back(static_cast<uint8_t>(count & 0xFF));
-			outData.push_back(static_cast<uint8_t>((count >> 8) & 0xFF));
-
-			/* Encode each PGN as index */
-			for (std::size_t i = 0; i < pgns.size(); ++i) {
-				uint16_t index;
-				if (!pgnToPgnIndex(pgns[i], index)) {
-					outError = "Invalid PGN 0x" + std::to_string(pgns[i]) + " at position " +
-							   std::to_string(i) + " - must be 0-254 or 0xFF000000-0xFF0001FF";
-					return false;
-				}
-				outData.push_back(static_cast<uint8_t>(index & 0xFF));
-				outData.push_back(static_cast<uint8_t>((index >> 8) & 0xFF));
+			outData.reserve(kRxPgnEnableListF2ResponseHeaderSize +
+							entries.size() * kRxPgnEnableListF2EntrySize);
+			outData.push_back(transferId);
+			outData.push_back(static_cast<uint8_t>(kRxPgnEnableListF2SvId & 0xFF));
+			outData.push_back(static_cast<uint8_t>((kRxPgnEnableListF2SvId >> 8) & 0xFF));
+			outData.push_back(static_cast<uint8_t>((kRxPgnEnableListF2SvId >> 16) & 0xFF));
+			outData.push_back(static_cast<uint8_t>((kRxPgnEnableListF2SvId >> 24) & 0xFF));
+			outData.push_back(totalListSize);
+			outData.push_back(firstSubIdx);
+			outData.push_back(static_cast<uint8_t>(entries.size()));
+			for (const auto& e : entries) {
+				outData.push_back(e.pgnIndex);
+				outData.push_back(e.rxMask);
 			}
-
 			return true;
 		}
 
 		/**************************************************************************/ /**
-		 \brief      Format Rx PGN Enable List F2 response as human-readable string
-		 \param[in]  response  Decoded response
-		 \return     Formatted string representation
+		 \brief      Format helper.
 		 *******************************************************************************/
 		[[nodiscard]] inline std::string
-		formatRxPgnEnableListF2(const RxPgnEnableListF2Response& response) {
-			std::string result;
-			result.reserve(response.pgns.size() * 16 + 64);
-
-			result += "Rx PGN Enable List (" + std::to_string(response.pgnCount) + " PGNs):\n";
-
-			for (std::size_t i = 0; i < response.pgns.size(); ++i) {
-				char buffer[32];
-				if (response.pgns[i] >= kProprietaryPgnBase) {
-					std::snprintf(buffer, sizeof(buffer), "0x%08X", response.pgns[i]);
-				} else {
-					std::snprintf(buffer, sizeof(buffer), "%u", response.pgns[i]);
-				}
-				result += "  [" + std::to_string(i) + "] " + buffer + "\n";
+		formatRxPgnEnableListF2(const RxPgnEnableListF2Response& r) {
+			std::string out;
+			out.reserve(64 + r.entries.size() * 16);
+			out += "Rx PGN Enable List F2 (xid=" + std::to_string(r.transferId) +
+				   ", total=" + std::to_string(r.totalListSize) + ", subList[" +
+				   std::to_string(r.firstSubIdx) + "..+" + std::to_string(r.subCount) +
+				   "]):\n";
+			for (const auto& e : r.entries) {
+				out += "  [" + std::to_string(e.pgnIndex) +
+					   "] mask=" + std::to_string(e.rxMask) + "\n";
 			}
-
-			return result;
+			return out;
 		}
 
 	} /* namespace Sdk */

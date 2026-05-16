@@ -700,12 +700,15 @@ namespace Actisense
 						   std::move(callback));
 		}
 
-		void SessionImpl::setRxPgnEnableListF2(const std::vector<uint32_t>& pgns,
+		void SessionImpl::setRxPgnEnableListF2(uint8_t transferId, uint8_t totalListSize,
+											   uint8_t firstSubIdx,
+											   const std::vector<RxPgnEnableEntry>& entries,
 											   std::chrono::milliseconds timeout,
 											   BemResponseCallback callback) {
 			std::string error;
 			std::vector<uint8_t> data;
-			if (!encodeRxPgnEnableListF2SetRequest(pgns, data, error)) {
+			if (!encodeRxPgnEnableListF2SetRequest(transferId, totalListSize, firstSubIdx,
+												   entries, data, error)) {
 				if (callback) {
 					callback(std::nullopt, ErrorCode::InvalidArgument, error);
 				}
@@ -724,12 +727,15 @@ namespace Actisense
 						   std::move(callback));
 		}
 
-		void SessionImpl::setTxPgnEnableListF2(const std::vector<TxPgnEnableEntry>& entries,
+		void SessionImpl::setTxPgnEnableListF2(uint8_t transferId, uint8_t totalListSize,
+											   uint8_t firstSubIdx,
+											   const std::vector<TxPgnEnableEntry>& entries,
 											   std::chrono::milliseconds timeout,
 											   BemResponseCallback callback) {
 			std::string error;
 			std::vector<uint8_t> data;
-			if (!encodeTxPgnEnableListF2SetRequest(entries, data, error)) {
+			if (!encodeTxPgnEnableListF2StdSetRequest(transferId, totalListSize, firstSubIdx,
+													  entries, data, error)) {
 				if (callback) {
 					callback(std::nullopt, ErrorCode::InvalidArgument, error);
 				}

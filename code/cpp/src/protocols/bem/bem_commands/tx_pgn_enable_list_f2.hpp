@@ -5,17 +5,51 @@
  \file       tx_pgn_enable_list_f2.hpp
  \author     (Created) Claude Code
  \date       (Created) 28/01/2026
- \brief      Tx PGN Enable List Format 2 BEM command types and helpers
- \details    Structures and functions for encoding/decoding Tx PGN Enable List
-			 Format 2 (0x4F) BEM commands. This is the current format supporting
-			 up to 767 PGNs with PGN Index encoding.
+ \brief      Tx PGN Enable List Format 2 (BEM 0x4F) types and helpers
+ \details    The TX list is split into two structure-variant flavours which
+			 the firmware may interleave across responses:
 
-			 PGN Index Encoding (same as Rx):
-			 - Index 1-255: Standard PGNs 0-254
-			 - Index 256-767: Proprietary PGNs 0xFF000000-0xFF0001FF
-			 - Index 0: Reserved/invalid
+			 - Standard (SVID 0x00001102): entries are device-local pgnIndex
+			   plus tx priority and rate (in ms; 0xFFFF = disabled). Each
+			   entry is 4 bytes. Sub-list cap 48 entries.
 
-			 Tx entries include rate and priority fields.
+			 - Proprietary (SVID 0x00001103): no per-entry rows; two 32-byte
+			   bitmaps (DataPage 0 and DataPage 1) where each set bit
+			   indicates an enabled proprietary PGN. Bit b in DP0 byte k
+			   corresponds to PGN 0xFF0000 + (k*8 + b). Bit b in DP1 byte k
+			   corresponds to PGN 0xFF0100 + (k*8 + b).
+
+			 On-wire response layout (after the BEM response header):
+			 - byte 0:    transferId (u8)
+			 - bytes 1..4:structureVariantId (u32 LE)
+			 - then variant-specific payload (see below)
+
+			 Standard variant (SVID 0x1102):
+			 - byte 5:   stdTotalListSize (u8)
+			 - byte 6:   firstSubIdx (u8)
+			 - byte 7:   subCount (u8, 0..48)
+			 - bytes 8+: [pgnIndex u8, priority u8, rateMs u16 LE] × subCount
+
+			 Proprietary variant (SVID 0x1103):
+			 - byte 5:   dp0Size (u8, length of DP0 bitmap, ≤32)
+			 - bytes 6..(5+dp0Size):  DP0 bitmap bytes
+			 - byte (6+dp0Size):      dp1Size (u8)
+			 - bytes (7+dp0Size)..:   DP1 bitmap bytes
+
+			 SET payload mirrors the standard-variant response layout.
+			 Setting proprietary bitmaps via this command is not supported by
+			 the SDK today.
+
+			 NOTE on multi-message: the firmware does not honour GET
+			 continuation parameters; each GET returns one variant (one
+			 sub-list) with an incrementing transferId. NGX returned the
+			 standard variant first; NGT returned the proprietary variant
+			 first. Callers wanting both should not assume ordering.
+
+			 Wire format reverse-engineered against live NGT-1 / NGX-1
+			 hardware under GIT-74 and matched against the legacy ACComps
+			 decoder at LibDev/ACCompLib/Codec-M/DecodeBEMCoreCmdResp.cpp
+			 DecodeTxPGNEnableList.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -26,194 +60,275 @@
 #include <string>
 #include <vector>
 
-#include "protocols/bem/bem_commands/rx_pgn_enable_list_f2.hpp" /* PGN Index helpers */
-
 namespace Actisense
 {
 	namespace Sdk
 	{
 		/* Constants ------------------------------------------------------------ */
 
-		/// Maximum Tx PGNs in Format 2 list
-		static constexpr std::size_t kTxPgnEnableListF2MaxPgns = 767;
+		/// Structure Variant IDs for 0x4F responses
+		static constexpr uint32_t kTxPgnEnableListF2StdSvId = 0x00001102;
+		static constexpr uint32_t kTxPgnEnableListF2PropSvId = 0x00001103;
 
-		/// Tx PGN Enable List F2 GET request size (no data payload)
-		static constexpr std::size_t kTxPgnEnableListF2GetRequestSize = 0;
+		/// Standard-variant header size (xid + SVID + total + first + sub)
+		static constexpr std::size_t kTxPgnEnableListF2StdHeaderSize = 8;
 
-		/// Tx PGN Enable List F2 response header size (before PGN entry list)
-		static constexpr std::size_t kTxPgnEnableListF2ResponseHeaderSize = 2;
+		/// Proprietary-variant initial header size (xid + SVID)
+		static constexpr std::size_t kTxPgnEnableListF2PropHeaderSize = 5;
 
-		/// Tx PGN Enable List F2 entry size (index + rate + priority = 4 bytes)
-		static constexpr std::size_t kTxPgnEnableListF2EntrySize = 4;
+		/// Standard-variant entry size (idx + prio + rate u16)
+		static constexpr std::size_t kTxPgnEnableListF2StdEntrySize = 4;
+
+		/// Max entries per standard-variant sub-list (firmware limit)
+		static constexpr std::size_t kTxPgnEnableListF2StdMaxEntriesPerSubList = 48;
+
+		/// Bitmap bytes per data page (32 → 256 PGNs per page)
+		static constexpr std::size_t kTxPgnEnableListF2PropBitmapBytes = 32;
+
+		/// Proprietary PGN base for DP0 (PGN = 0xFF0000 + bit-index)
+		static constexpr uint32_t kTxPgnPropDp0Base = 0x00FF0000;
+
+		/// Proprietary PGN base for DP1 (PGN = 0xFF0100 + bit-index)
+		static constexpr uint32_t kTxPgnPropDp1Base = 0x00FF0100;
+
+		/// Special rate value indicating the PGN is currently disabled
+		static constexpr uint16_t kTxPgnRateDisabled = 0xFFFF;
 
 		/* Data Structures ------------------------------------------------------ */
 
 		/**************************************************************************/ /**
-		 \brief      Tx PGN Enable entry with rate and priority
-		 \details    Each Tx PGN has transmission rate and priority settings
+		 \brief      One row in the standard-variant Tx Enable List.
 		 *******************************************************************************/
 		struct TxPgnEnableEntry
 		{
-			uint32_t pgn = 0;	  ///< PGN value (decoded from index)
-			uint8_t rate = 0;	  ///< Transmission rate (device-specific)
-			uint8_t priority = 0; ///< Transmission priority (0-7, 0=highest)
+			uint8_t  pgnIndex = 0; ///< Device-local PGN index (see SupportedPgnList)
+			uint8_t  priority = 0; ///< NMEA 2000 priority 0-7
+			uint16_t rateMs = 0;   ///< Transmit rate in ms (0xFFFF = disabled)
 		};
 
 		/**************************************************************************/ /**
-		 \brief      Tx PGN Enable List F2 response structure
-		 \details    Decoded list of enabled Tx PGNs using Format 2 encoding
+		 \brief      Which structure variant a 0x4F response carries.
+		 *******************************************************************************/
+		enum class TxPgnEnableListF2Variant : uint8_t
+		{
+			Unknown,
+			Standard,    ///< SVID 0x1102 — std PGN sub-list with priority+rate
+			Proprietary  ///< SVID 0x1103 — DP0/DP1 bitmaps for proprietary PGNs
+		};
+
+		/**************************************************************************/ /**
+		 \brief      Tx PGN Enable List F2 response (one message — one variant).
+		 \details    Inspect `variant` and read the matching fields. The other
+					 variant's fields are left zero/empty.
 		 *******************************************************************************/
 		struct TxPgnEnableListF2Response
 		{
-			uint16_t pgnCount = 0;				   ///< Number of enabled PGNs
-			std::vector<TxPgnEnableEntry> entries; ///< List of enabled PGNs with settings
+			uint8_t  transferId = 0;
+			uint32_t structureVariantId = 0;
+			TxPgnEnableListF2Variant variant = TxPgnEnableListF2Variant::Unknown;
+
+			/* Standard variant */
+			uint8_t stdTotalListSize = 0;
+			uint8_t stdFirstSubIdx = 0;
+			uint8_t stdSubCount = 0;
+			std::vector<TxPgnEnableEntry> stdEntries;
+
+			/* Proprietary variant */
+			std::vector<uint8_t> propDp0Bitmap; ///< Up to kTxPgnEnableListF2PropBitmapBytes
+			std::vector<uint8_t> propDp1Bitmap;
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
 
 		/**************************************************************************/ /**
-		 \brief      Decode Tx PGN Enable List F2 response from BEM data payload
-		 \param[in]  data       BEM response data (after 12-byte header)
-		 \param[out] response   Decoded response structure
-		 \param[out] outError   Error message if decoding fails
-		 \return     True on success, false on error
-		 \details    Response format:
-					 - Bytes 0-1: PGN count (uint16_t LE)
-					 - For each entry (4 bytes each):
-					   - Bytes 0-1: PGN index (uint16_t LE)
-					   - Byte 2: Transmission rate
-					   - Byte 3: Priority
+		 \brief      Decode a 0x4F response. Dispatches on the structure-variant
+					 ID to fill either standard-list fields or proprietary
+					 bitmap fields.
 		 *******************************************************************************/
 		[[nodiscard]] inline bool
 		decodeTxPgnEnableListF2Response(std::span<const uint8_t> data,
 										TxPgnEnableListF2Response& response,
 										std::string& outError) {
-			if (data.size() < kTxPgnEnableListF2ResponseHeaderSize) {
-				outError = "Tx PGN Enable List F2 response too short for header: expected " +
-						   std::to_string(kTxPgnEnableListF2ResponseHeaderSize) + " bytes, got " +
-						   std::to_string(data.size());
+			constexpr std::size_t kSvHeaderSize = 5; /* xid + SVID */
+			if (data.size() < kSvHeaderSize) {
+				outError = "Tx PGN Enable List F2 response too short for SV header: got " +
+						   std::to_string(data.size()) + " bytes";
 				return false;
 			}
 
-			/* PGN count: bytes 0-1, little-endian */
-			response.pgnCount =
-				static_cast<uint16_t>(data[0]) | (static_cast<uint16_t>(data[1]) << 8);
+			response.transferId = data[0];
+			response.structureVariantId =
+				static_cast<uint32_t>(data[1]) | (static_cast<uint32_t>(data[2]) << 8) |
+				(static_cast<uint32_t>(data[3]) << 16) | (static_cast<uint32_t>(data[4]) << 24);
 
-			/* Calculate expected data size */
-			const std::size_t expectedSize =
-				kTxPgnEnableListF2ResponseHeaderSize +
-				(static_cast<std::size_t>(response.pgnCount) * kTxPgnEnableListF2EntrySize);
+			if (response.structureVariantId == kTxPgnEnableListF2StdSvId) {
+				response.variant = TxPgnEnableListF2Variant::Standard;
+				if (data.size() < kTxPgnEnableListF2StdHeaderSize) {
+					outError = "Tx F2 std-variant response too short: got " +
+							   std::to_string(data.size()) + " bytes, need " +
+							   std::to_string(kTxPgnEnableListF2StdHeaderSize);
+					return false;
+				}
+				response.stdTotalListSize = data[5];
+				response.stdFirstSubIdx = data[6];
+				response.stdSubCount = data[7];
 
-			if (data.size() < expectedSize) {
-				outError = "Tx PGN Enable List F2 response too short for " +
-						   std::to_string(response.pgnCount) + " PGNs: expected " +
-						   std::to_string(expectedSize) + " bytes, got " +
-						   std::to_string(data.size());
-				return false;
-			}
-
-			/* Decode PGN entries */
-			response.entries.clear();
-			response.entries.reserve(response.pgnCount);
-
-			std::size_t offset = kTxPgnEnableListF2ResponseHeaderSize;
-			for (uint16_t i = 0; i < response.pgnCount; ++i) {
-				const uint16_t index = static_cast<uint16_t>(data[offset]) |
-									   (static_cast<uint16_t>(data[offset + 1]) << 8);
-
-				TxPgnEnableEntry entry;
-				if (!pgnIndexToPgn(index, entry.pgn)) {
-					outError = "Invalid PGN index " + std::to_string(index) + " at position " +
-							   std::to_string(i);
+				const std::size_t expected = kTxPgnEnableListF2StdHeaderSize +
+											 static_cast<std::size_t>(response.stdSubCount) *
+												 kTxPgnEnableListF2StdEntrySize;
+				if (data.size() < expected) {
+					outError = "Tx F2 std-variant truncated: subCount=" +
+							   std::to_string(response.stdSubCount) + " expects " +
+							   std::to_string(expected) + " bytes, got " +
+							   std::to_string(data.size());
 					return false;
 				}
 
-				entry.rate = data[offset + 2];
-				entry.priority = data[offset + 3];
-
-				response.entries.push_back(entry);
-				offset += kTxPgnEnableListF2EntrySize;
+				response.stdEntries.clear();
+				response.stdEntries.reserve(response.stdSubCount);
+				std::size_t offset = kTxPgnEnableListF2StdHeaderSize;
+				for (uint8_t i = 0; i < response.stdSubCount; ++i) {
+					TxPgnEnableEntry entry;
+					entry.pgnIndex = data[offset];
+					entry.priority = data[offset + 1];
+					entry.rateMs =
+						static_cast<uint16_t>(data[offset + 2]) |
+						(static_cast<uint16_t>(data[offset + 3]) << 8);
+					response.stdEntries.push_back(entry);
+					offset += kTxPgnEnableListF2StdEntrySize;
+				}
+				return true;
 			}
 
-			return true;
+			if (response.structureVariantId == kTxPgnEnableListF2PropSvId) {
+				response.variant = TxPgnEnableListF2Variant::Proprietary;
+				std::size_t offset = kSvHeaderSize;
+				if (data.size() < offset + 1) {
+					outError = "Tx F2 prop-variant truncated before DP0 length byte";
+					return false;
+				}
+				const uint8_t dp0Size = data[offset++];
+				if (dp0Size > kTxPgnEnableListF2PropBitmapBytes) {
+					outError = "Tx F2 prop-variant DP0 size " + std::to_string(dp0Size) +
+							   " exceeds max " +
+							   std::to_string(kTxPgnEnableListF2PropBitmapBytes);
+					return false;
+				}
+				if (data.size() < offset + dp0Size + 1) {
+					outError = "Tx F2 prop-variant truncated reading DP0 bitmap";
+					return false;
+				}
+				response.propDp0Bitmap.assign(data.data() + offset,
+											  data.data() + offset + dp0Size);
+				offset += dp0Size;
+
+				const uint8_t dp1Size = data[offset++];
+				if (dp1Size > kTxPgnEnableListF2PropBitmapBytes) {
+					outError = "Tx F2 prop-variant DP1 size " + std::to_string(dp1Size) +
+							   " exceeds max " +
+							   std::to_string(kTxPgnEnableListF2PropBitmapBytes);
+					return false;
+				}
+				if (data.size() < offset + dp1Size) {
+					outError = "Tx F2 prop-variant truncated reading DP1 bitmap";
+					return false;
+				}
+				response.propDp1Bitmap.assign(data.data() + offset,
+											  data.data() + offset + dp1Size);
+				return true;
+			}
+
+			outError = "Unexpected Structure Variant ID in Tx F2 response: 0x" +
+					   std::to_string(response.structureVariantId);
+			return false;
 		}
 
 		/**************************************************************************/ /**
-		 \brief      Encode Tx PGN Enable List F2 GET request data
-		 \param[out] outData    Encoded request data (empty)
+		 \brief      Encode an empty GET request payload.
 		 *******************************************************************************/
 		inline void encodeTxPgnEnableListF2GetRequest(std::vector<uint8_t>& outData) {
 			outData.clear();
-			/* No payload for GET request */
 		}
 
 		/**************************************************************************/ /**
-		 \brief      Encode Tx PGN Enable List F2 SET request data
-		 \param[in]  entries    List of PGN entries to enable
-		 \param[out] outData    Encoded request data
-		 \param[out] outError   Error message if encoding fails
-		 \return     True on success, false on error
+		 \brief      Encode a 0x4F SET request payload for the standard variant.
+		 \param[in]  transferId       Transfer ID (0 to let device assign)
+		 \param[in]  totalListSize    Total entries in application's full list
+		 \param[in]  firstSubIdx      Index of the first entry in this sub-list
+		 \param[in]  entries          Sub-list contents (max 48)
+		 \param[out] outData          Encoded payload
+		 \param[out] outError         Error message on failure
 		 *******************************************************************************/
-		[[nodiscard]] inline bool
-		encodeTxPgnEnableListF2SetRequest(const std::vector<TxPgnEnableEntry>& entries,
-										  std::vector<uint8_t>& outData, std::string& outError) {
-			if (entries.size() > kTxPgnEnableListF2MaxPgns) {
-				outError = "Too many PGNs: " + std::to_string(entries.size()) + " exceeds max " +
-						   std::to_string(kTxPgnEnableListF2MaxPgns);
+		[[nodiscard]] inline bool encodeTxPgnEnableListF2StdSetRequest(
+			uint8_t transferId, uint8_t totalListSize, uint8_t firstSubIdx,
+			const std::vector<TxPgnEnableEntry>& entries, std::vector<uint8_t>& outData,
+			std::string& outError) {
+			if (entries.size() > kTxPgnEnableListF2StdMaxEntriesPerSubList) {
+				outError = "Too many entries in Tx F2 std sub-list: " +
+						   std::to_string(entries.size()) + " exceeds max " +
+						   std::to_string(kTxPgnEnableListF2StdMaxEntriesPerSubList);
 				return false;
 			}
 
 			outData.clear();
-			outData.reserve(2 + entries.size() * kTxPgnEnableListF2EntrySize);
-
-			/* PGN count: 2 bytes, little-endian */
-			const uint16_t count = static_cast<uint16_t>(entries.size());
-			outData.push_back(static_cast<uint8_t>(count & 0xFF));
-			outData.push_back(static_cast<uint8_t>((count >> 8) & 0xFF));
-
-			/* Encode each entry */
-			for (std::size_t i = 0; i < entries.size(); ++i) {
-				uint16_t index;
-				if (!pgnToPgnIndex(entries[i].pgn, index)) {
-					outError = "Invalid PGN 0x" + std::to_string(entries[i].pgn) + " at position " +
-							   std::to_string(i) + " - must be 0-254 or 0xFF000000-0xFF0001FF";
-					return false;
-				}
-				outData.push_back(static_cast<uint8_t>(index & 0xFF));
-				outData.push_back(static_cast<uint8_t>((index >> 8) & 0xFF));
-				outData.push_back(entries[i].rate);
-				outData.push_back(entries[i].priority);
+			outData.reserve(kTxPgnEnableListF2StdHeaderSize +
+							entries.size() * kTxPgnEnableListF2StdEntrySize);
+			outData.push_back(transferId);
+			outData.push_back(static_cast<uint8_t>(kTxPgnEnableListF2StdSvId & 0xFF));
+			outData.push_back(static_cast<uint8_t>((kTxPgnEnableListF2StdSvId >> 8) & 0xFF));
+			outData.push_back(static_cast<uint8_t>((kTxPgnEnableListF2StdSvId >> 16) & 0xFF));
+			outData.push_back(static_cast<uint8_t>((kTxPgnEnableListF2StdSvId >> 24) & 0xFF));
+			outData.push_back(totalListSize);
+			outData.push_back(firstSubIdx);
+			outData.push_back(static_cast<uint8_t>(entries.size()));
+			for (const auto& e : entries) {
+				outData.push_back(e.pgnIndex);
+				outData.push_back(e.priority);
+				outData.push_back(static_cast<uint8_t>(e.rateMs & 0xFF));
+				outData.push_back(static_cast<uint8_t>((e.rateMs >> 8) & 0xFF));
 			}
-
 			return true;
 		}
 
 		/**************************************************************************/ /**
-		 \brief      Format Tx PGN Enable List F2 response as human-readable string
-		 \param[in]  response  Decoded response
-		 \return     Formatted string representation
+		 \brief      Format helper.
 		 *******************************************************************************/
 		[[nodiscard]] inline std::string
-		formatTxPgnEnableListF2(const TxPgnEnableListF2Response& response) {
-			std::string result;
-			result.reserve(response.entries.size() * 32 + 64);
-
-			result += "Tx PGN Enable List (" + std::to_string(response.pgnCount) + " PGNs):\n";
-
-			for (std::size_t i = 0; i < response.entries.size(); ++i) {
-				const auto& entry = response.entries[i];
-				char buffer[64];
-				if (entry.pgn >= kProprietaryPgnBase) {
-					std::snprintf(buffer, sizeof(buffer), "0x%08X (rate=%u, priority=%u)",
-								  entry.pgn, entry.rate, entry.priority);
-				} else {
-					std::snprintf(buffer, sizeof(buffer), "%u (rate=%u, priority=%u)", entry.pgn,
-								  entry.rate, entry.priority);
+		formatTxPgnEnableListF2(const TxPgnEnableListF2Response& r) {
+			std::string out;
+			out.reserve(128);
+			out += "Tx PGN Enable List F2 (xid=" + std::to_string(r.transferId) + ", ";
+			if (r.variant == TxPgnEnableListF2Variant::Standard) {
+				out += "Std, total=" + std::to_string(r.stdTotalListSize) +
+					   ", subList[" + std::to_string(r.stdFirstSubIdx) + "..+" +
+					   std::to_string(r.stdSubCount) + "]):\n";
+				for (const auto& e : r.stdEntries) {
+					out += "  [" + std::to_string(e.pgnIndex) +
+						   "] prio=" + std::to_string(e.priority) +
+						   " rate=" + std::to_string(e.rateMs) + "ms\n";
 				}
-				result += "  [" + std::to_string(i) + "] " + buffer + "\n";
+			} else if (r.variant == TxPgnEnableListF2Variant::Proprietary) {
+				out += "Proprietary DP0=" + std::to_string(r.propDp0Bitmap.size()) +
+					   "B DP1=" + std::to_string(r.propDp1Bitmap.size()) + "B):\n";
+				auto dumpBmp = [&out](const char* tag, uint32_t base,
+									  const std::vector<uint8_t>& bmp) {
+					for (std::size_t k = 0; k < bmp.size(); ++k) {
+						for (uint8_t b = 0; b < 8; ++b) {
+							if (bmp[k] & (1u << b)) {
+								char buf[32];
+								std::snprintf(buf, sizeof(buf), "  %s PGN 0x%06X\n", tag,
+											  static_cast<unsigned>(base + k * 8 + b));
+								out += buf;
+							}
+						}
+					}
+				};
+				dumpBmp("DP0", kTxPgnPropDp0Base, r.propDp0Bitmap);
+				dumpBmp("DP1", kTxPgnPropDp1Base, r.propDp1Bitmap);
+			} else {
+				out += "Unknown variant)\n";
 			}
-
-			return result;
+			return out;
 		}
 
 	} /* namespace Sdk */

@@ -397,12 +397,18 @@ namespace Actisense
 									  BemResponseCallback callback);
 
 			/**************************************************************************/ /**
-			 \brief      Send Set Rx PGN Enable List F2 command
-			 \param[in]  pgns      List of PGNs to enable (max 255)
-			 \param[in]  timeout   Timeout for response
-			 \param[in]  callback  Callback invoked on response or timeout
+			 \brief      Send Set Rx PGN Enable List F2 command (single sub-list)
+			 \param[in]  transferId      Transfer ID for this transfer (0 to let the
+									     device assign)
+			 \param[in]  totalListSize   Total entries in the application's full list
+			 \param[in]  firstSubIdx     Index of this sub-list's first entry
+			 \param[in]  entries         Sub-list contents (max 96)
+			 \param[in]  timeout         Timeout for response
+			 \param[in]  callback        Callback invoked on response or timeout
 			 *******************************************************************************/
-			void setRxPgnEnableListF2(const std::vector<uint32_t>& pgns,
+			void setRxPgnEnableListF2(uint8_t transferId, uint8_t totalListSize,
+									  uint8_t firstSubIdx,
+									  const std::vector<RxPgnEnableEntry>& entries,
 									  std::chrono::milliseconds timeout,
 									  BemResponseCallback callback);
 
@@ -415,12 +421,20 @@ namespace Actisense
 									  BemResponseCallback callback);
 
 			/**************************************************************************/ /**
-			 \brief      Send Set Tx PGN Enable List F2 command
-			 \param[in]  entries   PGN entries (PGN + rate + priority) to enable (max 767)
-			 \param[in]  timeout   Timeout for response
-			 \param[in]  callback  Callback invoked on response or timeout
+			 \brief      Send Set Tx PGN Enable List F2 command (standard sub-list)
+			 \param[in]  transferId      Transfer ID for this transfer (0 to let the
+									     device assign)
+			 \param[in]  totalListSize   Total std entries in application's full list
+			 \param[in]  firstSubIdx     Index of this sub-list's first entry
+			 \param[in]  entries         Sub-list contents (max 48)
+			 \param[in]  timeout         Timeout for response
+			 \param[in]  callback        Callback invoked on response or timeout
+			 \details    The proprietary variant (SVID 0x1103) cannot currently be
+						 written by this SDK; this method only emits the std variant.
 			 *******************************************************************************/
-			void setTxPgnEnableListF2(const std::vector<TxPgnEnableEntry>& entries,
+			void setTxPgnEnableListF2(uint8_t transferId, uint8_t totalListSize,
+									  uint8_t firstSubIdx,
+									  const std::vector<TxPgnEnableEntry>& entries,
 									  std::chrono::milliseconds timeout,
 									  BemResponseCallback callback);
 

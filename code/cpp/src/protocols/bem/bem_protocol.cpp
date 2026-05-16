@@ -435,12 +435,14 @@ namespace Actisense
 									   outFrame, outError);
 		}
 
-		bool BemProtocol::buildSetRxPgnEnableListF2(const std::vector<uint32_t>& pgns,
-													std::vector<uint8_t>& outFrame,
-													std::string& outError) {
+		bool BemProtocol::buildSetRxPgnEnableListF2(
+			uint8_t transferId, uint8_t totalListSize, uint8_t firstSubIdx,
+			const std::vector<RxPgnEnableEntry>& entries, std::vector<uint8_t>& outFrame,
+			std::string& outError) {
 			std::string encodeError;
 			std::vector<uint8_t> data;
-			if (!encodeRxPgnEnableListF2SetRequest(pgns, data, encodeError)) {
+			if (!encodeRxPgnEnableListF2SetRequest(transferId, totalListSize, firstSubIdx,
+												   entries, data, encodeError)) {
 				outError = encodeError;
 				return false;
 			}
@@ -459,12 +461,14 @@ namespace Actisense
 									   outFrame, outError);
 		}
 
-		bool BemProtocol::buildSetTxPgnEnableListF2(const std::vector<TxPgnEnableEntry>& entries,
-													std::vector<uint8_t>& outFrame,
-													std::string& outError) {
+		bool BemProtocol::buildSetTxPgnEnableListF2(
+			uint8_t transferId, uint8_t totalListSize, uint8_t firstSubIdx,
+			const std::vector<TxPgnEnableEntry>& entries, std::vector<uint8_t>& outFrame,
+			std::string& outError) {
 			std::string encodeError;
 			std::vector<uint8_t> data;
-			if (!encodeTxPgnEnableListF2SetRequest(entries, data, encodeError)) {
+			if (!encodeTxPgnEnableListF2StdSetRequest(transferId, totalListSize, firstSubIdx,
+													  entries, data, encodeError)) {
 				outError = encodeError;
 				return false;
 			}

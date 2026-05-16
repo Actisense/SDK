@@ -192,48 +192,57 @@ TEST_F(SessionPgnListManagementTest, GetParamsPgnEnableLists_SendsCommand)
 
 /* SET helpers -------------------------------------------------------------- */
 
-TEST_F(SessionPgnListManagementTest, SetRxPgnEnableListF2_EncodesPgnList)
+TEST_F(SessionPgnListManagementTest, SetRxPgnEnableListF2_EncodesSubList)
 {
-	/* Encoder maps PGN 0-254 -> index 1-255; use values in that range. */
-	const std::vector<uint32_t> pgns = {0, 10, 100};
-	session_->setRxPgnEnableListF2(pgns, kTimeout, nullptr);
+	const std::vector<RxPgnEnableEntry> entries = {
+		{0x00, kRxPgnMaskEnabled},
+		{0x05, kRxPgnMaskEnabled},
+		{0x14, kRxPgnMaskDisabled},
+	};
+	session_->setRxPgnEnableListF2(/*xid=*/1, /*total=*/3, /*firstIdx=*/0, entries,
+								   kTimeout, nullptr);
 
 	const auto dgm = captureSentDatagram();
 	EXPECT_EQ(dgm.bstId, static_cast<uint8_t>(BstId::Bem_PG_A1));
-	ASSERT_GE(dgm.data.size(), 3u);
+	/* Header: BEM ID + xid(1) + SVID(4) + total(1) + first(1) + sub(1) = 9 bytes,
+	   then 3 entries × 2 bytes = 6, total 15. */
+	ASSERT_EQ(dgm.data.size(), 1u + kRxPgnEnableListF2ResponseHeaderSize + 3 * 2);
 	EXPECT_EQ(dgm.data[0], static_cast<uint8_t>(BemCommandId::GetSetRxPgnEnableListF2));
-
-	/* Payload starts after the BEM ID; first 2 bytes = PGN count, LE. */
-	const uint16_t count =
-		static_cast<uint16_t>(dgm.data[1]) | (static_cast<uint16_t>(dgm.data[2]) << 8);
-	EXPECT_EQ(count, 3);
+	EXPECT_EQ(dgm.data[1], 1u);             /* xid */
+	EXPECT_EQ(dgm.data[2], 0x01);           /* SVID LE byte 0 */
+	EXPECT_EQ(dgm.data[6], 3u);             /* total */
+	EXPECT_EQ(dgm.data[7], 0u);             /* firstIdx */
+	EXPECT_EQ(dgm.data[8], 3u);             /* subCount */
+	EXPECT_EQ(dgm.data[9], 0x00);           /* first entry pgnIdx */
+	EXPECT_EQ(dgm.data[10], kRxPgnMaskEnabled);
 }
 
-TEST_F(SessionPgnListManagementTest, SetTxPgnEnableListF2_EncodesEntries)
+TEST_F(SessionPgnListManagementTest, SetTxPgnEnableListF2_EncodesStdEntries)
 {
-	/* Encoder accepts PGN 0-254 or proprietary 0xFF000000-0xFF0001FF. */
 	std::vector<TxPgnEnableEntry> entries;
-	TxPgnEnableEntry entry;
-	entry.pgn = 50;
-	entry.rate = 100;
-	entry.priority = 3;
-	entries.push_back(entry);
+	entries.push_back({/*pgnIndex=*/0x05, /*priority=*/3, /*rateMs=*/100});
 
-	session_->setTxPgnEnableListF2(entries, kTimeout, nullptr);
+	session_->setTxPgnEnableListF2(/*xid=*/1, /*total=*/1, /*firstIdx=*/0, entries,
+								   kTimeout, nullptr);
 
 	const auto dgm = captureSentDatagram();
 	EXPECT_EQ(dgm.bstId, static_cast<uint8_t>(BstId::Bem_PG_A1));
-	ASSERT_GE(dgm.data.size(), 3u + 4u); /* BEM ID + count(2) + 4-byte entry */
+	/* BEM ID + 8-byte header + 4-byte entry = 13 bytes. */
+	ASSERT_EQ(dgm.data.size(), 1u + kTxPgnEnableListF2StdHeaderSize +
+								   kTxPgnEnableListF2StdEntrySize);
 	EXPECT_EQ(dgm.data[0], static_cast<uint8_t>(BemCommandId::GetSetTxPgnEnableListF2));
+	EXPECT_EQ(dgm.data[1], 1u);   /* xid */
+	EXPECT_EQ(dgm.data[2], 0x02); /* SVID LE byte 0 — Std variant */
+	EXPECT_EQ(dgm.data[3], 0x11);
+	EXPECT_EQ(dgm.data[6], 1u);   /* total */
+	EXPECT_EQ(dgm.data[7], 0u);   /* firstIdx */
+	EXPECT_EQ(dgm.data[8], 1u);   /* subCount */
 
-	const uint16_t count =
-		static_cast<uint16_t>(dgm.data[1]) | (static_cast<uint16_t>(dgm.data[2]) << 8);
-	EXPECT_EQ(count, 1);
-
-	/* Verify the entry's rate and priority survived encoding (entry layout:
-	   index(2) + rate(1) + priority(1)). */
-	EXPECT_EQ(dgm.data[5], 100);
-	EXPECT_EQ(dgm.data[6], 3);
+	/* Entry layout: pgnIndex(1) + priority(1) + rateMs(2 LE). */
+	EXPECT_EQ(dgm.data[9], 0x05);  /* pgnIndex */
+	EXPECT_EQ(dgm.data[10], 3);    /* priority */
+	EXPECT_EQ(dgm.data[11], 100);  /* rate LE lo (100) */
+	EXPECT_EQ(dgm.data[12], 0);    /* rate LE hi */
 }
 
 /* Management commands ------------------------------------------------------ */

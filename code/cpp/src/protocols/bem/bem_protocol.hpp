@@ -420,14 +420,18 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Build Set Rx PGN Enable List F2 command
-			 \param[in]  pgns       List of PGNs to enable
-			 \param[out] outFrame   Complete BDTP-framed message
-			 \param[out] outError   Error message if encoding fails
+			 \param[in]  transferId      Transfer ID
+			 \param[in]  totalListSize   Total entries in full Rx list
+			 \param[in]  firstSubIdx     Index of first entry in this sub-list
+			 \param[in]  entries         Sub-list entries (max 96)
+			 \param[out] outFrame        Complete BDTP-framed message
+			 \param[out] outError        Error message if encoding fails
 			 \return     True on success
 			 *******************************************************************************/
-			[[nodiscard]] bool buildSetRxPgnEnableListF2(const std::vector<uint32_t>& pgns,
-														 std::vector<uint8_t>& outFrame,
-														 std::string& outError);
+			[[nodiscard]] bool buildSetRxPgnEnableListF2(
+				uint8_t transferId, uint8_t totalListSize, uint8_t firstSubIdx,
+				const std::vector<RxPgnEnableEntry>& entries,
+				std::vector<uint8_t>& outFrame, std::string& outError);
 
 			/**************************************************************************/ /**
 			 \brief      Build Get Tx PGN Enable List F2 command
@@ -439,14 +443,19 @@ namespace Actisense
 														 std::string& outError);
 
 			/**************************************************************************/ /**
-			 \brief      Build Set Tx PGN Enable List F2 command
-			 \param[in]  entries    PGN entries (PGN + rate + priority) to enable
-			 \param[out] outFrame   Complete BDTP-framed message
-			 \param[out] outError   Error message if encoding fails
+			 \brief      Build Set Tx PGN Enable List F2 command (standard variant)
+			 \param[in]  transferId      Transfer ID
+			 \param[in]  totalListSize   Total std entries in full list
+			 \param[in]  firstSubIdx     Index of first entry in this sub-list
+			 \param[in]  entries         Sub-list entries (max 48)
+			 \param[out] outFrame        Complete BDTP-framed message
+			 \param[out] outError        Error message if encoding fails
 			 \return     True on success
 			 *******************************************************************************/
 			[[nodiscard]] bool
-			buildSetTxPgnEnableListF2(const std::vector<TxPgnEnableEntry>& entries,
+			buildSetTxPgnEnableListF2(uint8_t transferId, uint8_t totalListSize,
+									  uint8_t firstSubIdx,
+									  const std::vector<TxPgnEnableEntry>& entries,
 									  std::vector<uint8_t>& outFrame, std::string& outError);
 
 			/**************************************************************************/ /**

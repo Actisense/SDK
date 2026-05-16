@@ -600,6 +600,28 @@ TEST_F(BemDeviceTest, GetProductInfo)
 	}
 }
 
+TEST_F(BemDeviceTest, GetProductInfo_ViaSession)
+{
+	/* Public-API counterpart to GetProductInfo: exercises the
+	   SessionImpl::getProductInfo convenience wrapper. The two tests should
+	   agree on the response — divergence indicates the wrapper has drifted
+	   from the raw protocol. */
+	auto result = sendConvenience([this](auto timeout, auto cb) {
+		session_->getProductInfo(timeout, std::move(cb));
+	});
+
+	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
+	ASSERT_TRUE(result.response.has_value());
+
+	ProductInfoResponse piResp;
+	std::string error;
+	ASSERT_TRUE(decodeProductInfoResponse(std::span<const uint8_t>(result.response->data),
+	                                       piResp, error))
+		<< "Product Info (via session API) decode failed: " << error;
+	std::cout << "  Product Info (via session API): "
+	          << piResp.modelId << " sw=" << piResp.softwareVersion << std::endl;
+}
+
 TEST_F(BemDeviceTest, GetCanConfig)
 {
 	auto cmd = makeGetCommand(BemCommandId::GetSetCanConfig);
@@ -622,6 +644,26 @@ TEST_F(BemDeviceTest, GetCanConfig)
 	}
 }
 
+TEST_F(BemDeviceTest, GetCanConfig_ViaSession)
+{
+	/* Public-API counterpart to GetCanConfig. */
+	auto result = sendConvenience([this](auto timeout, auto cb) {
+		session_->getCanConfig(timeout, std::move(cb));
+	});
+
+	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
+	ASSERT_TRUE(result.response.has_value());
+
+	CanConfigResponse ccResp;
+	std::string error;
+	ASSERT_TRUE(decodeCanConfigResponse(std::span<const uint8_t>(result.response->data),
+	                                     ccResp, error))
+		<< "CAN Config (via session API) decode failed: " << error;
+	std::cout << "  CAN Config (via session API): NAME=0x" << std::hex
+	          << ccResp.name.rawValue << std::dec << " SA="
+	          << static_cast<int>(ccResp.sourceAddress) << std::endl;
+}
+
 TEST_F(BemDeviceTest, GetCanInfoField1)
 {
 	auto cmd = makeGetCommand(BemCommandId::GetSetCanInfoField1);
@@ -630,6 +672,18 @@ TEST_F(BemDeviceTest, GetCanInfoField1)
 	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
 	ASSERT_TRUE(result.response.has_value());
 	std::cout << "  CAN Info Field 1 response: "
+	          << result.response->data.size() << " data bytes" << std::endl;
+}
+
+TEST_F(BemDeviceTest, GetCanInfoField1_ViaSession)
+{
+	auto result = sendConvenience([this](auto timeout, auto cb) {
+		session_->getCanInfoField1(timeout, std::move(cb));
+	});
+
+	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
+	ASSERT_TRUE(result.response.has_value());
+	std::cout << "  CAN Info Field 1 (via session API): "
 	          << result.response->data.size() << " data bytes" << std::endl;
 }
 
@@ -644,6 +698,18 @@ TEST_F(BemDeviceTest, GetCanInfoField2)
 	          << result.response->data.size() << " data bytes" << std::endl;
 }
 
+TEST_F(BemDeviceTest, GetCanInfoField2_ViaSession)
+{
+	auto result = sendConvenience([this](auto timeout, auto cb) {
+		session_->getCanInfoField2(timeout, std::move(cb));
+	});
+
+	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
+	ASSERT_TRUE(result.response.has_value());
+	std::cout << "  CAN Info Field 2 (via session API): "
+	          << result.response->data.size() << " data bytes" << std::endl;
+}
+
 TEST_F(BemDeviceTest, GetCanInfoField3)
 {
 	auto cmd = makeGetCommand(BemCommandId::GetCanInfoField3);
@@ -652,6 +718,18 @@ TEST_F(BemDeviceTest, GetCanInfoField3)
 	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
 	ASSERT_TRUE(result.response.has_value());
 	std::cout << "  CAN Info Field 3 (Manufacturer): "
+	          << result.response->data.size() << " data bytes" << std::endl;
+}
+
+TEST_F(BemDeviceTest, GetCanInfoField3_ViaSession)
+{
+	auto result = sendConvenience([this](auto timeout, auto cb) {
+		session_->getCanInfoField3(timeout, std::move(cb));
+	});
+
+	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
+	ASSERT_TRUE(result.response.has_value());
+	std::cout << "  CAN Info Field 3 (via session API): "
 	          << result.response->data.size() << " data bytes" << std::endl;
 }
 
@@ -674,18 +752,17 @@ TEST_F(BemDeviceTest, GetSupportedPgnList)
 
 	SupportedPgnListResponse spResp;
 	std::string error;
-	if (decodeSupportedPgnListResponse(std::span<const uint8_t>(data), spResp, error)) {
-		std::cout << "  PGN Index: " << static_cast<int>(spResp.pgnIndex)
-		          << ", Transfer ID: " << static_cast<int>(spResp.transferId)
-		          << ", PGN Count: " << spResp.pgns.size() << std::endl;
-		for (std::size_t i = 0; i < spResp.pgns.size() && i < 10; ++i) {
-			std::cout << "    PGN[" << i << "]: " << spResp.pgns[i] << std::endl;
-		}
-		if (spResp.pgns.size() > 10) {
-			std::cout << "    ... (" << spResp.pgns.size() - 10 << " more)" << std::endl;
-		}
-	} else {
-		std::cout << "  Supported PGN List decode note: " << error << std::endl;
+	ASSERT_TRUE(decodeSupportedPgnListResponse(std::span<const uint8_t>(data), spResp, error))
+		<< "Supported PGN List decode failed: " << error;
+	std::cout << "  transferId=" << static_cast<int>(spResp.transferId)
+	          << ", dbVer=" << (spResp.nmea2000DbVersion / 1000) << "."
+	          << (spResp.nmea2000DbVersion % 1000)
+	          << ", total=" << static_cast<int>(spResp.totalListSize)
+	          << ", subList[" << static_cast<int>(spResp.firstSubIdx)
+	          << "..+" << static_cast<int>(spResp.subCount) << "]" << std::endl;
+	for (std::size_t i = 0; i < spResp.entries.size() && i < 10; ++i) {
+		std::cout << "    [" << static_cast<int>(spResp.entries[i].pgnIndex)
+		          << "] PGN " << spResp.entries[i].pgn << std::endl;
 	}
 }
 
@@ -720,15 +797,15 @@ TEST_F(BemDeviceTest, GetRxPgnEnableListF2)
 	ASSERT_TRUE(result.response.has_value());
 
 	const auto& data = result.response->data;
-	std::cout << "  Rx PGN Enable List F2 response: " << data.size() << " data bytes" << std::endl;
-
 	RxPgnEnableListF2Response rxResp;
 	std::string error;
-	if (decodeRxPgnEnableListF2Response(std::span<const uint8_t>(data), rxResp, error)) {
-		std::cout << formatRxPgnEnableListF2(rxResp);
-	} else {
-		std::cout << "  Rx F2 decode note: " << error << std::endl;
-	}
+	ASSERT_TRUE(decodeRxPgnEnableListF2Response(std::span<const uint8_t>(data), rxResp, error))
+		<< "Rx F2 decode failed: " << error << " (got " << data.size() << " bytes)";
+
+	EXPECT_EQ(rxResp.structureVariantId, kRxPgnEnableListF2SvId);
+	EXPECT_EQ(rxResp.entries.size(), rxResp.subCount);
+	EXPECT_LE(rxResp.subCount, kRxPgnEnableListF2MaxEntriesPerSubList);
+	std::cout << formatRxPgnEnableListF2(rxResp);
 }
 
 TEST_F(BemDeviceTest, GetTxPgnEnableListF2)
@@ -740,15 +817,24 @@ TEST_F(BemDeviceTest, GetTxPgnEnableListF2)
 	ASSERT_TRUE(result.response.has_value());
 
 	const auto& data = result.response->data;
-	std::cout << "  Tx PGN Enable List F2 response: " << data.size() << " data bytes" << std::endl;
-
 	TxPgnEnableListF2Response txResp;
 	std::string error;
-	if (decodeTxPgnEnableListF2Response(std::span<const uint8_t>(data), txResp, error)) {
-		std::cout << formatTxPgnEnableListF2(txResp);
+	ASSERT_TRUE(decodeTxPgnEnableListF2Response(std::span<const uint8_t>(data), txResp, error))
+		<< "Tx F2 decode failed: " << error << " (got " << data.size() << " bytes)";
+
+	/* Variant depends on firmware ordering — NGX returned std first, NGT
+	   returned proprietary first. Either is valid; just confirm we got one. */
+	EXPECT_NE(txResp.variant, TxPgnEnableListF2Variant::Unknown);
+	if (txResp.variant == TxPgnEnableListF2Variant::Standard) {
+		EXPECT_EQ(txResp.structureVariantId, kTxPgnEnableListF2StdSvId);
+		EXPECT_EQ(txResp.stdEntries.size(), txResp.stdSubCount);
+		EXPECT_LE(txResp.stdSubCount, kTxPgnEnableListF2StdMaxEntriesPerSubList);
 	} else {
-		std::cout << "  Tx F2 decode note: " << error << std::endl;
+		EXPECT_EQ(txResp.structureVariantId, kTxPgnEnableListF2PropSvId);
+		EXPECT_LE(txResp.propDp0Bitmap.size(), kTxPgnEnableListF2PropBitmapBytes);
+		EXPECT_LE(txResp.propDp1Bitmap.size(), kTxPgnEnableListF2PropBitmapBytes);
 	}
+	std::cout << formatTxPgnEnableListF2(txResp);
 }
 
 TEST_F(BemDeviceTest, GetRxPgnEnableListF1_Message0)
@@ -894,6 +980,220 @@ TEST_F(BemDeviceTest, GetTxPgnEnableListF1_Message3)
 		std::cout << formatTxPgnEnableListF1(txResp);
 	} else {
 		std::cout << "  Tx F1 msg 3 decode note: " << error << std::endl;
+	}
+}
+
+/* ========================================================================== */
+/* GIT-74: PGN List Wire-Format Diagnostic                                    */
+/* ========================================================================== */
+
+/* GIT-74 diagnostic: dump raw response bytes for every PGN-list-related
+   command so we can reconcile against the legacy ACComms reference and
+   confirm NGT and NGX use the same on-wire format. Gated on
+   ACTISENSE_TEST_PGN_DIAG=1 so the regular suite never runs it (it produces
+   a lot of stdout). Run on each available device port and diff the
+   output. */
+TEST_F(BemDeviceTest, PgnListWireDiagnostic)
+{
+	const char* diagOn = std::getenv("ACTISENSE_TEST_PGN_DIAG");
+	if (!diagOn || std::string(diagOn) != "1") {
+		GTEST_SKIP() << "ACTISENSE_TEST_PGN_DIAG!=1 — diagnostic test skipped";
+	}
+
+	auto dumpResponse = [](const char* label, const BemResult& r) {
+		std::cout << "=== " << label << " ===\n";
+		if (r.errorCode != ErrorCode::Ok) {
+			std::cout << "  SDK errorCode=" << static_cast<int>(r.errorCode)
+			          << " msg=\"" << r.errorMsg << "\"\n";
+		}
+		if (!r.response.has_value()) {
+			std::cout << "  no response payload\n";
+			return;
+		}
+		const auto& h = r.response->header;
+		char buf[80];
+		std::snprintf(buf, sizeof(buf),
+		              "  hdr: bemId=0x%02X seq=0x%02X model=0x%04X serial=0x%08X arlErr=0x%08X",
+		              h.bemId, h.sequenceId, h.modelId, h.serialNumber, h.errorCode);
+		std::cout << buf << "\n  data (" << r.response->data.size() << " bytes):";
+		for (std::size_t i = 0; i < r.response->data.size(); ++i) {
+			if (i % 16 == 0) std::cout << "\n    ";
+			char hex[5];
+			std::snprintf(hex, sizeof(hex), " %02X", r.response->data[i]);
+			std::cout << hex;
+		}
+		std::cout << "\n";
+	};
+
+	std::cout << "\n----- PGN List Wire Diagnostic on " << modelIdToString(modelId_)
+	          << " (0x" << std::hex << modelId_ << std::dec << ") -----\n";
+
+	/* 0x40 Get Supported PGN List — request first chunk (pgnIndex=0,
+	   transferId=0). Multi-message; if response has a follow-on transferId,
+	   chain a second call to confirm chaining mechanics. */
+	{
+		BemCommand cmd;
+		cmd.bstId = BstId::Bem_PG_A1;
+		cmd.bemId = BemCommandId::GetSupportedPgnList;
+		cmd.data = {0x00, 0x00};
+		dumpResponse("0x40 GetSupportedPgnList (idx=0, xid=0)", sendSync(cmd));
+	}
+
+	/* 0x4D Params PGN Enable Lists */
+	dumpResponse("0x4D ParamsPgnEnableLists",
+	             sendSync(makeGetCommand(BemCommandId::ParamsPgnEnableLists)));
+
+	/* 0x4E Rx PGN Enable List F2 — empty GET. Confirmed during GIT-74
+	   investigation that the firmware ignores any GET payload bytes and
+	   always returns the first sub-list (firstSubIdx=0) with an
+	   incrementing transferId, so no SDK-side continuation logic is
+	   needed for F2. */
+	dumpResponse("0x4E GetRxPgnEnableListF2",
+	             sendSync(makeGetCommand(BemCommandId::GetSetRxPgnEnableListF2)));
+
+	/* 0x4F Tx PGN Enable List F2 */
+	dumpResponse("0x4F GetTxPgnEnableListF2",
+	             sendSync(makeGetCommand(BemCommandId::GetSetTxPgnEnableListF2)));
+
+	/* 0x48 / 0x49 F1 — gated on model: NGX-1 won't respond. NGT/NGW will
+	   serve up multi-message chunks indexed 0/1 (Rx) and 0..3 (Tx). */
+	if (deviceSupportsPgnListF1()) {
+		for (uint8_t msg = 0; msg < 2; ++msg) {
+			char label[64];
+			std::snprintf(label, sizeof(label), "0x48 GetRxPgnEnableListF1 (msg=%u)", msg);
+			dumpResponse(label,
+			             sendSync(makeCommand(BemCommandId::GetSetRxPgnEnableListF1, {msg})));
+		}
+		for (uint8_t msg = 0; msg < 4; ++msg) {
+			char label[64];
+			std::snprintf(label, sizeof(label), "0x49 GetTxPgnEnableListF1 (msg=%u)", msg);
+			dumpResponse(label,
+			             sendSync(makeCommand(BemCommandId::GetSetTxPgnEnableListF1, {msg})));
+		}
+	} else {
+		std::cout << "=== F1 (0x48/0x49) skipped on this model ===\n";
+	}
+
+	std::cout << "----- end PGN List Wire Diagnostic -----\n\n";
+}
+
+/* GIT-74: Rx PGN Enable List F2 round-trip — verify the management
+   commands compose end-to-end on real hardware (Delete -> SET -> Activate
+   -> GET -> Default -> GET) without firmware errors, and that each GET
+   response decodes cleanly via the rewritten codec.
+
+   This is intentionally a "doesn't error" test rather than a strict
+   content round-trip: investigation against NGX-1 showed that an Activate
+   reshapes the user-supplied list by overlaying device-mandatory entries
+   (e.g. address-claim) and that Default returns a non-zero ARL error code
+   (0xFFFFFBB8) under some firmware states — both are firmware-side
+   behaviours that warrant their own ticket once SET payload semantics are
+   nailed down. A reference SET-encoder against the legacy ACComms code is
+   pending (no public encoder exists, so the SDK's SET layout is inferred
+   from the response layout). */
+TEST_F(BemDeviceTest, PgnEnableListF2_RxRoundTrip)
+{
+	using namespace std::chrono_literals;
+
+	auto getRx = [&](const char* tag) -> std::optional<RxPgnEnableListF2Response> {
+		auto r = sendConvenience([this](auto t, auto cb) {
+			session_->getRxPgnEnableListF2(t, std::move(cb));
+		});
+		if (r.errorCode != ErrorCode::Ok || !r.response.has_value()) {
+			ADD_FAILURE() << tag << ": GET Rx F2 failed: " << r.errorMsg;
+			return std::nullopt;
+		}
+		RxPgnEnableListF2Response decoded;
+		std::string err;
+		if (!decodeRxPgnEnableListF2Response(std::span<const uint8_t>(r.response->data),
+											 decoded, err)) {
+			ADD_FAILURE() << tag << ": Rx F2 decode failed: " << err;
+			return std::nullopt;
+		}
+		return decoded;
+	};
+
+	const auto baseline = getRx("baseline");
+	ASSERT_TRUE(baseline.has_value());
+	std::cout << "  Baseline Rx list: total=" << static_cast<int>(baseline->totalListSize)
+	          << ", first sub-list has " << static_cast<int>(baseline->subCount)
+	          << " entries" << std::endl;
+
+	/* Best-effort restorer: try Default on the way out. If the firmware
+	   doesn't accept Default in the current state, that's the user's
+	   problem — but at least we tried. */
+	struct RxRestorer {
+		SessionImpl* session;
+		~RxRestorer() {
+			if (session) {
+				std::promise<void> done;
+				auto fut = done.get_future();
+				session->defaultPgnEnableList(std::chrono::milliseconds(2000),
+					[&done](const std::optional<BemResponse>&, ErrorCode,
+					        std::string_view) { done.set_value(); });
+				fut.wait_for(std::chrono::milliseconds(2500));
+				std::this_thread::sleep_for(std::chrono::milliseconds(300));
+			}
+		}
+	} restorer{session_.get()};
+
+	/* Delete the active Rx list. Selector 0 = Rx. */
+	auto deleteResult = sendConvenience([this](auto t, auto cb) {
+		session_->deletePgnEnableLists(/*selector=*/0, t, std::move(cb));
+	});
+	ASSERT_EQ(deleteResult.errorCode, ErrorCode::Ok)
+		<< "Delete Rx failed: " << deleteResult.errorMsg;
+	std::this_thread::sleep_for(150ms);
+
+	/* SET a minimal known list. */
+	const std::vector<RxPgnEnableEntry> probe = {
+		{0x05, kRxPgnMaskEnabled},
+		{0x08, kRxPgnMaskEnabled},
+	};
+	auto setResult = sendConvenience(
+		[this, &probe](auto t, auto cb) {
+			session_->setRxPgnEnableListF2(/*xid=*/0, /*total=*/2, /*firstIdx=*/0,
+										   probe, t, std::move(cb));
+		});
+	ASSERT_EQ(setResult.errorCode, ErrorCode::Ok)
+		<< "SET Rx F2 failed: " << setResult.errorMsg;
+	std::this_thread::sleep_for(150ms);
+
+	/* Activate the staged list. */
+	auto activateResult = sendConvenience([this](auto t, auto cb) {
+		session_->activatePgnEnableLists(t, std::move(cb));
+	});
+	ASSERT_EQ(activateResult.errorCode, ErrorCode::Ok)
+		<< "Activate failed: " << activateResult.errorMsg;
+	std::this_thread::sleep_for(150ms);
+
+	/* Re-GET and confirm decode still works. The exact contents are
+	   firmware-defined (NGX overlays mandatory PGNs onto the user SET, so
+	   totalListSize is generally not equal to our SET size). */
+	const auto applied = getRx("after-activate");
+	ASSERT_TRUE(applied.has_value());
+	std::cout << "  After Activate: total=" << static_cast<int>(applied->totalListSize)
+	          << " (firmware overlays mandatory PGNs onto user SET)" << std::endl;
+
+	/* Default — may return a device error code in some states; that's a
+	   firmware-side investigation outside this ticket. The destructor
+	   restorer will retry. */
+	auto defaultResult = sendConvenience([this](auto t, auto cb) {
+		session_->defaultPgnEnableList(t, std::move(cb));
+	});
+	if (defaultResult.errorCode == ErrorCode::Ok) {
+		std::this_thread::sleep_for(300ms);
+		const auto restored = getRx("after-default");
+		ASSERT_TRUE(restored.has_value());
+		std::cout << "  After Default: total="
+		          << static_cast<int>(restored->totalListSize) << std::endl;
+	} else {
+		const uint32_t arl = defaultResult.response.has_value()
+		                         ? defaultResult.response->header.errorCode
+		                         : 0;
+		std::cout << "  Default rejected by firmware (ARL=0x" << std::hex << arl
+		          << std::dec << ", msg=\"" << defaultResult.errorMsg
+		          << "\") — destructor will retry on test exit." << std::endl;
 	}
 }
 
@@ -1235,6 +1535,213 @@ TEST_F(BemDeviceTest, OperatingMode_NGConvertNormalMode_RoundTrip)
 		<< "Device did not revert to baseline after SET";
 	std::cout << "  Reverted: " << OperatingModeName(static_cast<OperatingMode>(*reverted))
 	          << " (" << *reverted << ")" << std::endl;
+}
+
+TEST_F(BemDeviceTest, CanConfig_SetSame_Acknowledged)
+{
+	/* GET the current NAME+SA, then SET them back unchanged and verify the
+	   device acknowledges the SET. Strict round-trip (flip SA, expect device
+	   to report new SA) is not viable on N2K devices: the NGX-1 firmware
+	   runs ISO 11783-5 address-claim continuously, so a SET that lands in
+	   a contested SA can result in NAME's device-instance field
+	   auto-incrementing and the requested SA being silently re-claimed.
+	   That is real CAN-bus protocol behaviour, not an SDK encoding issue.
+
+	   This test asserts the orthogonal SDK property: the on-wire SET frame
+	   encodes the supplied NAME+SA correctly and the firmware accepts it,
+	   leaving the device responsive afterwards. */
+
+	auto readConfig = [&]() -> std::optional<CanConfigResponse> {
+		auto result = sendConvenience([this](auto timeout, auto cb) {
+			session_->getCanConfig(timeout, std::move(cb));
+		});
+		if (result.errorCode != ErrorCode::Ok || !result.response.has_value()) {
+			return std::nullopt;
+		}
+		CanConfigResponse cfg;
+		std::string error;
+		if (!decodeCanConfigResponse(std::span<const uint8_t>(result.response->data),
+		                              cfg, error)) {
+			return std::nullopt;
+		}
+		return cfg;
+	};
+
+	const auto baseline = readConfig();
+	ASSERT_TRUE(baseline.has_value()) << "GET CAN Config (baseline) failed";
+	const uint64_t baselineName = baseline->name.rawValue;
+	const uint8_t  baselineSa   = baseline->sourceAddress;
+	std::cout << "  Baseline: NAME=0x" << std::hex << baselineName
+	          << " SA=" << std::dec << static_cast<int>(baselineSa) << std::endl;
+
+	auto setResult = sendConvenience(
+		[this, baselineName, baselineSa](auto timeout, auto cb) {
+			session_->setCanConfig(baselineName, baselineSa, timeout, std::move(cb));
+		});
+	ASSERT_EQ(setResult.errorCode, ErrorCode::Ok)
+		<< "SET CAN Config (no-change) failed: " << setResult.errorMsg;
+	ASSERT_TRUE(setResult.response.has_value());
+	std::cout << "  SET CAN Config (no-change) acknowledged" << std::endl;
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+	const auto after = readConfig();
+	ASSERT_TRUE(after.has_value()) << "Device unresponsive after SET CAN Config";
+	std::cout << "  After SET: NAME=0x" << std::hex << after->name.rawValue
+	          << " SA=" << std::dec << static_cast<int>(after->sourceAddress) << std::endl;
+}
+
+TEST_F(BemDeviceTest, CanInfoField1_RoundTrip)
+{
+	/* GET text -> SET to a marker string -> GET (assert applied) -> SET
+	   original -> GET (assert reverted). Scope guard restores the baseline
+	   text even if any assertion early-returns. */
+
+	auto readField = [&](const char* tag) -> std::optional<std::string> {
+		auto result = sendConvenience([this](auto timeout, auto cb) {
+			session_->getCanInfoField1(timeout, std::move(cb));
+		});
+		if (result.errorCode != ErrorCode::Ok || !result.response.has_value()) {
+			ADD_FAILURE() << tag << ": GET CAN Info Field 1 failed: " << result.errorMsg;
+			return std::nullopt;
+		}
+		CanInfoFieldResponse resp;
+		std::string error;
+		if (!decodeCanInfoFieldResponse(std::span<const uint8_t>(result.response->data),
+		                                 CanInfoField::InstallationDesc1, resp, error)) {
+			ADD_FAILURE() << tag << ": decode failed: " << error;
+			return std::nullopt;
+		}
+		return resp.text;
+	};
+
+	auto setField = [&](const std::string& text, const char* tag) -> bool {
+		auto result = sendConvenience([this, &text](auto timeout, auto cb) {
+			session_->setCanInfoField1(text, timeout, std::move(cb));
+		});
+		if (result.errorCode != ErrorCode::Ok) {
+			ADD_FAILURE() << tag << ": SET CAN Info Field 1 (\"" << text
+			              << "\") failed: " << result.errorMsg;
+			return false;
+		}
+		return true;
+	};
+
+	const auto baseline = readField("baseline");
+	ASSERT_TRUE(baseline.has_value());
+	const std::string baselineText = *baseline;
+	std::cout << "  Baseline: \"" << baselineText << "\"" << std::endl;
+
+	const std::string targetText = "SDK GIT-66 RT";
+	ASSERT_NE(targetText, baselineText)
+		<< "Marker collides with current device value — pick a different target";
+
+	struct FieldRestorer {
+		std::function<bool(const std::string&, const char*)> set;
+		std::string text;
+		bool armed;
+		~FieldRestorer() {
+			if (armed) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(300));
+				(void)set(text, "teardown restore");
+			}
+		}
+	} restorer{setField, baselineText, true};
+
+	ASSERT_TRUE(setField(targetText, "to-target"));
+	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+	const auto changed = readField("after-set-target");
+	ASSERT_TRUE(changed.has_value());
+	ASSERT_EQ(*changed, targetText)
+		<< "Device did not report target text after SET (baseline=\"" << baselineText
+		<< "\", target=\"" << targetText << "\", got=\"" << *changed << "\")";
+	std::cout << "  After SET: \"" << *changed << "\"" << std::endl;
+
+	ASSERT_TRUE(setField(baselineText, "back-to-baseline"));
+	restorer.armed = false;
+	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+	const auto reverted = readField("after-restore");
+	ASSERT_TRUE(reverted.has_value());
+	EXPECT_EQ(*reverted, baselineText)
+		<< "Device did not revert to baseline text after SET";
+	std::cout << "  Reverted: \"" << *reverted << "\"" << std::endl;
+}
+
+TEST_F(BemDeviceTest, CanInfoField2_RoundTrip)
+{
+	/* As CanInfoField1_RoundTrip but for Installation Description 2 (0x44). */
+
+	auto readField = [&](const char* tag) -> std::optional<std::string> {
+		auto result = sendConvenience([this](auto timeout, auto cb) {
+			session_->getCanInfoField2(timeout, std::move(cb));
+		});
+		if (result.errorCode != ErrorCode::Ok || !result.response.has_value()) {
+			ADD_FAILURE() << tag << ": GET CAN Info Field 2 failed: " << result.errorMsg;
+			return std::nullopt;
+		}
+		CanInfoFieldResponse resp;
+		std::string error;
+		if (!decodeCanInfoFieldResponse(std::span<const uint8_t>(result.response->data),
+		                                 CanInfoField::InstallationDesc2, resp, error)) {
+			ADD_FAILURE() << tag << ": decode failed: " << error;
+			return std::nullopt;
+		}
+		return resp.text;
+	};
+
+	auto setField = [&](const std::string& text, const char* tag) -> bool {
+		auto result = sendConvenience([this, &text](auto timeout, auto cb) {
+			session_->setCanInfoField2(text, timeout, std::move(cb));
+		});
+		if (result.errorCode != ErrorCode::Ok) {
+			ADD_FAILURE() << tag << ": SET CAN Info Field 2 (\"" << text
+			              << "\") failed: " << result.errorMsg;
+			return false;
+		}
+		return true;
+	};
+
+	const auto baseline = readField("baseline");
+	ASSERT_TRUE(baseline.has_value());
+	const std::string baselineText = *baseline;
+	std::cout << "  Baseline: \"" << baselineText << "\"" << std::endl;
+
+	const std::string targetText = "SDK GIT-66 RT F2";
+	ASSERT_NE(targetText, baselineText)
+		<< "Marker collides with current device value — pick a different target";
+
+	struct FieldRestorer {
+		std::function<bool(const std::string&, const char*)> set;
+		std::string text;
+		bool armed;
+		~FieldRestorer() {
+			if (armed) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(300));
+				(void)set(text, "teardown restore");
+			}
+		}
+	} restorer{setField, baselineText, true};
+
+	ASSERT_TRUE(setField(targetText, "to-target"));
+	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+	const auto changed = readField("after-set-target");
+	ASSERT_TRUE(changed.has_value());
+	ASSERT_EQ(*changed, targetText)
+		<< "Device did not report target text after SET";
+	std::cout << "  After SET: \"" << *changed << "\"" << std::endl;
+
+	ASSERT_TRUE(setField(baselineText, "back-to-baseline"));
+	restorer.armed = false;
+	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+	const auto reverted = readField("after-restore");
+	ASSERT_TRUE(reverted.has_value());
+	EXPECT_EQ(*reverted, baselineText)
+		<< "Device did not revert to baseline text after SET";
+	std::cout << "  Reverted: \"" << *reverted << "\"" << std::endl;
 }
 
 TEST_F(BemDeviceTest, SetOperatingMode_RejectsBuffer1OnNgx)

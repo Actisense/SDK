@@ -73,70 +73,93 @@ TEST_F(PgnListManagementTest, SupportedPgnList_EncodeGetRequest)
 
 TEST_F(PgnListManagementTest, SupportedPgnList_DecodeResponse)
 {
-	/* Response: pgnIndex (1) + transferId (1) + pgnCount (1) + pgns (4 each) */
-	/* Example: 3 PGNs */
+	/* Wire format (post-BEM-header): xid + SVID + dbVer + total + firstIdx +
+	   subCount + (pgnIndex u8, pgn u24 LE) × subCount.
+	   This sample: xid=01, SVID=0x1100, dbVer=2100, total=10, firstIdx=0,
+	   subCount=3, entries (0,0x01EF60)(1,0x01F010)(2,0x01F114). */
 	const std::vector<uint8_t> data = {
-		0x00,                          /* pgnIndex = 0 */
-		0x01,                          /* transferId = 1 */
-		0x03,                          /* pgnCount = 3 */
-		0x60, 0xEF, 0x01, 0x00,        /* PGN 126816 (0x01EF60) */
-		0x10, 0xF0, 0x01, 0x00,        /* PGN 126992 (0x01F010) */
-		0x14, 0xF1, 0x01, 0x00         /* PGN 127252 (0x01F114) */
+		0x01,                    /* transferId */
+		0x00, 0x11, 0x00, 0x00,  /* SVID LE = 0x00001100 */
+		0x34, 0x08,              /* dbVer LE = 2100 */
+		0x0A,                    /* totalListSize */
+		0x00,                    /* firstSubIdx */
+		0x03,                    /* subCount */
+		0x00, 0x60, 0xEF, 0x01,  /* idx 0 -> PGN 0x01EF60 */
+		0x01, 0x10, 0xF0, 0x01,  /* idx 1 -> PGN 0x01F010 */
+		0x02, 0x14, 0xF1, 0x01,  /* idx 2 -> PGN 0x01F114 */
 	};
 
 	SupportedPgnListResponse response;
 	EXPECT_TRUE(decodeSupportedPgnListResponse(data, response, m_error));
 	EXPECT_TRUE(m_error.empty());
 
-	EXPECT_EQ(response.pgnIndex, 0);
-	EXPECT_EQ(response.transferId, 1);
-	EXPECT_EQ(response.pgnCount, 3);
-	EXPECT_EQ(response.pgns.size(), 3u);
-	EXPECT_EQ(response.pgns[0], 126816u);
-	EXPECT_EQ(response.pgns[1], 126992u);
-	EXPECT_EQ(response.pgns[2], 127252u);
+	EXPECT_EQ(response.transferId, 1u);
+	EXPECT_EQ(response.structureVariantId, kSupportedPgnListSvId);
+	EXPECT_EQ(response.nmea2000DbVersion, 2100u);
+	EXPECT_EQ(response.totalListSize, 10u);
+	EXPECT_EQ(response.firstSubIdx, 0u);
+	EXPECT_EQ(response.subCount, 3u);
+	ASSERT_EQ(response.entries.size(), 3u);
+	EXPECT_EQ(response.entries[0].pgnIndex, 0u);
+	EXPECT_EQ(response.entries[0].pgn, 0x01EF60u);
+	EXPECT_EQ(response.entries[1].pgnIndex, 1u);
+	EXPECT_EQ(response.entries[1].pgn, 0x01F010u);
+	EXPECT_EQ(response.entries[2].pgnIndex, 2u);
+	EXPECT_EQ(response.entries[2].pgn, 0x01F114u);
 }
 
-TEST_F(PgnListManagementTest, SupportedPgnList_IsLastMessage)
+TEST_F(PgnListManagementTest, SupportedPgnList_HasMore)
 {
-	SupportedPgnListResponse response;
-	response.pgnIndex = 0;
-	response.pgnCount = 10;  /* Less than max (62) */
+	SupportedPgnListResponse r;
+	r.totalListSize = 10;
+	r.firstSubIdx = 0;
+	r.subCount = 3;
+	EXPECT_TRUE(supportedPgnListHasMore(r));
 
-	EXPECT_TRUE(response.isLastMessage());
-
-	response.pgnCount = 62;  /* Max */
-	EXPECT_FALSE(response.isLastMessage());
+	r.firstSubIdx = 7;
+	r.subCount = 3; /* consumed 10 -> equal to total, no more */
+	EXPECT_FALSE(supportedPgnListHasMore(r));
 }
 
-TEST_F(PgnListManagementTest, SupportedPgnList_NextIndex)
+TEST_F(PgnListManagementTest, SupportedPgnList_DecodeRejectsWrongSvId)
 {
+	std::vector<uint8_t> data = {
+		0x01, 0xFF, 0xFF, 0xFF, 0xFF, /* xid + bad SVID */
+		0x00, 0x00, 0x00, 0x00, 0x00,
+	};
 	SupportedPgnListResponse response;
-	response.pgnIndex = 0;
-	response.pgnCount = 62;
-
-	EXPECT_EQ(response.nextIndex(), 62u);
-
-	response.pgnCount = 10;  /* Last message */
-	EXPECT_EQ(response.nextIndex(), 0xFF);
+	EXPECT_FALSE(decodeSupportedPgnListResponse(data, response, m_error));
+	EXPECT_NE(m_error.find("Structure Variant"), std::string::npos);
 }
 
 TEST_F(PgnListManagementTest, SupportedPgnList_DecodeTooShort)
 {
-	const std::vector<uint8_t> shortData = {0x00, 0x01};  /* Missing pgnCount */
+	const std::vector<uint8_t> shortData = {0x00, 0x01};
 
 	SupportedPgnListResponse response;
 	EXPECT_FALSE(decodeSupportedPgnListResponse(shortData, response, m_error));
 	EXPECT_FALSE(m_error.empty());
 }
 
+TEST_F(PgnListManagementTest, SupportedPgnList_DecodeRejectsTruncatedEntries)
+{
+	std::vector<uint8_t> data = {
+		0x01, 0x00, 0x11, 0x00, 0x00, /* xid + SVID */
+		0x34, 0x08, 0x0A, 0x00, 0x03, /* dbVer + total=10 + firstIdx=0 + subCount=3 */
+		0x00, 0x60, 0xEF, 0x01,       /* only one entry */
+	};
+	SupportedPgnListResponse response;
+	EXPECT_FALSE(decodeSupportedPgnListResponse(data, response, m_error));
+	EXPECT_NE(m_error.find("truncated"), std::string::npos);
+}
+
 TEST_F(PgnListManagementTest, SupportedPgnList_Constants)
 {
 	EXPECT_EQ(kSupportedPgnListGetRequestSize, 2u);
-	EXPECT_EQ(kSupportedPgnListResponseHeaderSize, 3u);
-	EXPECT_EQ(kSupportedPgnListMaxPgnsPerMessage, 62u);
-	EXPECT_EQ(kSupportedPgnListFirstIndex, 0x00);
-	EXPECT_EQ(kSupportedPgnListEndIndex, 0xFF);
+	EXPECT_EQ(kSupportedPgnListResponseHeaderSize, 10u);
+	EXPECT_EQ(kSupportedPgnListEntrySize, 4u);
+	EXPECT_EQ(kSupportedPgnListSvId, 0x00001100u);
+	EXPECT_EQ(kSupportedPgnListMaxPgnsPerMessage, 48u);
 }
 
 /* Delete PGN Enable Lists (0x4A) Tests ------------------------------------- */
@@ -298,116 +321,74 @@ TEST_F(PgnListManagementTest, ParamsPgnEnableLists_FormatOutput)
 	EXPECT_TRUE(result.find("Synced") != std::string::npos);
 }
 
-/* PGN Index Encoding Tests ------------------------------------------------- */
-
-TEST_F(PgnListManagementTest, PgnIndex_StandardPgnToPgnIndex)
-{
-	uint16_t index;
-
-	/* Standard PGN 0 -> index 1 */
-	EXPECT_TRUE(pgnToPgnIndex(0, index));
-	EXPECT_EQ(index, 1u);
-
-	/* Standard PGN 254 -> index 255 */
-	EXPECT_TRUE(pgnToPgnIndex(254, index));
-	EXPECT_EQ(index, 255u);
-
-	/* Invalid standard PGN 255 - not in valid range */
-	EXPECT_FALSE(pgnToPgnIndex(255, index));
-}
-
-TEST_F(PgnListManagementTest, PgnIndex_ProprietaryPgnToPgnIndex)
-{
-	uint16_t index;
-
-	/* Proprietary PGN 0xFF000000 -> index 256 */
-	EXPECT_TRUE(pgnToPgnIndex(0xFF000000, index));
-	EXPECT_EQ(index, 256u);
-
-	/* Proprietary PGN 0xFF0001FF -> index 767 */
-	EXPECT_TRUE(pgnToPgnIndex(0xFF0001FF, index));
-	EXPECT_EQ(index, 767u);
-
-	/* Invalid proprietary PGN 0xFF000200 - out of range */
-	EXPECT_FALSE(pgnToPgnIndex(0xFF000200, index));
-}
-
-TEST_F(PgnListManagementTest, PgnIndex_IndexToStandardPgn)
-{
-	uint32_t pgn;
-
-	/* Index 1 -> PGN 0 */
-	EXPECT_TRUE(pgnIndexToPgn(1, pgn));
-	EXPECT_EQ(pgn, 0u);
-
-	/* Index 255 -> PGN 254 */
-	EXPECT_TRUE(pgnIndexToPgn(255, pgn));
-	EXPECT_EQ(pgn, 254u);
-
-	/* Invalid index 0 */
-	EXPECT_FALSE(pgnIndexToPgn(0, pgn));
-}
-
-TEST_F(PgnListManagementTest, PgnIndex_IndexToProprietaryPgn)
-{
-	uint32_t pgn;
-
-	/* Index 256 -> PGN 0xFF000000 */
-	EXPECT_TRUE(pgnIndexToPgn(256, pgn));
-	EXPECT_EQ(pgn, 0xFF000000u);
-
-	/* Index 767 -> PGN 0xFF0001FF */
-	EXPECT_TRUE(pgnIndexToPgn(767, pgn));
-	EXPECT_EQ(pgn, 0xFF0001FFu);
-
-	/* Invalid index 768 */
-	EXPECT_FALSE(pgnIndexToPgn(768, pgn));
-}
-
 /* Rx PGN Enable List F2 (0x4E) Tests --------------------------------------- */
 
 TEST_F(PgnListManagementTest, RxPgnEnableListF2_EncodeGetRequest)
 {
 	std::vector<uint8_t> data;
 	encodeRxPgnEnableListF2GetRequest(data);
-
-	EXPECT_EQ(data.size(), kRxPgnEnableListF2GetRequestSize);
 	EXPECT_TRUE(data.empty());
 }
 
 TEST_F(PgnListManagementTest, RxPgnEnableListF2_EncodeSetRequest)
 {
-	std::vector<uint32_t> pgns = {0, 10, 100, 254};  /* Standard PGNs */
+	const std::vector<RxPgnEnableEntry> entries = {
+		{0x00, kRxPgnMaskEnabled},
+		{0x05, kRxPgnMaskEnabled},
+		{0x14, kRxPgnMaskDisabled},
+	};
 	std::vector<uint8_t> data;
 
-	EXPECT_TRUE(encodeRxPgnEnableListF2SetRequest(pgns, data, m_error));
+	EXPECT_TRUE(encodeRxPgnEnableListF2SetRequest(
+		/*xid=*/1, /*total=*/3, /*firstIdx=*/0, entries, data, m_error));
 	EXPECT_TRUE(m_error.empty());
-	EXPECT_EQ(data.size(), 2 + pgns.size() * 2);  /* count + indices */
 
-	/* Check count */
-	EXPECT_EQ(data[0], 4u);
-	EXPECT_EQ(data[1], 0u);
+	/* Header: xid + SVID + total + first + sub = 8 bytes, then 3 entries × 2 */
+	ASSERT_EQ(data.size(), kRxPgnEnableListF2ResponseHeaderSize + entries.size() * 2);
+	EXPECT_EQ(data[0], 1u);              /* xid */
+	EXPECT_EQ(data[1], 0x01);            /* SVID byte 0 */
+	EXPECT_EQ(data[2], 0x11);
+	EXPECT_EQ(data[3], 0x00);
+	EXPECT_EQ(data[4], 0x00);
+	EXPECT_EQ(data[5], 3u);              /* total */
+	EXPECT_EQ(data[6], 0u);              /* firstIdx */
+	EXPECT_EQ(data[7], 3u);              /* subCount */
+	EXPECT_EQ(data[8], 0x00);            /* first entry pgnIdx */
+	EXPECT_EQ(data[9], kRxPgnMaskEnabled);
 }
 
 TEST_F(PgnListManagementTest, RxPgnEnableListF2_DecodeResponse)
 {
-	/* Response: 3 PGNs (indices 1, 100, 256) */
-	const std::array<uint8_t, 8> data = {
-		0x03, 0x00,   /* Count = 3 */
-		0x01, 0x00,   /* Index 1 = PGN 0 */
-		0x64, 0x00,   /* Index 100 = PGN 99 */
-		0x00, 0x01    /* Index 256 = PGN 0xFF000000 */
+	/* xid=01, SVID=0x1101, total=9, firstIdx=0, subCount=3, three entries */
+	const std::vector<uint8_t> data = {
+		0x01,
+		0x01, 0x11, 0x00, 0x00,
+		0x09, 0x00, 0x03,
+		0x05, 0x00,
+		0x08, 0x01,
+		0x0B, 0x00,
 	};
 
 	RxPgnEnableListF2Response response;
 	EXPECT_TRUE(decodeRxPgnEnableListF2Response(data, response, m_error));
-	EXPECT_TRUE(m_error.empty());
+	EXPECT_EQ(response.transferId, 1u);
+	EXPECT_EQ(response.structureVariantId, kRxPgnEnableListF2SvId);
+	EXPECT_EQ(response.totalListSize, 9u);
+	EXPECT_EQ(response.firstSubIdx, 0u);
+	EXPECT_EQ(response.subCount, 3u);
+	ASSERT_EQ(response.entries.size(), 3u);
+	EXPECT_EQ(response.entries[0].pgnIndex, 0x05u);
+	EXPECT_EQ(response.entries[0].rxMask, 0x00u);
+	EXPECT_EQ(response.entries[1].pgnIndex, 0x08u);
+	EXPECT_EQ(response.entries[1].rxMask, 0x01u);
+}
 
-	EXPECT_EQ(response.pgnCount, 3u);
-	EXPECT_EQ(response.pgns.size(), 3u);
-	EXPECT_EQ(response.pgns[0], 0u);
-	EXPECT_EQ(response.pgns[1], 99u);
-	EXPECT_EQ(response.pgns[2], 0xFF000000u);
+TEST_F(PgnListManagementTest, RxPgnEnableListF2_DecodeRejectsWrongSvId)
+{
+	std::vector<uint8_t> data = {0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0};
+	RxPgnEnableListF2Response response;
+	EXPECT_FALSE(decodeRxPgnEnableListF2Response(data, response, m_error));
+	EXPECT_NE(m_error.find("Structure Variant"), std::string::npos);
 }
 
 TEST_F(PgnListManagementTest, RxPgnEnableListF2_Builder)
@@ -419,8 +400,9 @@ TEST_F(PgnListManagementTest, RxPgnEnableListF2_Builder)
 
 TEST_F(PgnListManagementTest, RxPgnEnableListF2_SetBuilder)
 {
-	std::vector<uint32_t> pgns = {0, 10, 100};
-	EXPECT_TRUE(m_protocol.buildSetRxPgnEnableListF2(pgns, m_frame, m_error));
+	std::vector<RxPgnEnableEntry> entries = {{0, kRxPgnMaskEnabled}, {10, kRxPgnMaskEnabled}};
+	EXPECT_TRUE(m_protocol.buildSetRxPgnEnableListF2(/*xid=*/1, /*total=*/2, /*firstIdx=*/0,
+													 entries, m_frame, m_error));
 	EXPECT_TRUE(m_error.empty());
 	EXPECT_FALSE(m_frame.empty());
 }
@@ -431,36 +413,80 @@ TEST_F(PgnListManagementTest, TxPgnEnableListF2_EncodeGetRequest)
 {
 	std::vector<uint8_t> data;
 	encodeTxPgnEnableListF2GetRequest(data);
-
-	EXPECT_EQ(data.size(), kTxPgnEnableListF2GetRequestSize);
 	EXPECT_TRUE(data.empty());
 }
 
-TEST_F(PgnListManagementTest, TxPgnEnableListF2_DecodeResponse)
+TEST_F(PgnListManagementTest, TxPgnEnableListF2_DecodeStdResponse)
 {
-	/* Response: 2 entries */
-	const std::array<uint8_t, 10> data = {
-		0x02, 0x00,   /* Count = 2 */
-		0x01, 0x00,   /* Index 1 = PGN 0 */
-		0x05,         /* Rate */
-		0x03,         /* Priority */
-		0x64, 0x00,   /* Index 100 = PGN 99 */
-		0x0A,         /* Rate */
-		0x06          /* Priority */
+	/* xid=01, SVID=0x1102, total=2, firstIdx=0, subCount=2, two entries */
+	const std::vector<uint8_t> data = {
+		0x01,
+		0x02, 0x11, 0x00, 0x00,
+		0x02, 0x00, 0x02,
+		0x03, 0x06, 0xE8, 0x03,  /* idx 3, prio 6, rate 1000ms */
+		0x04, 0x07, 0xFF, 0xFF,  /* idx 4, prio 7, rate disabled */
 	};
 
 	TxPgnEnableListF2Response response;
 	EXPECT_TRUE(decodeTxPgnEnableListF2Response(data, response, m_error));
-	EXPECT_TRUE(m_error.empty());
+	EXPECT_EQ(response.variant, TxPgnEnableListF2Variant::Standard);
+	EXPECT_EQ(response.transferId, 1u);
+	EXPECT_EQ(response.structureVariantId, kTxPgnEnableListF2StdSvId);
+	EXPECT_EQ(response.stdTotalListSize, 2u);
+	EXPECT_EQ(response.stdFirstSubIdx, 0u);
+	EXPECT_EQ(response.stdSubCount, 2u);
+	ASSERT_EQ(response.stdEntries.size(), 2u);
+	EXPECT_EQ(response.stdEntries[0].pgnIndex, 0x03u);
+	EXPECT_EQ(response.stdEntries[0].priority, 6u);
+	EXPECT_EQ(response.stdEntries[0].rateMs, 1000u);
+	EXPECT_EQ(response.stdEntries[1].rateMs, kTxPgnRateDisabled);
+}
 
-	EXPECT_EQ(response.pgnCount, 2u);
-	EXPECT_EQ(response.entries.size(), 2u);
-	EXPECT_EQ(response.entries[0].pgn, 0u);
-	EXPECT_EQ(response.entries[0].rate, 5u);
-	EXPECT_EQ(response.entries[0].priority, 3u);
-	EXPECT_EQ(response.entries[1].pgn, 99u);
-	EXPECT_EQ(response.entries[1].rate, 10u);
-	EXPECT_EQ(response.entries[1].priority, 6u);
+TEST_F(PgnListManagementTest, TxPgnEnableListF2_DecodeProprietaryResponse)
+{
+	/* xid=02, SVID=0x1103, dp0Size=2, dp0=[01,00], dp1Size=1, dp1=[20] */
+	const std::vector<uint8_t> data = {
+		0x02,
+		0x03, 0x11, 0x00, 0x00,
+		0x02, 0x01, 0x00,
+		0x01, 0x20,
+	};
+
+	TxPgnEnableListF2Response response;
+	EXPECT_TRUE(decodeTxPgnEnableListF2Response(data, response, m_error));
+	EXPECT_EQ(response.variant, TxPgnEnableListF2Variant::Proprietary);
+	ASSERT_EQ(response.propDp0Bitmap.size(), 2u);
+	EXPECT_EQ(response.propDp0Bitmap[0], 0x01u);
+	EXPECT_EQ(response.propDp0Bitmap[1], 0x00u);
+	ASSERT_EQ(response.propDp1Bitmap.size(), 1u);
+	EXPECT_EQ(response.propDp1Bitmap[0], 0x20u);
+}
+
+TEST_F(PgnListManagementTest, TxPgnEnableListF2_DecodeRejectsUnknownSvId)
+{
+	std::vector<uint8_t> data = {0x01, 0xFF, 0xFF, 0xFF, 0xFF};
+	TxPgnEnableListF2Response response;
+	EXPECT_FALSE(decodeTxPgnEnableListF2Response(data, response, m_error));
+}
+
+TEST_F(PgnListManagementTest, TxPgnEnableListF2_EncodeStdSet)
+{
+	std::vector<TxPgnEnableEntry> entries = {
+		{0x03, 6, 1000},
+		{0x04, 7, kTxPgnRateDisabled},
+	};
+	std::vector<uint8_t> data;
+	EXPECT_TRUE(encodeTxPgnEnableListF2StdSetRequest(
+		/*xid=*/1, /*total=*/2, /*firstIdx=*/0, entries, data, m_error));
+
+	ASSERT_EQ(data.size(), kTxPgnEnableListF2StdHeaderSize +
+							   entries.size() * kTxPgnEnableListF2StdEntrySize);
+	EXPECT_EQ(data[1], 0x02);  /* SVID byte 0 */
+	EXPECT_EQ(data[2], 0x11);
+	EXPECT_EQ(data[8], 0x03);  /* first entry pgnIdx */
+	EXPECT_EQ(data[9], 6);     /* prio */
+	EXPECT_EQ(data[10], 0xE8); /* rate LE lo */
+	EXPECT_EQ(data[11], 0x03); /* rate LE hi */
 }
 
 TEST_F(PgnListManagementTest, TxPgnEnableListF2_Builder)
@@ -602,8 +628,8 @@ TEST_F(PgnListManagementTest, Constants)
 	EXPECT_EQ(kActivatePgnEnableListsRequestSize, 0u);
 	EXPECT_EQ(kDefaultPgnEnableListRequestSize, 0u);
 	EXPECT_EQ(kParamsPgnEnableListsResponseSize, 14u);
-	EXPECT_EQ(kRxPgnEnableListF2MaxPgns, 255u);
-	EXPECT_EQ(kTxPgnEnableListF2MaxPgns, 767u);
+	EXPECT_EQ(kRxPgnEnableListF2MaxEntriesPerSubList, 96u);
+	EXPECT_EQ(kTxPgnEnableListF2StdMaxEntriesPerSubList, 48u);
 	EXPECT_EQ(kRxPgnEnableListF1MaxPgns, 50u);
 	EXPECT_EQ(kTxPgnEnableListF1MaxPgns, 50u);
 }

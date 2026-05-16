@@ -5,13 +5,23 @@
  \file       supported_pgn_list.hpp
  \author     (Created) Claude Code
  \date       (Created) 28/01/2026
- \brief      Supported PGN List BEM command types and helpers
- \details    Structures and functions for encoding/decoding Supported PGN List
-			 (0x40) BEM commands. This command retrieves the list of PGNs
-			 supported by the device.
+ \brief      Supported PGN List BEM command types and helpers (BEM 0x40)
+ \details    Structures and functions for encoding/decoding the Supported PGN
+			 List command. Reports the PGN-index → PGN mapping that the
+			 firmware exposes via the Enable List F2 commands (0x4E/0x4F).
 
-			 This is a multi-message response command. The session layer must
-			 assemble multiple responses using Transfer ID and PGN Index fields.
+			 On-wire response payload (after the BEM response header):
+			 - byte 0:    transferId (u8, cyclic 1..255, device-set)
+			 - bytes 1..4:structureVariantId (u32 LE, 0x00001100)
+			 - bytes 5..6:nmea2000DbVersion (u16 LE, × 1000; e.g. 2100 = v2.100)
+			 - byte 7:    totalListSize (u8, total PGNs in the device's table)
+			 - byte 8:    firstSubIdx (u8, index of first entry in this sub-list)
+			 - byte 9:    subCount (u8, entries in this sub-list, 0..48)
+			 - bytes 10+: [pgnIndex(u8), pgn(u24 LE)] × subCount
+
+			 Wire format reverse-engineered against live NGT-1 / NGX-1 hardware
+			 under GIT-74 and confirmed against the legacy ACComps decoder at
+			 LibDev/ACCompLib/Codec-M/DecodeBEMCoreCmdResp.cpp DecodeSupportedPGNList.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -28,201 +38,153 @@ namespace Actisense
 	{
 		/* Constants ------------------------------------------------------------ */
 
-		/// Supported PGN List GET request size (2 bytes: PGN Index + Transfer ID)
+		/// Supported PGN List GET request size (2 bytes: pgnIndex + transferId)
 		static constexpr std::size_t kSupportedPgnListGetRequestSize = 2;
 
-		/// Supported PGN List response header size (before PGN list)
-		static constexpr std::size_t kSupportedPgnListResponseHeaderSize = 3;
+		/// Structure Variant ID expected in 0x40 responses
+		static constexpr uint32_t kSupportedPgnListSvId = 0x00001100;
 
-		/// Maximum PGNs per response message
-		static constexpr std::size_t kSupportedPgnListMaxPgnsPerMessage = 62;
+		/// Response header size before the entry list (xid + SVID + db + total + first + sub)
+		static constexpr std::size_t kSupportedPgnListResponseHeaderSize = 10;
 
-		/// Starting PGN index for first request
-		static constexpr uint8_t kSupportedPgnListFirstIndex = 0x00;
+		/// Each response entry: [pgnIndex u8][pgn u24 LE] = 4 bytes
+		static constexpr std::size_t kSupportedPgnListEntrySize = 4;
 
-		/// Special index indicating end of list
-		static constexpr uint8_t kSupportedPgnListEndIndex = 0xFF;
+		/// Max PGNs per response message (firmware limit)
+		static constexpr std::size_t kSupportedPgnListMaxPgnsPerMessage = 48;
 
 		/* Data Structures ------------------------------------------------------ */
 
 		/**************************************************************************/ /**
-		 \brief      Supported PGN List request structure
-		 \details    Used for building Supported PGN List GET commands
+		 \brief      A single (pgnIndex, pgn) row in the Supported PGN List.
 		 *******************************************************************************/
-		struct SupportedPgnListRequest
+		struct SupportedPgnEntry
 		{
-			uint8_t pgnIndex = 0;	///< Starting PGN index (0 for first request)
-			uint8_t transferId = 0; ///< Transfer ID for multi-message tracking
+			uint8_t  pgnIndex = 0; ///< Device-local PGN index referenced by 0x4E/0x4F
+			uint32_t pgn = 0;      ///< 24-bit NMEA 2000 PGN value
 		};
 
 		/**************************************************************************/ /**
-		 \brief      Supported PGN List response (single message)
-		 \details    Decoded response from a single Supported PGN List message.
-					 Multiple messages may be needed to get the complete list.
+		 \brief      Supported PGN List response (single sub-list message).
 		 *******************************************************************************/
 		struct SupportedPgnListResponse
 		{
-			uint8_t pgnIndex = 0;		///< Starting PGN index for this message
-			uint8_t transferId = 0;		///< Transfer ID for multi-message tracking
-			uint8_t pgnCount = 0;		///< Number of PGNs in this message
-			std::vector<uint32_t> pgns; ///< List of PGNs (24-bit values)
-
-			/// True if this is the last message (pgnCount < max)
-			[[nodiscard]] bool isLastMessage() const noexcept {
-				return pgnCount < kSupportedPgnListMaxPgnsPerMessage;
-			}
-
-			/// Calculate next index for continuation request
-			[[nodiscard]] uint8_t nextIndex() const noexcept {
-				if (isLastMessage()) {
-					return kSupportedPgnListEndIndex;
-				}
-				return static_cast<uint8_t>(pgnIndex + pgnCount);
-			}
-		};
-
-		/**************************************************************************/ /**
-		 \brief      Complete Supported PGN List (assembled from multiple messages)
-		 \details    Contains the complete list of supported PGNs after
-					 assembling all response messages.
-		 *******************************************************************************/
-		struct SupportedPgnListComplete
-		{
-			std::vector<uint32_t> pgns; ///< Complete list of supported PGNs
-			uint8_t transferId = 0;		///< Transfer ID used for assembly
+			uint8_t  transferId = 0;        ///< Device-set transfer ID
+			uint32_t structureVariantId = 0;///< Expected kSupportedPgnListSvId
+			uint16_t nmea2000DbVersion = 0; ///< × 1000 (e.g. 2100 = v2.100)
+			uint8_t  totalListSize = 0;     ///< Total PGNs in device's table
+			uint8_t  firstSubIdx = 0;       ///< First entry's index in this sub-list
+			uint8_t  subCount = 0;          ///< Entries in this sub-list
+			std::vector<SupportedPgnEntry> entries;
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
 
 		/**************************************************************************/ /**
-		 \brief      Decode Supported PGN List response from BEM data payload
-		 \param[in]  data       BEM response data (after 12-byte header)
-		 \param[out] response   Decoded response structure
-		 \param[out] outError   Error message if decoding fails
-		 \return     True on success, false on error
-		 \details    Response format:
-					 - Byte 0: PGN Index (starting index for this message)
-					 - Byte 1: Transfer ID
-					 - Byte 2: PGN Count (number of PGNs in this message)
-					 - Bytes 3+: PGN list (4 bytes each, little-endian, only 24 bits used)
+		 \brief      Decode a 0x40 Supported PGN List response payload.
+		 \param[in]  data       Response bytes after the BEM response header.
+		 \param[out] response   Decoded sub-list.
+		 \param[out] outError   Error message on failure.
+		 \return     True on success.
 		 *******************************************************************************/
-		[[nodiscard]] inline bool decodeSupportedPgnListResponse(std::span<const uint8_t> data,
-																 SupportedPgnListResponse& response,
-																 std::string& outError) {
+		[[nodiscard]] inline bool
+		decodeSupportedPgnListResponse(std::span<const uint8_t> data,
+									   SupportedPgnListResponse& response,
+									   std::string& outError) {
 			if (data.size() < kSupportedPgnListResponseHeaderSize) {
 				outError = "Supported PGN List response too short for header: expected " +
-						   std::to_string(kSupportedPgnListResponseHeaderSize) + " bytes, got " +
-						   std::to_string(data.size());
+						   std::to_string(kSupportedPgnListResponseHeaderSize) +
+						   " bytes, got " + std::to_string(data.size());
 				return false;
 			}
 
-			response.pgnIndex = data[0];
-			response.transferId = data[1];
-			response.pgnCount = data[2];
+			response.transferId = data[0];
+			response.structureVariantId =
+				static_cast<uint32_t>(data[1]) | (static_cast<uint32_t>(data[2]) << 8) |
+				(static_cast<uint32_t>(data[3]) << 16) | (static_cast<uint32_t>(data[4]) << 24);
 
-			/* Calculate expected data size */
+			if (response.structureVariantId != kSupportedPgnListSvId) {
+				outError = "Unexpected Structure Variant ID in Supported PGN List response: 0x" +
+						   std::to_string(response.structureVariantId);
+				return false;
+			}
+
+			response.nmea2000DbVersion =
+				static_cast<uint16_t>(data[5]) | (static_cast<uint16_t>(data[6]) << 8);
+			response.totalListSize = data[7];
+			response.firstSubIdx = data[8];
+			response.subCount = data[9];
+
 			const std::size_t expectedSize = kSupportedPgnListResponseHeaderSize +
-											 (static_cast<std::size_t>(response.pgnCount) * 4);
-
+											 static_cast<std::size_t>(response.subCount) *
+												 kSupportedPgnListEntrySize;
 			if (data.size() < expectedSize) {
-				outError = "Supported PGN List response too short for " +
-						   std::to_string(response.pgnCount) + " PGNs: expected " +
+				outError = "Supported PGN List response truncated: subCount=" +
+						   std::to_string(response.subCount) + " expects " +
 						   std::to_string(expectedSize) + " bytes, got " +
 						   std::to_string(data.size());
 				return false;
 			}
 
-			/* Extract PGNs */
-			response.pgns.clear();
-			response.pgns.reserve(response.pgnCount);
-
+			response.entries.clear();
+			response.entries.reserve(response.subCount);
 			std::size_t offset = kSupportedPgnListResponseHeaderSize;
-			for (uint8_t i = 0; i < response.pgnCount; ++i) {
-				/* PGN: 4 bytes, little-endian (only lower 24 bits are valid) */
-				const uint32_t pgn = static_cast<uint32_t>(data[offset]) |
-									 (static_cast<uint32_t>(data[offset + 1]) << 8) |
-									 (static_cast<uint32_t>(data[offset + 2]) << 16) |
-									 (static_cast<uint32_t>(data[offset + 3]) << 24);
-
-				response.pgns.push_back(pgn & 0x00FFFFFF); /* Mask to 24 bits */
-				offset += 4;
+			for (uint8_t i = 0; i < response.subCount; ++i) {
+				SupportedPgnEntry entry;
+				entry.pgnIndex = data[offset];
+				entry.pgn = static_cast<uint32_t>(data[offset + 1]) |
+							(static_cast<uint32_t>(data[offset + 2]) << 8) |
+							(static_cast<uint32_t>(data[offset + 3]) << 16);
+				response.entries.push_back(entry);
+				offset += kSupportedPgnListEntrySize;
 			}
 
 			return true;
 		}
 
 		/**************************************************************************/ /**
-		 \brief      Encode Supported PGN List GET request data
-		 \param[in]  pgnIndex    Starting PGN index (0 for first request)
-		 \param[in]  transferId  Transfer ID for multi-message tracking
-		 \param[out] outData     Encoded request data
+		 \brief      Encode a 0x40 GET request payload.
+		 \param[in]  pgnIndex    Starting PGN index (0 for first call).
+		 \param[in]  transferId  Transfer ID to continue (0 to start a new transfer).
+		 \param[out] outData     Encoded payload (2 bytes).
 		 *******************************************************************************/
 		inline void encodeSupportedPgnListGetRequest(uint8_t pgnIndex, uint8_t transferId,
 													 std::vector<uint8_t>& outData) {
 			outData.clear();
 			outData.reserve(kSupportedPgnListGetRequestSize);
-
 			outData.push_back(pgnIndex);
 			outData.push_back(transferId);
 		}
 
 		/**************************************************************************/ /**
-		 \brief      Format PGN value as string
-		 \param[in]  pgn  PGN value (24-bit)
-		 \return     Formatted PGN string (e.g., "126992")
+		 \brief      True if more entries remain after this sub-list.
+		 \details    Subsequent calls should pass pgnIndex = firstSubIdx + subCount.
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string formatPgn(uint32_t pgn) {
-			return std::to_string(pgn);
+		[[nodiscard]] inline bool supportedPgnListHasMore(
+			const SupportedPgnListResponse& response) noexcept {
+			const std::size_t consumedThrough =
+				static_cast<std::size_t>(response.firstSubIdx) + response.subCount;
+			return consumedThrough < response.totalListSize;
 		}
 
 		/**************************************************************************/ /**
-		 \brief      Format Supported PGN List response as human-readable string
-		 \param[in]  response  Decoded response
-		 \return     Formatted string representation
+		 \brief      Format helper.
 		 *******************************************************************************/
 		[[nodiscard]] inline std::string
-		formatSupportedPgnListResponse(const SupportedPgnListResponse& response) {
-			std::string result;
-			result.reserve(256);
-
-			result += "Supported PGN List (Index=" + std::to_string(response.pgnIndex) +
-					  ", TransferID=" + std::to_string(response.transferId) +
-					  ", Count=" + std::to_string(response.pgnCount) + "):\n";
-
-			for (std::size_t i = 0; i < response.pgns.size(); ++i) {
-				result += "  [" + std::to_string(response.pgnIndex + i) + "] " +
-						  formatPgn(response.pgns[i]) + "\n";
+		formatSupportedPgnListResponse(const SupportedPgnListResponse& r) {
+			std::string out;
+			out.reserve(64 + r.entries.size() * 24);
+			out += "Supported PGN List (xid=" + std::to_string(r.transferId) +
+				   ", dbVer=" + std::to_string(r.nmea2000DbVersion / 1000) + "." +
+				   std::to_string(r.nmea2000DbVersion % 1000) +
+				   ", total=" + std::to_string(r.totalListSize) +
+				   ", subList[" + std::to_string(r.firstSubIdx) + "..+" +
+				   std::to_string(r.subCount) + "]):\n";
+			for (const auto& e : r.entries) {
+				out += "  [" + std::to_string(e.pgnIndex) + "] PGN " +
+					   std::to_string(e.pgn) + "\n";
 			}
-
-			if (response.isLastMessage()) {
-				result += "  (End of list)\n";
-			} else {
-				result +=
-					"  (More PGNs available, next index: " + std::to_string(response.nextIndex()) +
-					")\n";
-			}
-
-			return result;
-		}
-
-		/**************************************************************************/ /**
-		 \brief      Format complete Supported PGN List as human-readable string
-		 \param[in]  list  Complete PGN list
-		 \return     Formatted string representation
-		 *******************************************************************************/
-		[[nodiscard]] inline std::string
-		formatSupportedPgnListComplete(const SupportedPgnListComplete& list) {
-			std::string result;
-			result.reserve(list.pgns.size() * 16 + 64);
-
-			result +=
-				"Complete Supported PGN List (" + std::to_string(list.pgns.size()) + " PGNs):\n";
-
-			for (std::size_t i = 0; i < list.pgns.size(); ++i) {
-				result += "  [" + std::to_string(i) + "] " + formatPgn(list.pgns[i]) + "\n";
-			}
-
-			return result;
+			return out;
 		}
 
 	} /* namespace Sdk */
