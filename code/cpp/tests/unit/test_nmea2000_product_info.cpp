@@ -286,7 +286,9 @@ TEST_F(Nmea2000ProductInfoTest, CanInfoField3_EncodeGetRequest)
 
 TEST_F(Nmea2000ProductInfoTest, CanInfoField_DecodeResponse)
 {
-	const std::vector<uint8_t> data = {'T', 'e', 's', 't', ' ', 'I', 'n', 'f', 'o', 0xFF, 0xFF};
+	/* [totalLen=11][encoding=1][9-byte text "Test Info"] */
+	const std::vector<uint8_t> data = {
+		0x0B, 0x01, 'T', 'e', 's', 't', ' ', 'I', 'n', 'f', 'o'};
 
 	CanInfoFieldResponse response;
 	EXPECT_TRUE(decodeCanInfoFieldResponse(data, CanInfoField::InstallationDesc1, response, m_error));
@@ -297,12 +299,72 @@ TEST_F(Nmea2000ProductInfoTest, CanInfoField_DecodeResponse)
 
 TEST_F(Nmea2000ProductInfoTest, CanInfoField_DecodeEmptyString)
 {
-	const std::vector<uint8_t> data = {0xFF, 0xFF, 0xFF};
+	/* [totalLen=2][encoding=1] — header only, zero text bytes */
+	const std::vector<uint8_t> data = {0x02, 0x01};
 
 	CanInfoFieldResponse response;
 	EXPECT_TRUE(decodeCanInfoFieldResponse(data, CanInfoField::ManufacturerInfo, response, m_error));
 
 	EXPECT_EQ(response.text, "");
+}
+
+TEST_F(Nmea2000ProductInfoTest, CanInfoField_DecodeRejectsTooShort)
+{
+	const std::vector<uint8_t> data = {0x02}; /* missing encoding byte */
+
+	CanInfoFieldResponse response;
+	EXPECT_FALSE(decodeCanInfoFieldResponse(data, CanInfoField::InstallationDesc1, response, m_error));
+	EXPECT_FALSE(m_error.empty());
+}
+
+TEST_F(Nmea2000ProductInfoTest, CanInfoField_DecodeRejectsUnicodeEncoding)
+{
+	/* encoding=0 (Unicode) is rejected by the SDK */
+	const std::vector<uint8_t> data = {0x04, 0x00, 'A', 'B'};
+
+	CanInfoFieldResponse response;
+	EXPECT_FALSE(decodeCanInfoFieldResponse(data, CanInfoField::InstallationDesc1, response, m_error));
+	EXPECT_NE(m_error.find("encoding"), std::string::npos);
+}
+
+TEST_F(Nmea2000ProductInfoTest, CanInfoField_DecodeRejectsTruncatedPayload)
+{
+	/* totalLen claims 11 bytes but only 5 bytes provided */
+	const std::vector<uint8_t> data = {0x0B, 0x01, 'A', 'B', 'C'};
+
+	CanInfoFieldResponse response;
+	EXPECT_FALSE(decodeCanInfoFieldResponse(data, CanInfoField::InstallationDesc1, response, m_error));
+	EXPECT_NE(m_error.find("truncated"), std::string::npos);
+}
+
+TEST_F(Nmea2000ProductInfoTest, CanInfoField_EncodeSetRequestPayload)
+{
+	std::vector<uint8_t> payload;
+	EXPECT_TRUE(encodeCanInfoFieldSetRequest("Hi", payload, m_error));
+
+	ASSERT_EQ(payload.size(), 4u);
+	EXPECT_EQ(payload[0], 0x04);                            /* totalLen = 2 + 2 */
+	EXPECT_EQ(payload[1], kCanInfoFieldEncodingAscii);
+	EXPECT_EQ(payload[2], 'H');
+	EXPECT_EQ(payload[3], 'i');
+}
+
+TEST_F(Nmea2000ProductInfoTest, CanInfoField_EncodeSetRequestEmpty)
+{
+	std::vector<uint8_t> payload;
+	EXPECT_TRUE(encodeCanInfoFieldSetRequest("", payload, m_error));
+
+	ASSERT_EQ(payload.size(), 2u);
+	EXPECT_EQ(payload[0], 0x02);
+	EXPECT_EQ(payload[1], kCanInfoFieldEncodingAscii);
+}
+
+TEST_F(Nmea2000ProductInfoTest, CanInfoField_EncodeSetRequestRejectsTooLong)
+{
+	const std::string tooLong(kCanInfoFieldMaxLen + 1, 'X');
+	std::vector<uint8_t> payload;
+	EXPECT_FALSE(encodeCanInfoFieldSetRequest(tooLong, payload, m_error));
+	EXPECT_FALSE(m_error.empty());
 }
 
 TEST_F(Nmea2000ProductInfoTest, CanInfoField_FieldToString)
