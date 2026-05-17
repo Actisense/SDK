@@ -1555,20 +1555,23 @@ TEST_F(BemDeviceTest, TxPgnEnable_PerPgnSetPath)
 }
 
 /* NGXSW-4186 probe: try getRxPgnEnable for a baseline set of well-known
-   standard NMEA 2000 PGNs. The original NGT-1 failure was on PGN 126992
-   (System Time), so we probe that plus a handful of other PGNs every N2K
-   gateway must know about. If ALL succeed on NGT-1, the
-   F2-list-vs-0x46 divergence was unique to the (now-deprecated) F1 path
-   and NGXSW-4186 can close. Any ES9 result means the underlying firmware
-   bug persists through F2 and the ticket stays open.
+   standard NMEA 2000 PGNs in BOTH operating modes (NGTransferNormalMode
+   and NGTransferRxAllMode). Hypothesis: NGT-1's per-PGN handler only
+   populates its lookup table when the device is in TransferNormal mode;
+   in RxAll mode the gateway is a pass-through, the table is empty, and
+   0x46 returns ES9 for everything.
 
-   This is a cheaper, more direct probe than walking the multi-message
-   Supported / F2 responses to find overlap — the SDK currently only
-   surfaces the first sub-list, and on NGT-1 the index ranges of those two
-   lists happen not to overlap, making any list-walking probe
-   uninformative without multi-message reassembly. */
+   If the probe passes in TransferNormal and fails in RxAll, NGXSW-4186 is
+   not a firmware bug but a documented mode-dependent behaviour that the
+   SDK should call out. If the probe still fails in TransferNormal too,
+   the original "firmware bug" diagnosis stands.
+
+   Restores the device's baseline mode on exit via scope guard regardless
+   of how the test ends. */
 TEST_F(BemDeviceTest, RxPgnEnable_WellKnownPgnsAddressableViaPerPgn)
 {
+	using namespace std::chrono_literals;
+
 	struct ProbePgn { uint32_t pgn; const char* name; };
 	constexpr ProbePgn kProbes[] = {
 		{ 60928,  "ISO Address Claim"    },
@@ -1581,53 +1584,127 @@ TEST_F(BemDeviceTest, RxPgnEnable_WellKnownPgnsAddressableViaPerPgn)
 		{ 130306, "Wind Data"            },
 	};
 
-	std::vector<uint32_t> es9Pgns;
-	std::vector<std::pair<uint32_t, std::string>> otherFailures;
-	std::size_t ok = 0;
+	struct ProbeResult {
+		std::size_t ok = 0;
+		std::vector<uint32_t> es9Pgns;
+		std::vector<std::pair<uint32_t, std::string>> otherFailures;
+	};
 
-	for (const auto& p : kProbes) {
-		auto r = sendConvenience([this, pgn = p.pgn](auto t, auto cb) {
-			session_->getRxPgnEnable(pgn, t, std::move(cb));
+	auto runProbe = [&](const char* tag) -> ProbeResult {
+		ProbeResult result;
+		std::cout << "  --- Probing in " << tag << " ---" << std::endl;
+		for (const auto& p : kProbes) {
+			auto r = sendConvenience([this, pgn = p.pgn](auto t, auto cb) {
+				session_->getRxPgnEnable(pgn, t, std::move(cb));
+			});
+			const uint32_t arlErr =
+				r.response.has_value() ? r.response->header.errorCode : 0u;
+			if (r.errorCode == ErrorCode::Ok) {
+				++result.ok;
+				continue;
+			}
+			if (arlErr == 0xFFFFFC1Du) { /* ES9_N2000_PGN_NOT_ON_LIST */
+				result.es9Pgns.push_back(p.pgn);
+				std::cout << "    PGN " << p.pgn << " (" << p.name
+				          << "): ES9_N2000_PGN_NOT_ON_LIST" << std::endl;
+			} else {
+				result.otherFailures.emplace_back(p.pgn, r.errorMsg);
+				std::cout << "    PGN " << p.pgn << " (" << p.name
+				          << "): unexpected failure ARL=0x" << std::hex << arlErr
+				          << std::dec << " — " << r.errorMsg << std::endl;
+			}
+		}
+		std::cout << "    " << tag << " summary: " << result.ok << " ok, "
+		          << result.es9Pgns.size() << " ES9, "
+		          << result.otherFailures.size() << " other" << std::endl;
+		return result;
+	};
+
+	auto readMode = [&]() -> std::optional<uint16_t> {
+		auto r = sendConvenience([this](auto t, auto cb) {
+			session_->getOperatingMode(t, std::move(cb));
 		});
-		const uint32_t arlErr =
-			r.response.has_value() ? r.response->header.errorCode : 0u;
-		if (r.errorCode == ErrorCode::Ok) {
-			++ok;
-			continue;
+		if (r.errorCode != ErrorCode::Ok || !r.response.has_value() ||
+			r.response->data.size() < 2) {
+			return std::nullopt;
 		}
-		if (arlErr == 0xFFFFFC1Du) { /* ES9_N2000_PGN_NOT_ON_LIST */
-			es9Pgns.push_back(p.pgn);
-			std::cout << "  PGN " << p.pgn << " (" << p.name
-			          << "): ES9_N2000_PGN_NOT_ON_LIST" << std::endl;
-		} else {
-			otherFailures.emplace_back(p.pgn, r.errorMsg);
-			std::cout << "  PGN " << p.pgn << " (" << p.name
-			          << "): unexpected failure ARL=0x" << std::hex << arlErr
-			          << std::dec << " — " << r.errorMsg << std::endl;
+		return static_cast<uint16_t>(r.response->data[0]) |
+			   (static_cast<uint16_t>(r.response->data[1]) << 8);
+	};
+
+	auto setMode = [&](uint16_t mode) -> bool {
+		auto r = sendConvenience([this, mode](auto t, auto cb) {
+			session_->setOperatingMode(mode, t, std::move(cb));
+		});
+		return r.errorCode == ErrorCode::Ok;
+	};
+
+	/* Baseline + scope-guard restorer pattern, same as
+	   SetOperatingMode_Roundtrip. */
+	const auto baseline = readMode();
+	ASSERT_TRUE(baseline.has_value()) << "Could not read baseline operating mode";
+	const uint16_t baselineMode = *baseline;
+	std::cout << "  Baseline operating mode: "
+	          << OperatingModeName(static_cast<OperatingMode>(baselineMode))
+	          << " (" << baselineMode << ")" << std::endl;
+
+	struct ModeRestorer {
+		std::function<bool(uint16_t)> set;
+		uint16_t mode;
+		bool armed;
+		~ModeRestorer() {
+			if (armed) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(300));
+				(void)set(mode);
+			}
 		}
+	} restorer{setMode, baselineMode, true};
+
+	const auto kNormal = static_cast<uint16_t>(OperatingMode::OM_NGTransferNormalMode);
+	const auto kRxAll  = static_cast<uint16_t>(OperatingMode::OM_NGTransferRxAllMode);
+
+	/* Pass 1: TransferNormal. */
+	ASSERT_TRUE(setMode(kNormal)) << "SET to TransferNormal failed";
+	std::this_thread::sleep_for(300ms);
+	const auto normalResult = runProbe("NGTransferNormalMode");
+
+	/* Pass 2: RxAll. */
+	ASSERT_TRUE(setMode(kRxAll)) << "SET to RxAll failed";
+	std::this_thread::sleep_for(300ms);
+	const auto rxAllResult = runProbe("NGTransferRxAllMode");
+
+	/* Restore baseline. */
+	ASSERT_TRUE(setMode(baselineMode));
+	restorer.armed = false;
+	std::this_thread::sleep_for(300ms);
+
+	/* Report non-ES9 failures in either mode as test failures — those
+	   indicate something other than the mode-dependent bug. */
+	for (const auto& [pgn, msg] : normalResult.otherFailures) {
+		ADD_FAILURE() << "TransferNormal: PGN " << pgn
+		              << " non-ES9 failure: " << msg;
+	}
+	for (const auto& [pgn, msg] : rxAllResult.otherFailures) {
+		ADD_FAILURE() << "RxAll: PGN " << pgn
+		              << " non-ES9 failure: " << msg;
 	}
 
-	std::cout << "  Summary: " << ok << " ok, " << es9Pgns.size()
-	          << " ES9, " << otherFailures.size() << " other on "
-	          << modelIdToString(modelId_) << std::endl;
-
-	for (const auto& [pgn, msg] : otherFailures) {
-		ADD_FAILURE() << "PGN " << pgn << " returned non-ES9 failure: " << msg;
-	}
-
-	/* The probe: well-known PGNs must be addressable via 0x46. On NGT-1
-	   this is known to fail — 7 of 8 probe PGNs return ES9 (only ISO
-	   Address Claim 60928 works). Confirms NGXSW-4186 is independent of
-	   how the SDK enumerates PGNs (F1 vs F2) and persists firmware-side.
-	   Skip the assertion on NGT-1 to keep the suite green; the diagnostic
-	   above is still captured. Unmask this gate once NGXSW-4186 is fixed. */
+	/* NGT-1 fails identically in both modes (7/8 ES9), confirming
+	   NGXSW-4186 is not mode-dependent — the per-PGN handler is broken in
+	   the NGW1 firmware regardless of operating mode. NGX-1 passes both
+	   modes cleanly. Skip the assertion on NGT-1 with the recorded
+	   diagnostic; unmask once NGXSW-4186 lands. */
 	if (modelId_ == static_cast<uint16_t>(ArlModelId::NGT1)) {
-		GTEST_SKIP() << "NGT-1 firmware fails ES9 for most well-known PGNs via 0x46 — "
-		             << "see NGXSW-4186. Diagnostic captured above.";
+		GTEST_SKIP() << "NGT-1: " << normalResult.es9Pgns.size()
+		             << " ES9 in TransferNormal, " << rxAllResult.es9Pgns.size()
+		             << " ES9 in RxAll — NGXSW-4186 (firmware-side, mode-independent)";
 	}
 
-	EXPECT_EQ(es9Pgns.size(), 0u)
-		<< "Well-known PGNs rejected with ES9_N2000_PGN_NOT_ON_LIST on "
+	EXPECT_EQ(normalResult.es9Pgns.size(), 0u)
+		<< "Well-known PGNs rejected with ES9 in TransferNormal mode on "
+		<< modelIdToString(modelId_);
+	EXPECT_EQ(rxAllResult.es9Pgns.size(), 0u)
+		<< "Well-known PGNs rejected with ES9 in RxAll mode on "
 		<< modelIdToString(modelId_);
 }
 
