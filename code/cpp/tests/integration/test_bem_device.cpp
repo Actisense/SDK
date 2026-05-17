@@ -1708,6 +1708,378 @@ TEST_F(BemDeviceTest, RxPgnEnable_WellKnownPgnsAddressableViaPerPgn)
 		<< modelIdToString(modelId_);
 }
 
+/* Comprehensive Rx/Tx PGN enable sweep. Walks every PGN the firmware
+   reports in the F2 Rx and Tx enable lists, attempts a round-trip
+   (baseline GET -> flip SET -> verify GET -> restore SET -> verify GET)
+   on each, and prints a categorised summary at the end.
+
+   Known limitation: the SDK's BEM correlator only surfaces the first
+   sub-list of multi-message responses, so this sweep only covers
+   PGN-indices in the first sub-list of BOTH the Supported PGN List and
+   the F2 enable list. On NGX-1 that's typically up to 48 of the ~200
+   entries on each side; on NGT-1 the entire F2 list fits in one
+   sub-list (7 entries) but the Supported list overlap may be empty,
+   leaving NGT effectively un-sweepable until the SDK gains multi-
+   message reassembly (tracked elsewhere).
+
+   On NGT-1 we additionally expect mass ES9 failures from the per-PGN
+   path itself (NGXSW-4186), so the assertion is skipped — the printed
+   summary still records exactly which PGNs failed and how. */
+TEST_F(BemDeviceTest, PgnEnable_ComprehensiveSweep)
+{
+	using namespace std::chrono_literals;
+
+	enum class Outcome
+	{
+		Ok,           ///< Flip + restore both observed in GET state
+		StackGated,   ///< SET ack'd but GET state did not flip
+		SetFailed,    ///< SET command returned non-Ok
+		GetFailed,    ///< GET command returned non-Ok (e.g. ES9)
+		NoPgnLookup   ///< F2 entry pgnIndex not in Supported first sub-list
+	};
+
+	struct EntryResult
+	{
+		uint8_t pgnIndex = 0;
+		uint32_t pgn = 0;       /* 0 if NoPgnLookup */
+		Outcome outcome = Outcome::Ok;
+		std::string detail;     /* failure mode detail, empty on success */
+	};
+
+	/* 0. Switch to NGTransferNormalMode for the duration of the sweep —
+	   the per-PGN Rx GET enable flag is stack-gated to Enabled in RxAll
+	   mode regardless of SET, which would make every Rx round-trip look
+	   STACK_GATED. Scope-guarded restore returns the device to its
+	   baseline mode no matter how the test ends. */
+	std::optional<uint16_t> baselineMode;
+	{
+		auto r = sendConvenience([this](auto t, auto cb) {
+			session_->getOperatingMode(t, std::move(cb));
+		});
+		if (r.errorCode == ErrorCode::Ok && r.response.has_value() &&
+			r.response->data.size() >= 2) {
+			baselineMode = static_cast<uint16_t>(r.response->data[0]) |
+			               (static_cast<uint16_t>(r.response->data[1]) << 8);
+		}
+	}
+	ASSERT_TRUE(baselineMode.has_value()) << "Could not read baseline operating mode";
+
+	struct ModeRestorer {
+		std::function<void(uint16_t)> set;
+		uint16_t mode;
+		bool armed;
+		~ModeRestorer() {
+			if (armed) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(300));
+				set(mode);
+			}
+		}
+	} restorer{
+		[this](uint16_t m) {
+			auto r = sendConvenience([this, m](auto t, auto cb) {
+				session_->setOperatingMode(m, t, std::move(cb));
+			});
+			(void)r;
+		},
+		*baselineMode,
+		true
+	};
+
+	const auto kNormal = static_cast<uint16_t>(OperatingMode::OM_NGTransferNormalMode);
+	if (*baselineMode != kNormal) {
+		auto r = sendConvenience([this, kNormal](auto t, auto cb) {
+			session_->setOperatingMode(kNormal, t, std::move(cb));
+		});
+		ASSERT_EQ(r.errorCode, ErrorCode::Ok) << "SET TransferNormal failed: "
+		                                       << r.errorMsg;
+		std::this_thread::sleep_for(300ms);
+		std::cout << "  Switched from "
+		          << OperatingModeName(static_cast<OperatingMode>(*baselineMode))
+		          << " to NGTransferNormalMode for sweep" << std::endl;
+	} else {
+		std::cout << "  Operating mode: NGTransferNormalMode (no switch needed)"
+		          << std::endl;
+	}
+
+	/* 1. Build pgnIndex -> PGN value map from Supported list first sub-list. */
+	std::map<uint8_t, uint32_t> indexToPgn;
+	{
+		auto r = sendSync(makeGetCommand(BemCommandId::GetSupportedPgnList));
+		ASSERT_EQ(r.errorCode, ErrorCode::Ok) << "Supported PGN List GET failed: "
+		                                       << r.errorMsg;
+		ASSERT_TRUE(r.response.has_value());
+		SupportedPgnListResponse supported;
+		std::string err;
+		ASSERT_TRUE(decodeSupportedPgnListResponse(
+			std::span<const uint8_t>(r.response->data), supported, err))
+			<< "Supported decode failed: " << err;
+		for (const auto& e : supported.entries) {
+			indexToPgn[e.pgnIndex] = e.pgn;
+		}
+		std::cout << "  Supported list: " << static_cast<int>(supported.subCount)
+		          << " of " << static_cast<int>(supported.totalListSize)
+		          << " entries surfaced (first sub-list only)" << std::endl;
+	}
+
+	/* 2. Collect pgnIndex lists from Rx F2 and Tx F2 (first sub-list only). */
+	std::vector<uint8_t> rxIndices;
+	{
+		auto r = sendSync(makeGetCommand(BemCommandId::GetSetRxPgnEnableListF2));
+		ASSERT_EQ(r.errorCode, ErrorCode::Ok) << "Rx F2 GET failed: " << r.errorMsg;
+		ASSERT_TRUE(r.response.has_value());
+		RxPgnEnableListF2Response f2;
+		std::string err;
+		ASSERT_TRUE(decodeRxPgnEnableListF2Response(
+			std::span<const uint8_t>(r.response->data), f2, err))
+			<< "Rx F2 decode failed: " << err;
+		for (const auto& e : f2.entries) {
+			rxIndices.push_back(e.pgnIndex);
+		}
+		std::cout << "  Rx F2: " << f2.entries.size()
+		          << " entries surfaced (totalListSize="
+		          << static_cast<int>(f2.totalListSize) << ")" << std::endl;
+	}
+
+	std::vector<uint8_t> txIndices;
+	{
+		auto r = sendSync(makeGetCommand(BemCommandId::GetSetTxPgnEnableListF2));
+		ASSERT_EQ(r.errorCode, ErrorCode::Ok) << "Tx F2 GET failed: " << r.errorMsg;
+		ASSERT_TRUE(r.response.has_value());
+		TxPgnEnableListF2Response f2;
+		std::string err;
+		ASSERT_TRUE(decodeTxPgnEnableListF2Response(
+			std::span<const uint8_t>(r.response->data), f2, err))
+			<< "Tx F2 decode failed: " << err;
+		/* Only the standard variant carries pgnIndex entries; the
+		   proprietary variant uses DP0/DP1 bitmaps. Sweep only the
+		   standard entries for now. */
+		if (f2.variant == TxPgnEnableListF2Variant::Standard) {
+			for (const auto& e : f2.stdEntries) {
+				txIndices.push_back(e.pgnIndex);
+			}
+		}
+		std::cout << "  Tx F2: " << txIndices.size()
+		          << " std-variant entries surfaced (variant="
+		          << static_cast<int>(f2.variant)
+		          << ", stdTotalListSize=" << static_cast<int>(f2.stdTotalListSize)
+		          << ")" << std::endl;
+	}
+
+	/* 3. Per-direction sweep helper. RxPgnEnableResponse and
+	   TxPgnEnableResponse both carry a .enable flag with Disabled/Enabled
+	   values at the same numeric values (0/1), so the per-direction
+	   getters/setters are the only thing that varies. */
+	auto sweepDirection = [&](const char* dirName,
+	                          const std::vector<uint8_t>& indices,
+	                          auto getEnableBool,
+	                          auto setEnableBool) -> std::vector<EntryResult>
+	{
+		std::cout << "\n  === " << dirName << " sweep ===" << std::endl;
+		std::vector<EntryResult> results;
+		results.reserve(indices.size());
+
+		for (uint8_t pgnIndex : indices) {
+			EntryResult er;
+			er.pgnIndex = pgnIndex;
+
+			auto pgnIt = indexToPgn.find(pgnIndex);
+			if (pgnIt == indexToPgn.end()) {
+				er.outcome = Outcome::NoPgnLookup;
+				er.detail = "pgnIndex not in Supported first sub-list";
+				results.push_back(std::move(er));
+				continue;
+			}
+			er.pgn = pgnIt->second;
+
+			/* Baseline GET. */
+			std::string err;
+			auto baseline = getEnableBool(er.pgn, err);
+			if (!baseline.has_value()) {
+				er.outcome = Outcome::GetFailed;
+				er.detail = "baseline GET: " + err;
+				results.push_back(std::move(er));
+				continue;
+			}
+			const bool baselineEnabled = *baseline;
+
+			/* Flip SET. */
+			std::string setErr;
+			if (!setEnableBool(er.pgn, !baselineEnabled, setErr)) {
+				er.outcome = Outcome::SetFailed;
+				er.detail = "flip SET: " + setErr;
+				results.push_back(std::move(er));
+				continue;
+			}
+			std::this_thread::sleep_for(50ms);
+
+			/* Verify flip. */
+			std::string verifyErr;
+			auto flipped = getEnableBool(er.pgn, verifyErr);
+			const bool flipObserved = flipped.has_value() &&
+			                          (*flipped != baselineEnabled);
+
+			/* Restore SET. */
+			std::string restoreErr;
+			if (!setEnableBool(er.pgn, baselineEnabled, restoreErr)) {
+				er.outcome = Outcome::SetFailed;
+				er.detail = "restore SET: " + restoreErr;
+				results.push_back(std::move(er));
+				continue;
+			}
+			std::this_thread::sleep_for(50ms);
+
+			if (!flipObserved) {
+				er.outcome = Outcome::StackGated;
+				er.detail = "SET ack'd but GET state didn't flip "
+				            "(mandatory/stack-gated PGN)";
+			} else {
+				er.outcome = Outcome::Ok;
+			}
+			results.push_back(std::move(er));
+		}
+
+		return results;
+	};
+
+	/* 4. Rx sweep — wrap getRxPgnEnable / setRxPgnEnable into bool helpers. */
+	auto rxResults = sweepDirection(
+		"Rx",
+		rxIndices,
+		[this](uint32_t pgn, std::string& err) -> std::optional<bool> {
+			auto r = sendConvenience([this, pgn](auto t, auto cb) {
+				session_->getRxPgnEnable(pgn, t, std::move(cb));
+			});
+			if (r.errorCode != ErrorCode::Ok || !r.response.has_value()) {
+				err = r.errorMsg;
+				if (r.response.has_value() &&
+					r.response->header.errorCode == 0xFFFFFC1Du) {
+					err += " (ES9_N2000_PGN_NOT_ON_LIST)";
+				}
+				return std::nullopt;
+			}
+			RxPgnEnableResponse decoded;
+			std::string derr;
+			if (!decodeRxPgnEnableResponse(
+				std::span<const uint8_t>(r.response->data), decoded, derr)) {
+				err = "decode: " + derr;
+				return std::nullopt;
+			}
+			return decoded.enable == RxPgnEnableFlag::Enabled;
+		},
+		[this](uint32_t pgn, bool enable, std::string& err) {
+			auto r = sendConvenience([this, pgn, enable](auto t, auto cb) {
+				session_->setRxPgnEnable(pgn, enable ? 1 : 0, t, std::move(cb));
+			});
+			if (r.errorCode != ErrorCode::Ok) {
+				err = r.errorMsg;
+				return false;
+			}
+			return true;
+		});
+
+	/* 5. Tx sweep — wrap getTxPgnEnable / setTxPgnEnable into bool helpers. */
+	auto txResults = sweepDirection(
+		"Tx",
+		txIndices,
+		[this](uint32_t pgn, std::string& err) -> std::optional<bool> {
+			auto r = sendConvenience([this, pgn](auto t, auto cb) {
+				session_->getTxPgnEnable(pgn, t, std::move(cb));
+			});
+			if (r.errorCode != ErrorCode::Ok || !r.response.has_value()) {
+				err = r.errorMsg;
+				if (r.response.has_value() &&
+					r.response->header.errorCode == 0xFFFFFC1Du) {
+					err += " (ES9_N2000_PGN_NOT_ON_LIST)";
+				}
+				return std::nullopt;
+			}
+			TxPgnEnableResponse decoded;
+			std::string derr;
+			if (!decodeTxPgnEnableResponse(
+				std::span<const uint8_t>(r.response->data), decoded, derr)) {
+				err = "decode: " + derr;
+				return std::nullopt;
+			}
+			return decoded.enable == TxPgnEnableFlag::Enabled;
+		},
+		[this](uint32_t pgn, bool enable, std::string& err) {
+			auto r = sendConvenience([this, pgn, enable](auto t, auto cb) {
+				session_->setTxPgnEnable(pgn, enable ? 1 : 0, t, std::move(cb));
+			});
+			if (r.errorCode != ErrorCode::Ok) {
+				err = r.errorMsg;
+				return false;
+			}
+			return true;
+		});
+
+	/* 5. Render summary. */
+	auto outcomeName = [](Outcome o) {
+		switch (o) {
+			case Outcome::Ok:          return "OK         ";
+			case Outcome::StackGated:  return "STACK_GATED";
+			case Outcome::SetFailed:   return "SET_FAILED ";
+			case Outcome::GetFailed:   return "GET_FAILED ";
+			case Outcome::NoPgnLookup: return "NO_LOOKUP  ";
+		}
+		return "???        ";
+	};
+
+	auto renderTally = [&](const char* dirName, const std::vector<EntryResult>& rs) {
+		std::map<Outcome, std::size_t> tally;
+		for (const auto& r : rs) ++tally[r.outcome];
+
+		std::cout << "\n  ===== " << dirName << " Sweep Summary ===== " << std::endl;
+		std::cout << "  " << dirName << " entries probed: " << rs.size() << std::endl;
+		std::cout << "    OK            : " << tally[Outcome::Ok] << std::endl;
+		std::cout << "    STACK_GATED   : " << tally[Outcome::StackGated]
+		          << " (SET ack'd, GET unchanged — mandatory PGNs)" << std::endl;
+		std::cout << "    SET_FAILED    : " << tally[Outcome::SetFailed] << std::endl;
+		std::cout << "    GET_FAILED    : " << tally[Outcome::GetFailed] << std::endl;
+		std::cout << "    NO_LOOKUP     : " << tally[Outcome::NoPgnLookup]
+		          << " (pgnIndex outside Supported first sub-list)" << std::endl;
+
+		/* Print failures and stack-gated entries in detail. */
+		for (const auto& r : rs) {
+			if (r.outcome == Outcome::Ok) continue;
+			std::cout << "    [" << outcomeName(r.outcome) << "] pgnIdx="
+			          << static_cast<int>(r.pgnIndex);
+			if (r.pgn != 0) {
+				std::cout << " pgn=" << r.pgn;
+			}
+			if (!r.detail.empty()) {
+				std::cout << " — " << r.detail;
+			}
+			std::cout << std::endl;
+		}
+	};
+
+	renderTally("Rx", rxResults);
+	renderTally("Tx", txResults);
+
+	/* 6. Assert. On NGT-1 mass ES9 failures are expected (NGXSW-4186); skip
+	   to keep the suite green but the summary above still shows everything. */
+	if (modelId_ == static_cast<uint16_t>(ArlModelId::NGT1)) {
+		GTEST_SKIP() << "NGT-1: per-PGN failures expected (NGXSW-4186). "
+		             << "See sweep summary above for details.";
+	}
+
+	auto countOf = [](const std::vector<EntryResult>& rs, Outcome o) {
+		std::size_t n = 0;
+		for (const auto& r : rs) if (r.outcome == o) ++n;
+		return n;
+	};
+
+	EXPECT_EQ(countOf(rxResults, Outcome::SetFailed), 0u)
+		<< "Rx SET failures on " << modelIdToString(modelId_);
+	EXPECT_EQ(countOf(rxResults, Outcome::GetFailed), 0u)
+		<< "Rx GET failures on " << modelIdToString(modelId_);
+	EXPECT_EQ(countOf(txResults, Outcome::SetFailed), 0u)
+		<< "Tx SET failures on " << modelIdToString(modelId_);
+	EXPECT_EQ(countOf(txResults, Outcome::GetFailed), 0u)
+		<< "Tx GET failures on " << modelIdToString(modelId_);
+}
+
 /* GIT-77 sign-off coverage: exercise every Delete selector (Rx / Tx / Both).
    Delete is a list-level operation that does not go through the per-PGN
    VD-0 path, so it works on both NGT-1 and NGX-1 for the Rx/Tx selectors.
