@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -28,6 +29,9 @@ namespace Actisense
 {
 	namespace Sdk
 	{
+		/* Forward declarations ------------------------------------------------- */
+		class RemoteDevice;
+
 		/* Definitions ---------------------------------------------------------- */
 
 		/**************************************************************************/ /**
@@ -137,6 +141,17 @@ namespace Actisense
 			 *******************************************************************************/
 			virtual void getHardwareInfo(std::chrono::milliseconds timeout,
 										 HardwareInfoCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Open a handle for issuing BEM commands to a remote
+			             NMEA 2000 device, wrapped in PGN 126720 (GIT-88).
+			 \param[in]  n2kSourceAddress  N2K source address of the target
+			                               device on the bus behind the
+			                               locally connected gateway.
+			 \return     Owning handle. Must not outlive the session.
+			 *******************************************************************************/
+			[[nodiscard]] virtual std::unique_ptr<RemoteDevice>
+			openRemote(uint8_t n2kSourceAddress) = 0;
 
 			/**************************************************************************/ /**
 			 \brief      Close the session gracefully

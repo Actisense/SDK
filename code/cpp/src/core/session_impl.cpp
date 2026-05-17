@@ -8,6 +8,8 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include "core/session_impl.hpp"
+#include "core/remote_device_impl.hpp"
+#include "protocols/bem/bem_wrap_126720.hpp"
 
 #include <condition_variable>
 #include <cstring>
@@ -274,6 +276,44 @@ namespace Actisense
 									   SendCompletionHandler completion) {
 			traceWire(WireTraceDirection::Tx, frame);
 			transport_->asyncSend(frame, std::move(completion));
+		}
+
+		std::unique_ptr<RemoteDevice> SessionImpl::openRemote(uint8_t n2kSourceAddress) {
+			return std::make_unique<RemoteDeviceImpl>(*this, n2kSourceAddress);
+		}
+
+		void SessionImpl::sendBemCommandRemote(uint8_t targetN2kSourceAddress,
+											   const BemCommand& command,
+											   std::chrono::milliseconds timeout,
+											   BemResponseCallback callback) {
+			std::string error;
+			std::vector<uint8_t> innerBst;
+
+			if (!bem_.encodeCommandInnerBst(command, innerBst, error)) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument, error);
+				}
+				return;
+			}
+
+			std::vector<uint8_t> wrappedPayload;
+			wrapBemInPgn126720(innerBst, wrappedPayload);
+
+			/* PGN 126720 priority is per the Tx PGN object configured in firmware;
+			   3 is the conventional fast-packet proprietary priority that the
+			   ACCompLib reference path uses. */
+			const BstFrame frame =
+				BstFrame::create94(kPgn126720, targetN2kSourceAddress, wrappedPayload,
+								   /*priority=*/3);
+
+			bem_.registerRequest(command.bemId, command.bstId, timeout, std::move(callback),
+								 targetN2kSourceAddress);
+
+			asyncSend("bst", frame.rawData(), [this](ErrorCode code) {
+				if (code != ErrorCode::Ok && errorCallback_) {
+					errorCallback_(code, "Failed to send remote BEM command");
+				}
+			});
 		}
 
 		void SessionImpl::sendBemCommand(const BemCommand& command,
@@ -1045,6 +1085,25 @@ namespace Actisense
 		}
 
 		void SessionImpl::handleBstFrame(const BstFrame& frame) {
+			/* GIT-88: a remote BEM reply arrives wrapped in PGN 126720. If the
+			   payload carries the Actisense manufacturer header and decodes as
+			   a BEM response that matches a pending request registered against
+			   the same source address, consume it silently. Otherwise fall
+			   through so the user still sees the raw PGN 126720 event. */
+			if (frame.isN2k() && frame.pgn() == kPgn126720) {
+				std::span<const uint8_t> innerBst;
+				if (tryUnwrapBemFromPgn126720(frame.data(), innerBst)) {
+					std::string decodeError;
+					auto response = bem_.decodeResponseFromBytes(innerBst, decodeError);
+					if (response) {
+						++bem_responses_received_;
+						if (bem_.correlateResponse(*response, frame.source())) {
+							return;
+						}
+					}
+				}
+			}
+
 			if (!eventCallback_) {
 				return;
 			}

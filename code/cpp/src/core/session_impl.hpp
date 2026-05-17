@@ -86,6 +86,9 @@ namespace Actisense
 			void getHardwareInfo(std::chrono::milliseconds timeout,
 								 HardwareInfoCallback callback) override;
 
+			[[nodiscard]] std::unique_ptr<RemoteDevice>
+			openRemote(uint8_t n2kSourceAddress) override;
+
 			void close() override;
 
 			[[nodiscard]] bool isConnected() const noexcept override;
@@ -133,6 +136,27 @@ namespace Actisense
 			 *******************************************************************************/
 			void sendBemCommand(const BemCommand& command, std::chrono::milliseconds timeout,
 								BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send a BEM command wrapped in PGN 126720 to a remote
+			             NMEA 2000 device (GIT-88).
+			 \details    The inner BST bytes are extracted from the encoded
+			             command, prepended with the Actisense
+			             manufacturer/industry header, and transmitted as a
+			             BST-94 PGN 126720 frame addressed to
+			             @p targetN2kSourceAddress. The reply, when it arrives
+			             unwrapped from the same PGN, is correlated against the
+			             pending request via the BEM correlator keyed on the
+			             remote source address.
+			 \param[in]  targetN2kSourceAddress  N2K source address of the
+			                                     destination device.
+			 \param[in]  command                 BEM command to send.
+			 \param[in]  timeout                 Response timeout.
+			 \param[in]  callback                Invoked on response or timeout.
+			 *******************************************************************************/
+			void sendBemCommandRemote(uint8_t targetN2kSourceAddress, const BemCommand& command,
+									  std::chrono::milliseconds timeout,
+									  BemResponseCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Send Get Operating Mode command

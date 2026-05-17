@@ -4,6 +4,8 @@
 add_sdk_test(test_bdtp_loopback test_bdtp_loopback.cpp)
 # BEM commands over real serial device (requires ACTISENSE_TEST_PORT env var)
 add_sdk_test(test_bem_device test_bem_device.cpp)
+# Remote BEM via PGN 126720 wrapping over a fake-gateway loopback (GIT-88)
+add_sdk_test(test_remote_bem_loopback test_remote_bem_loopback.cpp)
 
 # Add integration test files here as they are developed
 

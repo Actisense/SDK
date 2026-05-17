@@ -23,6 +23,7 @@ set(PUBLIC_HEADERS
     public/config.hpp
     public/events.hpp
     public/session.hpp
+    public/remote_device.hpp
     public/api.hpp
     public/logging.hpp
     public/metrics.hpp
@@ -40,6 +41,7 @@ set(SDK_SOURCES
     # Core
     core/error_category.cpp
     core/session_impl.cpp
+    core/remote_device_impl.cpp
     core/logger.cpp
     core/metrics_collector.cpp
 
@@ -53,6 +55,7 @@ set(SDK_SOURCES
     protocols/bst/bst_decoder.cpp
     protocols/bst/bst_frame.cpp
     protocols/bem/bem_protocol.cpp
+    protocols/bem/bem_wrap_126720.cpp
     protocols/bem/bem_commands/operating_mode.cpp
     protocols/protocol_error.cpp
 

@@ -27,6 +27,13 @@ namespace Actisense
 		using ConstByteSpan = std::span<const uint8_t>;
 
 		/**************************************************************************/ /**
+		 \brief      Sentinel N2K source address that marks a request bound for
+		             the locally connected gateway rather than a remote device
+		             reached via PGN 126720 wrapping (GIT-88).
+		 *******************************************************************************/
+		inline constexpr uint8_t kLocalSrcAddr = 0xFF;
+
+		/**************************************************************************/ /**
 		 \brief      BEM protocol handler
 		 \details    Handles encoding of BEM commands, decoding of BEM responses,
 					 and correlation of responses with pending requests.
@@ -55,6 +62,22 @@ namespace Actisense
 			 *******************************************************************************/
 			[[nodiscard]] bool encodeCommand(const BemCommand& command,
 											 std::vector<uint8_t>& outFrame, std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      Encode a BEM command as the bare inner BST bytes
+			             (BST ID + storeLength + BEM ID + data).
+			 \details    No BDTP framing and no trailing BDTP checksum: those
+			             belong to the local transmission path, not to the BEM
+			             payload that gets wrapped inside PGN 126720 when
+			             addressing a remote device (GIT-88).
+			 \param[in]  command       Command to encode
+			 \param[out] outInnerBst   Inner BST bytes ready to wrap or frame
+			 \param[out] outError      Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool encodeCommandInnerBst(const BemCommand& command,
+													 std::vector<uint8_t>& outInnerBst,
+													 std::string& outError);
 
 			/**************************************************************************/ /**
 			 \brief      Build and encode a simple command (no data payload)
@@ -499,6 +522,13 @@ namespace Actisense
 			 \param[in]  bstId      Command BST ID (to map to corresponding response BST ID)
 			 \param[in]  timeout    Timeout for response
 			 \param[in]  callback   Callback to invoke on response or timeout
+			 \param[in]  srcAddr    N2K source address the matching response is
+			                        expected to arrive from. Defaults to
+			                        kLocalSrcAddr (response comes from the locally
+			                        connected gateway). For commands sent to a
+			                        remote device via PGN 126720 wrapping
+			                        (GIT-88), pass the target device's address so
+			                        replies from different remotes do not collide.
 			 \return     Sequence ID assigned to this request
 			 \note       One-shot: the entry is released after the first matching
 			             response. For commands whose firmware emits a train of
@@ -507,7 +537,8 @@ namespace Actisense
 			 *******************************************************************************/
 			uint8_t registerRequest(BemCommandId commandId, BstId bstId,
 									std::chrono::milliseconds timeout,
-									BemResponseCallback callback);
+									BemResponseCallback callback,
+									uint8_t srcAddr = kLocalSrcAddr);
 
 			/**************************************************************************/ /**
 			 \brief      Register a pending request that may receive several
@@ -528,14 +559,22 @@ namespace Actisense
 			uint8_t registerMultiReplyRequest(BemCommandId commandId, BstId bstId,
 											  std::chrono::milliseconds inactivityTimeout,
 											  std::function<bool(const BemResponse&)> isComplete,
-											  BemResponseCallback callback);
+											  BemResponseCallback callback,
+											  uint8_t srcAddr = kLocalSrcAddr);
 
 			/**************************************************************************/ /**
 			 \brief      Try to correlate a response with a pending request
 			 \param[in]  response   Decoded BEM response
+			 \param[in]  srcAddr    N2K source address that delivered the response.
+			                        Defaults to kLocalSrcAddr for replies that
+			                        arrived directly from the locally connected
+			                        gateway. For replies unwrapped from a
+			                        PGN 126720 envelope (GIT-88), pass the N2K
+			                        source address of the remote device.
 			 \return     True if response was correlated and callback invoked
 			 *******************************************************************************/
-			bool correlateResponse(const BemResponse& response);
+			bool correlateResponse(const BemResponse& response,
+								   uint8_t srcAddr = kLocalSrcAddr);
 
 			/**************************************************************************/ /**
 			 \brief      Check for timed-out requests and invoke callbacks
@@ -597,13 +636,18 @@ namespace Actisense
 			};
 
 			/**************************************************************************/ /**
-			 \brief      Build correlation key from BST ID and BEM ID
+			 \brief      Build correlation key from BST ID, BEM ID and source address
 			 \param[in]  bstId    BST command/response ID
 			 \param[in]  bemId    BEM command ID
+			 \param[in]  srcAddr  N2K source address (kLocalSrcAddr for the
+			                      locally connected gateway). Lets concurrent
+			                      requests to different remote devices share the
+			                      same (bstId, bemId) without colliding.
 			 \return     64-bit key for request/response correlation
 			 *******************************************************************************/
-			[[nodiscard]] static uint64_t buildResponseKey(BstId bstId,
-														   BemCommandId bemId) noexcept;
+			[[nodiscard]] static uint64_t buildResponseKey(
+				BstId bstId, BemCommandId bemId,
+				uint8_t srcAddr = kLocalSrcAddr) noexcept;
 
 			/**************************************************************************/ /**
 			 \brief      Get next sequence ID (thread-safe)

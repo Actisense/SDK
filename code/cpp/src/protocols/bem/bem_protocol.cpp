@@ -25,8 +25,9 @@ namespace Actisense
 			clearPendingRequests();
 		}
 
-		bool BemProtocol::encodeCommand(const BemCommand& command, std::vector<uint8_t>& outFrame,
-										std::string& outError) {
+		bool BemProtocol::encodeCommandInnerBst(const BemCommand& command,
+												std::vector<uint8_t>& outInnerBst,
+												std::string& outError) {
 			if (!isBemCommand(command.bstId)) {
 				outError = "Invalid BST ID for BEM command";
 				return false;
@@ -38,16 +39,26 @@ namespace Actisense
 				return false;
 			}
 
-			/* Build BST payload: BEM ID + data */
+			/* Inner BST bytes: BST ID + storeLength + BEM ID + data
+			   (no checksum, no BDTP framing). */
 			const uint8_t storeLen = static_cast<uint8_t>(1 + command.data.size());
 
-			std::vector<uint8_t> bstPayload;
-			bstPayload.reserve(2 + storeLen + 1); /* ID + Len + payload + checksum */
+			outInnerBst.clear();
+			outInnerBst.reserve(2 + storeLen);
+			outInnerBst.push_back(static_cast<uint8_t>(command.bstId));
+			outInnerBst.push_back(storeLen);
+			outInnerBst.push_back(static_cast<uint8_t>(command.bemId));
+			outInnerBst.insert(outInnerBst.end(), command.data.begin(), command.data.end());
+			return true;
+		}
 
-			bstPayload.push_back(static_cast<uint8_t>(command.bstId));
-			bstPayload.push_back(storeLen);
-			bstPayload.push_back(static_cast<uint8_t>(command.bemId));
-			bstPayload.insert(bstPayload.end(), command.data.begin(), command.data.end());
+		bool BemProtocol::encodeCommand(const BemCommand& command, std::vector<uint8_t>& outFrame,
+										std::string& outError) {
+			std::vector<uint8_t> bstPayload;
+			if (!encodeCommandInnerBst(command, bstPayload, outError)) {
+				return false;
+			}
+			bstPayload.reserve(bstPayload.size() + 1);
 
 			/* Calculate and append checksum */
 			const uint8_t checksum =
@@ -573,11 +584,13 @@ namespace Actisense
 
 		uint8_t BemProtocol::registerRequest(BemCommandId commandId, BstId bstId,
 											 std::chrono::milliseconds timeout,
-											 BemResponseCallback callback) {
+											 BemResponseCallback callback,
+											 uint8_t srcAddr) {
 			std::lock_guard<std::mutex> lock(mutex_);
 
 			const uint8_t seqId = nextSequenceId();
-			const uint64_t key = buildResponseKey(responseBstIdFor(bstId), commandId);
+			const uint64_t key =
+				buildResponseKey(responseBstIdFor(bstId), commandId, srcAddr);
 
 			PendingRequest req;
 			req.commandId = commandId;
@@ -594,11 +607,12 @@ namespace Actisense
 			BemCommandId commandId, BstId bstId,
 			std::chrono::milliseconds inactivityTimeout,
 			std::function<bool(const BemResponse&)> isComplete,
-			BemResponseCallback callback) {
+			BemResponseCallback callback, uint8_t srcAddr) {
 			std::lock_guard<std::mutex> lock(mutex_);
 
 			const uint8_t seqId = nextSequenceId();
-			const uint64_t key = buildResponseKey(responseBstIdFor(bstId), commandId);
+			const uint64_t key =
+				buildResponseKey(responseBstIdFor(bstId), commandId, srcAddr);
 
 			PendingRequest req;
 			req.commandId = commandId;
@@ -612,7 +626,7 @@ namespace Actisense
 			return seqId;
 		}
 
-		bool BemProtocol::correlateResponse(const BemResponse& response) {
+		bool BemProtocol::correlateResponse(const BemResponse& response, uint8_t srcAddr) {
 			BemResponseCallback callbackToFire;
 			std::function<bool(const BemResponse&)> isCompletePred;
 			bool releaseEntry = true;
@@ -622,7 +636,8 @@ namespace Actisense
 
 				const uint64_t key =
 					buildResponseKey(response.header.bstId,
-									 static_cast<BemCommandId>(response.header.bemId));
+									 static_cast<BemCommandId>(response.header.bemId),
+									 srcAddr);
 
 				auto it = pending_requests_.find(key);
 				if (it == pending_requests_.end()) {
@@ -666,7 +681,8 @@ namespace Actisense
 					std::lock_guard<std::mutex> lock(mutex_);
 					const uint64_t key = buildResponseKey(
 						response.header.bstId,
-						static_cast<BemCommandId>(response.header.bemId));
+						static_cast<BemCommandId>(response.header.bemId),
+						srcAddr);
 					auto it = pending_requests_.find(key);
 					if (it != pending_requests_.end()) {
 						pending_requests_.erase(it);
@@ -735,20 +751,26 @@ namespace Actisense
 			}
 		}
 
-		uint64_t BemProtocol::buildResponseKey(BstId bstId, BemCommandId bemId) noexcept {
+		uint64_t BemProtocol::buildResponseKey(BstId bstId, BemCommandId bemId,
+											   uint8_t srcAddr) noexcept {
 			/* Build 64-bit correlation key for request/response matching:
 			 *
-			 * Bits 63-32: Reserved for future use (e.g., device serial, channel ID, etc.)
+			 * Bits 63-40: Reserved for future use
+			 * Bits 39-32: N2K source address of the responding device
+			 *             (kLocalSrcAddr = 0xFF for the locally connected
+			 *             gateway; the address of the remote device for
+			 *             commands wrapped in PGN 126720 — GIT-88)
 			 * Bits 31-16: BST ID (response BST ID, e.g., A0, A2, A3, A5)
 			 * Bits 15-0:  BEM command ID (e.g., 0x11 for GetSetOperatingMode)
 			 *
 			 * This allows correlation without relying on sequence IDs, which may not
 			 * be unique across different devices or channels.
 			 *
-			 * Example key for GetSetOperatingMode response (A0/0x11):
-			 *   Key = 0x00000000_00A0_0011
+			 * Example key for GetSetOperatingMode response (A0/0x11) from local:
+			 *   Key = 0x0000_00FF_00A0_0011
 			 */
-			return (static_cast<uint64_t>(static_cast<uint16_t>(bstId)) << 16) |
+			return (static_cast<uint64_t>(srcAddr) << 32) |
+				   (static_cast<uint64_t>(static_cast<uint16_t>(bstId)) << 16) |
 				   static_cast<uint64_t>(static_cast<uint16_t>(bemId));
 		}
 
