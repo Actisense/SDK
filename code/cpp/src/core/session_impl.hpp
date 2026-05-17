@@ -18,6 +18,8 @@
 
 #include "core/metrics_collector.hpp"
 #include "protocols/bdtp/bdtp_protocol.hpp"
+#include "protocols/bem/bem_commands/rx_pgn_enable_list_f2.hpp"
+#include "protocols/bem/bem_commands/tx_pgn_enable_list_f2.hpp"
 #include "protocols/bem/bem_protocol.hpp"
 #include "protocols/bst/bst_decoder.hpp"
 #include "public/config.hpp"
@@ -31,6 +33,20 @@ namespace Actisense
 {
 	namespace Sdk
 	{
+		/**************************************************************************/ /**
+		 \brief      Callback delivered the fully-aggregated Rx PGN Enable
+		             List F2 result (or an error / timeout).
+		 *******************************************************************************/
+		using RxPgnEnableListF2ResultCallback = std::function<void(
+			std::optional<RxPgnEnableListF2Result>, ErrorCode, std::string_view)>;
+
+		/**************************************************************************/ /**
+		 \brief      Callback delivered the fully-aggregated Tx PGN Enable
+		             List F2 result (or an error / timeout).
+		 *******************************************************************************/
+		using TxPgnEnableListF2ResultCallback = std::function<void(
+			std::optional<TxPgnEnableListF2Result>, ErrorCode, std::string_view)>;
+
 		/**************************************************************************/ /**
 		 \brief      Concrete session implementation
 		 \details    Manages transport, protocol parsing, and async operations
@@ -401,23 +417,30 @@ namespace Actisense
 									  BemResponseCallback callback);
 
 			/**************************************************************************/ /**
-			 \brief      Send Get Rx PGN Enable List F2 command
-			 \param[in]  timeout   Timeout for response
-			 \param[in]  callback  Callback invoked on response or timeout
+			 \brief      Send Get Rx PGN Enable List F2 command and aggregate
+			             the multi-message reply train.
+			 \param[in]  inactivityTimeout  Max gap between successive sub-list
+			                                messages before the request is
+			                                considered to have timed out.
+			 \param[in]  callback           Invoked once with the merged result,
+			                                or with an error / timeout.
 			 *******************************************************************************/
-			void getRxPgnEnableListF2(std::chrono::milliseconds timeout,
-									  BemResponseCallback callback);
+			void getRxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
+									  RxPgnEnableListF2ResultCallback callback);
 
 			/* Note: 0x4E has no firmware SET handler. To change Rx enable state,
 			   use the per-PGN command via setRxPgnEnable (0x46). */
 
 			/**************************************************************************/ /**
-			 \brief      Send Get Tx PGN Enable List F2 command
-			 \param[in]  timeout   Timeout for response
-			 \param[in]  callback  Callback invoked on response or timeout
+			 \brief      Send Get Tx PGN Enable List F2 command and aggregate
+			             the multi-message reply train (standard sub-lists +
+			             trailing proprietary bitmap message).
+			 \param[in]  inactivityTimeout  Max gap between successive messages.
+			 \param[in]  callback           Invoked once with the merged result,
+			                                or with an error / timeout.
 			 *******************************************************************************/
-			void getTxPgnEnableListF2(std::chrono::milliseconds timeout,
-									  BemResponseCallback callback);
+			void getTxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
+									  TxPgnEnableListF2ResultCallback callback);
 
 			/* Note: 0x4F has no firmware SET handler. To change Tx enable state,
 			   priority, or rate use the per-PGN command via setTxPgnEnable (0x47). */

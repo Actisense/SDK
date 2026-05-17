@@ -97,13 +97,16 @@ All messages in a response share the same Transfer ID.
 | 38      | DP1 Array Size           | 1 byte (uint8_t) |
 | 39-70   | DP1 Enable LUT           | 32 bytes |
 
-**DP0/DP1 Enable LUT**: 256-bit lookup tables (32 bytes each) for proprietary PGN enable status:
-- DP0: Data Page 0 proprietary PGNs (PGNs 0xEF00-0xEFFF)
-- DP1: Data Page 1 proprietary PGNs (PGNs 0x1EF00-0x1EFFF)
+**DP0/DP1 Enable LUT**: 256-bit lookup tables (32 bytes each) for PDU2 proprietary PGN enable status:
+- DP0: Data Page 0 PDU2 proprietary single-frame PGNs (`0xFF00`-`0xFFFF`, 65280-65535)
+- DP1: Data Page 1 PDU2 proprietary fast-packet PGNs (`0x1FF00`-`0x1FFFF`, 130816-131071)
 - Each bit represents one proprietary PGN
 - Bit position = PGN & 0xFF (lower 8 bits)
 - Byte index = (PGN & 0xFF) / 8
 - Bit mask = 1 << ((PGN & 0xFF) % 8)
+- PGN reconstruction: `PGN = base + (byteIndex * 8 + bitIndex)`, where base is `0xFF00` for DP0 and `0x1FF00` for DP1
+
+> Note: PGNs `0xEF00` and `0x1EF00` are PDU1 destination-addressed proprietary messages and are **not** represented in these bitmaps; they are handled through other commands.
 
 ### Multi-Message Transfer
 
@@ -179,7 +182,7 @@ Response showing the proprietary PGN bitmask message:
 | 15-18 | Structure Variant | 03 11 00 00 | SV_DIG_PropTxEnableList0 = 0x00001103 (LE) |
 | 19 | DP0 Array Size | 20H | 32 bytes for DP0 LUT |
 | **20-51** | **DP0 Enable LUT** | ... | **32 bytes: Data Page 0 bitmask** |
-| 20 | DP0 LUT[0] | 05H | Bits 0,2 set (PGNs 0xEF00, 0xEF02 enabled) |
+| 20 | DP0 LUT[0] | 05H | Bits 0,2 set (PGNs 0xFF00, 0xFF02 enabled) |
 | 21-51 | DP0 LUT[1-31] | 00 ... | Remaining bytes (other PGNs disabled) |
 | 52 | DP1 Array Size | 20H | 32 bytes for DP1 LUT |
 | **53-84** | **DP1 Enable LUT** | ... | **32 bytes: Data Page 1 bitmask** |
@@ -187,12 +190,13 @@ Response showing the proprietary PGN bitmask message:
 
 **Proprietary PGN Bitmask Decoding**:
 - DP0 LUT[0] = 0x05 = binary 00000101
-  - Bit 0 set → PGN 0xEF00 (61184) enabled
-  - Bit 2 set → PGN 0xEF02 (61186) enabled
-- To check if PGN 0xEFxx is enabled:
+  - Bit 0 set → PGN 0xFF00 (65280) enabled
+  - Bit 2 set → PGN 0xFF02 (65282) enabled
+- To check if PGN 0xFFxx (DP0) is enabled:
   - Byte index: xx / 8
   - Bit mask: 1 << (xx % 8)
   - Check: LUT[byte_index] & bit_mask
+- DP1 follows the same scheme over the `0x1FF00`-`0x1FFFF` fast-packet range.
 
 ### Example - Multi-Message Response Sequence
 
@@ -249,11 +253,12 @@ For a device with 60 standard PGNs and some proprietary PGNs, the response seque
   | 10000+ | Periodic status/heartbeat |
 
 - **Proprietary PGN Handling**:
-  - Proprietary PGNs use Data Page 0 or 1 with specific PGN ranges
-  - DP0 Proprietary: 0xEF00-0xEFFF (61184-61439)
-  - DP1 Proprietary: 0x1EF00-0x1EFFF (126720-126975)
+  - These bitmaps cover the PDU2 (broadcast) proprietary PGN ranges:
+    - DP0: `0xFF00`-`0xFFFF` (65280-65535) — single-frame proprietary
+    - DP1: `0x1FF00`-`0x1FFFF` (130816-131071) — fast-packet proprietary
   - Each LUT byte covers 8 consecutive PGNs
   - Set bit = PGN enabled, clear bit = PGN disabled
+  - PDU1 proprietary PGNs (`0xEF00`, `0x1EF00`) are destination-addressed and are managed elsewhere — they are not exposed through these bitmaps.
 
 - **Transfer ID Handling**:
   - Transfer ID cycles 1-255 (never 0)

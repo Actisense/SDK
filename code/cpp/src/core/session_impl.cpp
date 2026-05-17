@@ -684,16 +684,181 @@ namespace Actisense
 			}
 		}
 
-		void SessionImpl::getRxPgnEnableListF2(std::chrono::milliseconds timeout,
-											   BemResponseCallback callback) {
-			sendBemCommand(makeBemA1(BemCommandId::GetSetRxPgnEnableListF2), timeout,
-						   std::move(callback));
+		void SessionImpl::getRxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
+											   RxPgnEnableListF2ResultCallback callback) {
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnableListF2);
+
+			std::string encodeError;
+			std::vector<uint8_t> frame;
+			if (!bem_.encodeCommand(cmd, frame, encodeError)) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument, encodeError);
+				}
+				return;
+			}
+
+			struct State
+			{
+				RxPgnEnableListF2Accumulator accumulator;
+				RxPgnEnableListF2ResultCallback userCallback;
+				bool delivered = false;
+			};
+			auto state = std::make_shared<State>();
+			state->userCallback = std::move(callback);
+
+			auto isComplete = [state](const BemResponse& response) -> bool {
+				if (state->delivered) {
+					return true;
+				}
+				RxPgnEnableListF2Response decoded;
+				std::string decodeError;
+				if (!decodeRxPgnEnableListF2Response(
+						std::span<const uint8_t>(response.data.data(), response.data.size()),
+						decoded, decodeError)) {
+					if (state->userCallback) {
+						state->userCallback(std::nullopt, ErrorCode::InvalidArgument,
+											decodeError);
+					}
+					state->delivered = true;
+					return true;
+				}
+				std::string feedError;
+				const auto status = state->accumulator.feed(decoded, feedError);
+				if (status == PgnListAccumulatorStatus::Mismatch) {
+					if (state->userCallback) {
+						state->userCallback(std::nullopt, ErrorCode::InvalidArgument,
+											feedError);
+					}
+					state->delivered = true;
+					return true;
+				}
+				if (status == PgnListAccumulatorStatus::Done) {
+					if (state->userCallback) {
+						state->userCallback(state->accumulator.result(), ErrorCode::Ok,
+											std::string_view{});
+					}
+					state->delivered = true;
+					return true;
+				}
+				return false;
+			};
+
+			auto perResponseCallback = [state](const std::optional<BemResponse>& response,
+											   ErrorCode ec, std::string_view errMsg) {
+				if (state->delivered) {
+					return;
+				}
+				if (ec == ErrorCode::Timeout || !response.has_value()) {
+					if (state->userCallback) {
+						const auto& acc = state->accumulator;
+						std::optional<RxPgnEnableListF2Result> partial;
+						if (acc.initialised()) {
+							partial = acc.result();
+						}
+						state->userCallback(std::move(partial), ec, errMsg);
+					}
+					state->delivered = true;
+				}
+				/* Successful per-response delivery is handled in isComplete. */
+			};
+
+			bem_.registerMultiReplyRequest(cmd.bemId, cmd.bstId, inactivityTimeout,
+										   std::move(isComplete),
+										   std::move(perResponseCallback));
+
+			asyncSendRaw(frame, [this](ErrorCode code, std::size_t /*written*/) {
+				if (code != ErrorCode::Ok && errorCallback_) {
+					errorCallback_(code, "Failed to send Get Rx PGN Enable List F2");
+				}
+			});
 		}
 
-		void SessionImpl::getTxPgnEnableListF2(std::chrono::milliseconds timeout,
-											   BemResponseCallback callback) {
-			sendBemCommand(makeBemA1(BemCommandId::GetSetTxPgnEnableListF2), timeout,
-						   std::move(callback));
+		void SessionImpl::getTxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
+											   TxPgnEnableListF2ResultCallback callback) {
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnableListF2);
+
+			std::string encodeError;
+			std::vector<uint8_t> frame;
+			if (!bem_.encodeCommand(cmd, frame, encodeError)) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument, encodeError);
+				}
+				return;
+			}
+
+			struct State
+			{
+				TxPgnEnableListF2Accumulator accumulator;
+				TxPgnEnableListF2ResultCallback userCallback;
+				bool delivered = false;
+			};
+			auto state = std::make_shared<State>();
+			state->userCallback = std::move(callback);
+
+			auto isComplete = [state](const BemResponse& response) -> bool {
+				if (state->delivered) {
+					return true;
+				}
+				TxPgnEnableListF2Response decoded;
+				std::string decodeError;
+				if (!decodeTxPgnEnableListF2Response(
+						std::span<const uint8_t>(response.data.data(), response.data.size()),
+						decoded, decodeError)) {
+					if (state->userCallback) {
+						state->userCallback(std::nullopt, ErrorCode::InvalidArgument,
+											decodeError);
+					}
+					state->delivered = true;
+					return true;
+				}
+				std::string feedError;
+				const auto status = state->accumulator.feed(decoded, feedError);
+				if (status == PgnListAccumulatorStatus::Mismatch) {
+					if (state->userCallback) {
+						state->userCallback(std::nullopt, ErrorCode::InvalidArgument,
+											feedError);
+					}
+					state->delivered = true;
+					return true;
+				}
+				if (status == PgnListAccumulatorStatus::Done) {
+					if (state->userCallback) {
+						state->userCallback(state->accumulator.result(), ErrorCode::Ok,
+											std::string_view{});
+					}
+					state->delivered = true;
+					return true;
+				}
+				return false;
+			};
+
+			auto perResponseCallback = [state](const std::optional<BemResponse>& response,
+											   ErrorCode ec, std::string_view errMsg) {
+				if (state->delivered) {
+					return;
+				}
+				if (ec == ErrorCode::Timeout || !response.has_value()) {
+					if (state->userCallback) {
+						const auto& acc = state->accumulator;
+						std::optional<TxPgnEnableListF2Result> partial;
+						if (acc.initialised()) {
+							partial = acc.result();
+						}
+						state->userCallback(std::move(partial), ec, errMsg);
+					}
+					state->delivered = true;
+				}
+			};
+
+			bem_.registerMultiReplyRequest(cmd.bemId, cmd.bstId, inactivityTimeout,
+										   std::move(isComplete),
+										   std::move(perResponseCallback));
+
+			asyncSendRaw(frame, [this](ErrorCode code, std::size_t /*written*/) {
+				if (code != ErrorCode::Ok && errorCallback_) {
+					errorCallback_(code, "Failed to send Get Tx PGN Enable List F2");
+				}
+			});
 		}
 
 		void SessionImpl::deletePgnEnableLists(uint8_t selector, std::chrono::milliseconds timeout,

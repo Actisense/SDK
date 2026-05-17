@@ -78,6 +78,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <tuple>
 
 namespace Actisense
 {
@@ -1007,51 +1008,51 @@ TEST_F(BemDeviceTest, GetParamsPgnEnableLists)
 
 TEST_F(BemDeviceTest, GetRxPgnEnableListF2)
 {
-	auto cmd = makeGetCommand(BemCommandId::GetSetRxPgnEnableListF2);
-	auto result = sendSync(cmd);
+	/* GIT-87: exercise the aggregating session facade so we receive the
+	   full multi-message sub-list train, not just the first sub-list. */
+	std::promise<std::tuple<std::optional<RxPgnEnableListF2Result>, ErrorCode, std::string>> p;
+	auto f = p.get_future();
+	session_->getRxPgnEnableListF2(
+		std::chrono::seconds(5),
+		[&p](std::optional<RxPgnEnableListF2Result> result, ErrorCode ec,
+			 std::string_view errMsg) {
+			p.set_value({std::move(result), ec, std::string(errMsg)});
+		});
 
-	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
-	ASSERT_TRUE(result.response.has_value());
+	ASSERT_EQ(f.wait_for(std::chrono::seconds(10)), std::future_status::ready)
+		<< "Rx F2 aggregated GET never completed";
+	auto [result, ec, errMsg] = f.get();
+	ASSERT_EQ(ec, ErrorCode::Ok) << errMsg;
+	ASSERT_TRUE(result.has_value());
 
-	const auto& data = result.response->data;
-	RxPgnEnableListF2Response rxResp;
-	std::string error;
-	ASSERT_TRUE(decodeRxPgnEnableListF2Response(std::span<const uint8_t>(data), rxResp, error))
-		<< "Rx F2 decode failed: " << error << " (got " << data.size() << " bytes)";
-
-	EXPECT_EQ(rxResp.structureVariantId, kRxPgnEnableListF2SvId);
-	EXPECT_EQ(rxResp.entries.size(), rxResp.subCount);
-	EXPECT_LE(rxResp.subCount, kRxPgnEnableListF2MaxEntriesPerSubList);
-	std::cout << formatRxPgnEnableListF2(rxResp);
+	EXPECT_EQ(result->entries.size(), result->totalListSize);
+	std::cout << "Rx F2 aggregated: transferId=" << static_cast<int>(result->transferId)
+	          << " totalListSize=" << static_cast<int>(result->totalListSize)
+	          << " entries=" << result->entries.size() << std::endl;
 }
 
 TEST_F(BemDeviceTest, GetTxPgnEnableListF2)
 {
-	auto cmd = makeGetCommand(BemCommandId::GetSetTxPgnEnableListF2);
-	auto result = sendSync(cmd);
+	std::promise<std::tuple<std::optional<TxPgnEnableListF2Result>, ErrorCode, std::string>> p;
+	auto f = p.get_future();
+	session_->getTxPgnEnableListF2(
+		std::chrono::seconds(5),
+		[&p](std::optional<TxPgnEnableListF2Result> result, ErrorCode ec,
+			 std::string_view errMsg) {
+			p.set_value({std::move(result), ec, std::string(errMsg)});
+		});
 
-	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
-	ASSERT_TRUE(result.response.has_value());
+	ASSERT_EQ(f.wait_for(std::chrono::seconds(10)), std::future_status::ready)
+		<< "Tx F2 aggregated GET never completed";
+	auto [result, ec, errMsg] = f.get();
+	ASSERT_EQ(ec, ErrorCode::Ok) << errMsg;
+	ASSERT_TRUE(result.has_value());
 
-	const auto& data = result.response->data;
-	TxPgnEnableListF2Response txResp;
-	std::string error;
-	ASSERT_TRUE(decodeTxPgnEnableListF2Response(std::span<const uint8_t>(data), txResp, error))
-		<< "Tx F2 decode failed: " << error << " (got " << data.size() << " bytes)";
-
-	/* Variant depends on firmware ordering — NGX returned std first, NGT
-	   returned proprietary first. Either is valid; just confirm we got one. */
-	EXPECT_NE(txResp.variant, TxPgnEnableListF2Variant::Unknown);
-	if (txResp.variant == TxPgnEnableListF2Variant::Standard) {
-		EXPECT_EQ(txResp.structureVariantId, kTxPgnEnableListF2StdSvId);
-		EXPECT_EQ(txResp.stdEntries.size(), txResp.stdSubCount);
-		EXPECT_LE(txResp.stdSubCount, kTxPgnEnableListF2StdMaxEntriesPerSubList);
-	} else {
-		EXPECT_EQ(txResp.structureVariantId, kTxPgnEnableListF2PropSvId);
-		EXPECT_LE(txResp.propDp0Bitmap.size(), kTxPgnEnableListF2PropBitmapBytes);
-		EXPECT_LE(txResp.propDp1Bitmap.size(), kTxPgnEnableListF2PropBitmapBytes);
-	}
-	std::cout << formatTxPgnEnableListF2(txResp);
+	EXPECT_EQ(result->entries.size(), result->totalListSize);
+	EXPECT_TRUE(result->proprietaryReceived);
+	std::cout << "Tx F2 aggregated: transferId=" << static_cast<int>(result->transferId)
+	          << " stdEntries=" << result->entries.size()
+	          << " propEnabled=" << result->proprietary.enabledPgns.size() << std::endl;
 }
 
 /* The F1 enum values BemCommandId::GetSetRxPgnEnableListF1 and

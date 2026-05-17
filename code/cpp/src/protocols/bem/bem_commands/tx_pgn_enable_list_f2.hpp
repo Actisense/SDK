@@ -15,9 +15,13 @@
 
 			 - Proprietary (SVID 0x00001103): no per-entry rows; two 32-byte
 			   bitmaps (DataPage 0 and DataPage 1) where each set bit
-			   indicates an enabled proprietary PGN. Bit b in DP0 byte k
-			   corresponds to PGN 0xFF0000 + (k*8 + b). Bit b in DP1 byte k
-			   corresponds to PGN 0xFF0100 + (k*8 + b).
+			   indicates an enabled PDU2 proprietary PGN. Bit b in DP0 byte k
+			   corresponds to PGN 0xFF00 + (k*8 + b) — the PDU2 single-frame
+			   proprietary range 65280..65535. Bit b in DP1 byte k corresponds
+			   to PGN 0x1FF00 + (k*8 + b) — the PDU2 fast-packet proprietary
+			   range 130816..131071. (PGNs 0xEF00 and 0x1EF00 are PDU1
+			   destination-addressed proprietary messages and are handled
+			   elsewhere.)
 
 			 On-wire response layout (after the BEM response header):
 			 - byte 0:    transferId (u8)
@@ -40,25 +44,37 @@
 			 Setting proprietary bitmaps via this command is not supported by
 			 the SDK today.
 
-			 NOTE on multi-message: the firmware does not honour GET
-			 continuation parameters; each GET returns one variant (one
-			 sub-list) with an incrementing transferId. NGX returned the
-			 standard variant first; NGT returned the proprietary variant
-			 first. Callers wanting both should not assume ordering.
+			 Multi-message: one GET produces a *train* of standard-variant
+			 sub-list messages (one or more, all sharing the same transferId
+			 and (bstId, bemId), with each successive message advancing
+			 firstSubIdx) followed by exactly one proprietary-variant message
+			 (sequenceId=2) carrying both DP0/DP1 bitmaps. The proprietary
+			 message is always emitted, even when the standard list is empty,
+			 so its arrival is the natural transfer-complete signal.
 
-			 Wire format reverse-engineered against live NGT-1 / NGX-1
-			 hardware under GIT-74 and matched against the legacy ACComps
-			 decoder at LibDev/ACCompLib/Codec-M/DecodeBEMCoreCmdResp.cpp
-			 DecodeTxPGNEnableList.
+			 Use SessionImpl::getTxPgnEnableListF2 (which wraps the multi-reply
+			 correlator path and a TxPgnEnableListF2Accumulator) for the
+			 aggregated result; raw single-message decoding via
+			 decodeTxPgnEnableListF2Response remains available for callers
+			 driving aggregation themselves.
+
+			 Wire format matches the firmware-side implementation at
+			 LibDev/AMKLib/AMKLib/Command/NMEACommands/BemCommandTxPGNEnableListF2.cpp
+			 and the legacy ACComps decoder at
+			 LibDev/ACCompLib/Codec-M/DecodeBEMCoreCmdResp.cpp DecodeTxPGNEnableList.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
+#include <array>
 #include <cstdint>
+#include <cstdio>
 #include <span>
 #include <string>
 #include <vector>
+
+#include "protocols/bem/bem_commands/rx_pgn_enable_list_f2.hpp"
 
 namespace Actisense
 {
@@ -85,11 +101,13 @@ namespace Actisense
 		/// Bitmap bytes per data page (32 → 256 PGNs per page)
 		static constexpr std::size_t kTxPgnEnableListF2PropBitmapBytes = 32;
 
-		/// Proprietary PGN base for DP0 (PGN = 0xFF0000 + bit-index)
-		static constexpr uint32_t kTxPgnPropDp0Base = 0x00FF0000;
+		/// Proprietary PGN base for DP0: PDU2 single-frame 0xFF00..0xFFFF.
+		/// PGN = kTxPgnPropDp0Base + (byteIndex * 8 + bitIndex).
+		static constexpr uint32_t kTxPgnPropDp0Base = 0x0000FF00;
 
-		/// Proprietary PGN base for DP1 (PGN = 0xFF0100 + bit-index)
-		static constexpr uint32_t kTxPgnPropDp1Base = 0x00FF0100;
+		/// Proprietary PGN base for DP1: PDU2 fast-packet 0x1FF00..0x1FFFF.
+		/// PGN = kTxPgnPropDp1Base + (byteIndex * 8 + bitIndex).
+		static constexpr uint32_t kTxPgnPropDp1Base = 0x0001FF00;
 
 		/// Special rate value indicating the PGN is currently disabled
 		static constexpr uint16_t kTxPgnRateDisabled = 0xFFFF;
@@ -256,6 +274,182 @@ namespace Actisense
 		   messages) and a final proprietary-variant message with sequenceId=2). To
 		   change Tx enable state, priority, or rate for a PGN use the per-PGN BEM
 		   command 0x47 (TxPgnEnable) — see tx_pgn_enable.hpp. */
+
+		/* Multi-message aggregation --------------------------------------- */
+
+		/**************************************************************************/ /**
+		 \brief      Decoded proprietary bitmaps + expanded enabled-PGN list.
+		 \details    enabledPgns is sorted ascending (DP0 entries then DP1).
+		             The raw LUTs are retained alongside so callers that need
+		             to re-emit or compare against the wire bytes can do so
+		             without re-encoding from the expanded set.
+		 *******************************************************************************/
+		struct TxPgnEnableListF2ProprietaryEntries
+		{
+			std::array<uint8_t, kTxPgnEnableListF2PropBitmapBytes> dp0RawLut{};
+			std::array<uint8_t, kTxPgnEnableListF2PropBitmapBytes> dp1RawLut{};
+			std::vector<uint32_t> enabledPgns;
+		};
+
+		/**************************************************************************/ /**
+		 \brief      Aggregated Tx PGN Enable List F2 result.
+		 \details    Populated by TxPgnEnableListF2Accumulator once the
+		             standard-variant sub-list train and the trailing
+		             proprietary-variant message for one transfer have been
+		             received.
+		 *******************************************************************************/
+		struct TxPgnEnableListF2Result
+		{
+			uint8_t  transferId = 0;
+			uint8_t  totalListSize = 0;                  ///< standard PGN total
+			std::vector<TxPgnEnableEntry> entries;       ///< standard PGNs
+			TxPgnEnableListF2ProprietaryEntries proprietary;
+			bool proprietaryReceived = false;
+		};
+
+		/**************************************************************************/ /**
+		 \brief      Expand DP0/DP1 bitmap bytes into a sorted ascending list
+		             of enabled proprietary PGN numbers.
+		 \param[in]  dp0Lut      DP0 bitmap (≤ kTxPgnEnableListF2PropBitmapBytes)
+		 \param[in]  dp1Lut      DP1 bitmap (≤ kTxPgnEnableListF2PropBitmapBytes)
+		 \param[out] outPgns     Cleared then filled with enabled PGNs
+		 *******************************************************************************/
+		inline void decodeProprietaryEnabledPgns(std::span<const uint8_t> dp0Lut,
+												 std::span<const uint8_t> dp1Lut,
+												 std::vector<uint32_t>& outPgns) {
+			outPgns.clear();
+			auto expand = [&outPgns](std::span<const uint8_t> lut, uint32_t base) {
+				for (std::size_t k = 0; k < lut.size(); ++k) {
+					const uint8_t byte = lut[k];
+					if (!byte) {
+						continue;
+					}
+					for (uint8_t b = 0; b < 8; ++b) {
+						if (byte & static_cast<uint8_t>(1u << b)) {
+							outPgns.push_back(base +
+								static_cast<uint32_t>(k * 8 + b));
+						}
+					}
+				}
+			};
+			expand(dp0Lut, kTxPgnPropDp0Base);
+			expand(dp1Lut, kTxPgnPropDp1Base);
+		}
+
+		/**************************************************************************/ /**
+		 \brief      Accumulator that merges the multi-message Tx F2 response
+		             train into a single TxPgnEnableListF2Result.
+		 \details    Standard-variant messages populate entries by firstSubIdx
+		             (same rules as the Rx accumulator). The trailing
+		             proprietary-variant message latches the bitmaps and
+		             marks proprietaryReceived; that arrival is the Done
+		             signal. transferId must match across all messages.
+		 *******************************************************************************/
+		class TxPgnEnableListF2Accumulator
+		{
+		public:
+			[[nodiscard]] PgnListAccumulatorStatus feed(
+				const TxPgnEnableListF2Response& msg, std::string& outError) {
+				if (!initialised_) {
+					result_.transferId = msg.transferId;
+					if (msg.variant == TxPgnEnableListF2Variant::Standard) {
+						result_.totalListSize = msg.stdTotalListSize;
+						result_.entries.assign(msg.stdTotalListSize,
+											   TxPgnEnableEntry{});
+						seen_.assign(msg.stdTotalListSize, false);
+					}
+					initialised_ = true;
+				} else if (msg.transferId != result_.transferId) {
+					outError = "Tx F2 transferId changed mid-stream: expected " +
+							   std::to_string(result_.transferId) + ", got " +
+							   std::to_string(msg.transferId);
+					return PgnListAccumulatorStatus::Mismatch;
+				}
+
+				if (msg.variant == TxPgnEnableListF2Variant::Standard) {
+					if (result_.entries.size() != msg.stdTotalListSize) {
+						/* First time we see a Std msg, or totalListSize must
+						   stay constant. */
+						if (result_.entries.empty() && !standardSeen_) {
+							result_.totalListSize = msg.stdTotalListSize;
+							result_.entries.assign(msg.stdTotalListSize,
+												   TxPgnEnableEntry{});
+							seen_.assign(msg.stdTotalListSize, false);
+						} else {
+							outError = "Tx F2 stdTotalListSize changed mid-stream: "
+									   "expected " +
+									   std::to_string(result_.totalListSize) +
+									   ", got " +
+									   std::to_string(msg.stdTotalListSize);
+							return PgnListAccumulatorStatus::Mismatch;
+						}
+					}
+					standardSeen_ = true;
+
+					const std::size_t end =
+						static_cast<std::size_t>(msg.stdFirstSubIdx) + msg.stdSubCount;
+					if (end > result_.entries.size()) {
+						outError = "Tx F2 std sub-list overruns total: firstSubIdx=" +
+								   std::to_string(msg.stdFirstSubIdx) + " subCount=" +
+								   std::to_string(msg.stdSubCount) + " total=" +
+								   std::to_string(result_.totalListSize);
+						return PgnListAccumulatorStatus::Mismatch;
+					}
+
+					for (std::size_t i = 0; i < msg.stdSubCount; ++i) {
+						const std::size_t slot = msg.stdFirstSubIdx + i;
+						result_.entries[slot] = msg.stdEntries[i];
+						if (!seen_[slot]) {
+							seen_[slot] = true;
+							++stdReceived_;
+						}
+					}
+				} else if (msg.variant == TxPgnEnableListF2Variant::Proprietary) {
+					result_.proprietary.dp0RawLut.fill(0);
+					result_.proprietary.dp1RawLut.fill(0);
+					const std::size_t dp0Bytes =
+						std::min(msg.propDp0Bitmap.size(),
+								 result_.proprietary.dp0RawLut.size());
+					const std::size_t dp1Bytes =
+						std::min(msg.propDp1Bitmap.size(),
+								 result_.proprietary.dp1RawLut.size());
+					for (std::size_t i = 0; i < dp0Bytes; ++i) {
+						result_.proprietary.dp0RawLut[i] = msg.propDp0Bitmap[i];
+					}
+					for (std::size_t i = 0; i < dp1Bytes; ++i) {
+						result_.proprietary.dp1RawLut[i] = msg.propDp1Bitmap[i];
+					}
+					decodeProprietaryEnabledPgns(
+						std::span<const uint8_t>(result_.proprietary.dp0RawLut.data(),
+												  dp0Bytes),
+						std::span<const uint8_t>(result_.proprietary.dp1RawLut.data(),
+												  dp1Bytes),
+						result_.proprietary.enabledPgns);
+					result_.proprietaryReceived = true;
+					return PgnListAccumulatorStatus::Done;
+				} else {
+					outError = "Tx F2 unknown variant";
+					return PgnListAccumulatorStatus::Mismatch;
+				}
+
+				return PgnListAccumulatorStatus::Continue;
+			}
+
+			[[nodiscard]] const TxPgnEnableListF2Result& result() const noexcept {
+				return result_;
+			}
+
+			[[nodiscard]] bool initialised() const noexcept { return initialised_; }
+
+		private:
+			TxPgnEnableListF2Result result_;
+			std::vector<bool> seen_;
+			bool initialised_ = false;
+			bool standardSeen_ = false;
+			std::size_t stdReceived_ = 0;
+		};
+
+		/* Format helpers -------------------------------------------------- */
 
 		/**************************************************************************/ /**
 		 \brief      Format helper.

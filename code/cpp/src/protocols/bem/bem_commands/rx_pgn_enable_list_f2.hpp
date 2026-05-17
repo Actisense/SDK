@@ -22,17 +22,24 @@
 			 fields — the device expects the application to re-send the
 			 full sub-list header it would generate.
 
-			 NOTE on multi-message: the firmware on current NGT/NGX devices
-			 does not honour any GET continuation parameter and returns the
-			 same first sub-list on every call (transferId increments). The
-			 SDK therefore exposes a single sub-list per GET; if totalListSize
-			 exceeds subCount the remaining entries are not retrievable via
-			 this command on these devices.
+			 Multi-message: one GET produces a *train* of response messages,
+			 all sharing the same (bstId, bemId) and the same transferId, with
+			 each successive message advancing firstSubIdx. The transfer is
+			 complete when the accumulated sub-counts equal totalListSize.
+			 Callers should not issue per-sub-list GETs; the firmware does not
+			 honour continuation parameters and a fresh GET always starts a new
+			 transferId.
 
-			 Wire format reverse-engineered against live NGT-1 / NGX-1
-			 hardware under GIT-74 and matched against the legacy ACComps
-			 decoder at LibDev/ACCompLib/Codec-M/DecodeBEMCoreCmdResp.cpp
-			 DecodeRxPGNEnableList.
+			 Use SessionImpl::getRxPgnEnableListF2 (which wraps the multi-reply
+			 correlator path and a RxPgnEnableListF2Accumulator) for the
+			 aggregated result; raw single-message decoding via
+			 decodeRxPgnEnableListF2Response remains available for callers that
+			 want to drive aggregation themselves.
+
+			 Wire format matches the firmware-side implementation at
+			 LibDev/AMKLib/AMKLib/Command/NMEACommands/BemCommandRxPGNEnableListF2.cpp
+			 and the legacy ACComps decoder at
+			 LibDev/ACCompLib/Codec-M/DecodeBEMCoreCmdResp.cpp DecodeRxPGNEnableList.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -164,6 +171,103 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Format helper.
 		 *******************************************************************************/
+		/* Multi-message aggregation --------------------------------------- */
+
+		/**************************************************************************/ /**
+		 \brief      Outcome of feeding one sub-list message into an
+		             accumulator.
+		 *******************************************************************************/
+		enum class PgnListAccumulatorStatus : uint8_t
+		{
+			Continue,  ///< Sub-list absorbed; more expected.
+			Done,      ///< Last sub-list absorbed; result() is ready.
+			Mismatch   ///< Transfer-id changed mid-stream or msg malformed.
+		};
+
+		/**************************************************************************/ /**
+		 \brief      Aggregated Rx PGN Enable List F2 result.
+		 \details    Populated by RxPgnEnableListF2Accumulator once all
+		             sub-list messages for one transfer have been received.
+		 *******************************************************************************/
+		struct RxPgnEnableListF2Result
+		{
+			uint8_t  transferId = 0;
+			uint8_t  totalListSize = 0;
+			std::vector<RxPgnEnableEntry> entries; ///< sized totalListSize on Done
+		};
+
+		/**************************************************************************/ /**
+		 \brief      Accumulator that merges the multi-message Rx F2 response
+		             train into a single RxPgnEnableListF2Result.
+		 \details    First message latches transferId and totalListSize; later
+		             messages must carry the same transferId or Mismatch is
+		             returned. Sub-lists are written at firstSubIdx; repeats
+		             of an already-received sub-list overwrite in place without
+		             double-counting. Done is reported when the unique sub-list
+		             count equals totalListSize.
+		 *******************************************************************************/
+		class RxPgnEnableListF2Accumulator
+		{
+		public:
+			[[nodiscard]] PgnListAccumulatorStatus feed(
+				const RxPgnEnableListF2Response& msg, std::string& outError) {
+				if (!initialised_) {
+					result_.transferId = msg.transferId;
+					result_.totalListSize = msg.totalListSize;
+					result_.entries.assign(msg.totalListSize, RxPgnEnableEntry{});
+					seen_.assign(msg.totalListSize, false);
+					initialised_ = true;
+				} else if (msg.transferId != result_.transferId) {
+					outError = "Rx F2 transferId changed mid-stream: expected " +
+							   std::to_string(result_.transferId) + ", got " +
+							   std::to_string(msg.transferId);
+					return PgnListAccumulatorStatus::Mismatch;
+				} else if (msg.totalListSize != result_.totalListSize) {
+					outError = "Rx F2 totalListSize changed mid-stream: expected " +
+							   std::to_string(result_.totalListSize) + ", got " +
+							   std::to_string(msg.totalListSize);
+					return PgnListAccumulatorStatus::Mismatch;
+				}
+
+				const std::size_t end =
+					static_cast<std::size_t>(msg.firstSubIdx) + msg.subCount;
+				if (end > result_.entries.size()) {
+					outError = "Rx F2 sub-list overruns totalListSize: firstSubIdx=" +
+							   std::to_string(msg.firstSubIdx) + " subCount=" +
+							   std::to_string(msg.subCount) + " total=" +
+							   std::to_string(result_.totalListSize);
+					return PgnListAccumulatorStatus::Mismatch;
+				}
+
+				for (std::size_t i = 0; i < msg.subCount; ++i) {
+					const std::size_t slot = msg.firstSubIdx + i;
+					result_.entries[slot] = msg.entries[i];
+					if (!seen_[slot]) {
+						seen_[slot] = true;
+						++received_;
+					}
+				}
+
+				return (received_ == result_.totalListSize)
+						   ? PgnListAccumulatorStatus::Done
+						   : PgnListAccumulatorStatus::Continue;
+			}
+
+			[[nodiscard]] const RxPgnEnableListF2Result& result() const noexcept {
+				return result_;
+			}
+
+			[[nodiscard]] bool initialised() const noexcept { return initialised_; }
+
+		private:
+			RxPgnEnableListF2Result result_;
+			std::vector<bool> seen_;
+			bool initialised_ = false;
+			std::size_t received_ = 0;
+		};
+
+		/* Format helpers -------------------------------------------------- */
+
 		[[nodiscard]] inline std::string
 		formatRxPgnEnableListF2(const RxPgnEnableListF2Response& r) {
 			std::string out;

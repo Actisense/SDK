@@ -558,36 +558,26 @@ namespace Actisense
 			return decodeResponse(datagram, outError);
 		}
 
+		namespace
+		{
+			BstId responseBstIdFor(BstId commandBstId) noexcept {
+				switch (commandBstId) {
+					case BstId::Bem_PG_A1: return BstId::Bem_GP_A0;
+					case BstId::Bem_PG_A4: return BstId::Bem_GP_A2;
+					case BstId::Bem_PG_A6: return BstId::Bem_GP_A3;
+					case BstId::Bem_PG_A8: return BstId::Bem_GP_A5;
+					default:               return BstId::Bem_GP_A0;
+				}
+			}
+		}
+
 		uint8_t BemProtocol::registerRequest(BemCommandId commandId, BstId bstId,
 											 std::chrono::milliseconds timeout,
 											 BemResponseCallback callback) {
 			std::lock_guard<std::mutex> lock(mutex_);
 
 			const uint8_t seqId = nextSequenceId();
-
-			/* Map command BST ID to corresponding response BST ID */
-			BstId responseBstId;
-			switch (bstId) {
-				case BstId::Bem_PG_A1:
-					responseBstId = BstId::Bem_GP_A0;
-					break;
-				case BstId::Bem_PG_A4:
-					responseBstId = BstId::Bem_GP_A2;
-					break;
-				case BstId::Bem_PG_A6:
-					responseBstId = BstId::Bem_GP_A3;
-					break;
-				case BstId::Bem_PG_A8:
-					responseBstId = BstId::Bem_GP_A5;
-					break;
-				default:
-					/* Default to A1->A0 mapping for unknown BST IDs */
-					responseBstId = BstId::Bem_GP_A0;
-					break;
-			}
-
-			/* Build correlation key from response BST ID and BEM command ID */
-			const uint64_t key = buildResponseKey(responseBstId, commandId);
+			const uint64_t key = buildResponseKey(responseBstIdFor(bstId), commandId);
 
 			PendingRequest req;
 			req.commandId = commandId;
@@ -600,37 +590,89 @@ namespace Actisense
 			return seqId;
 		}
 
-		bool BemProtocol::correlateResponse(const BemResponse& response) {
+		uint8_t BemProtocol::registerMultiReplyRequest(
+			BemCommandId commandId, BstId bstId,
+			std::chrono::milliseconds inactivityTimeout,
+			std::function<bool(const BemResponse&)> isComplete,
+			BemResponseCallback callback) {
 			std::lock_guard<std::mutex> lock(mutex_);
 
-			/* Build correlation key from response BST ID and BEM command ID */
-			const uint64_t key = buildResponseKey(response.header.bstId,
-												  static_cast<BemCommandId>(response.header.bemId));
+			const uint8_t seqId = nextSequenceId();
+			const uint64_t key = buildResponseKey(responseBstIdFor(bstId), commandId);
 
-			auto it = pending_requests_.find(key);
-			if (it == pending_requests_.end()) {
-				/* No pending request with this correlation key */
-				return false;
-			}
+			PendingRequest req;
+			req.commandId = commandId;
+			req.sentAt = std::chrono::steady_clock::now();
+			req.timeout = inactivityTimeout;
+			req.callback = std::move(callback);
+			req.isComplete = std::move(isComplete);
 
-			/* Found matching request */
-			auto callback = std::move(it->second.callback);
-			pending_requests_.erase(it);
+			pending_requests_[key] = std::move(req);
 
-			++responses_correlated_;
+			return seqId;
+		}
 
-			/* Invoke callback outside lock? For now, keep it simple */
-			if (callback) {
-				ErrorCode ec = ErrorCode::Ok;
-				std::string errorMsg;
+		bool BemProtocol::correlateResponse(const BemResponse& response) {
+			BemResponseCallback callbackToFire;
+			std::function<bool(const BemResponse&)> isCompletePred;
+			bool releaseEntry = true;
 
-				if (response.header.errorCode != 0) {
-					ec = ErrorCode::UnsupportedOperation; /* Map ARL errors later */
-					errorMsg =
-						"Device returned error: " + std::to_string(response.header.errorCode);
+			{
+				std::lock_guard<std::mutex> lock(mutex_);
+
+				const uint64_t key =
+					buildResponseKey(response.header.bstId,
+									 static_cast<BemCommandId>(response.header.bemId));
+
+				auto it = pending_requests_.find(key);
+				if (it == pending_requests_.end()) {
+					return false;
 				}
 
-				callback(response, ec, errorMsg);
+				if (it->second.isComplete) {
+					/* Multi-reply: keep entry; copy callback so we can invoke
+					   it without losing the registration. */
+					callbackToFire = it->second.callback;
+					isCompletePred = it->second.isComplete;
+					/* Refresh activity timestamp; if isComplete returns true
+					   below we'll erase, otherwise sentAt now reflects the
+					   most recent response and the inactivity window restarts. */
+					it->second.sentAt = std::chrono::steady_clock::now();
+					releaseEntry = false;
+				} else {
+					/* One-shot: move callback out and erase. */
+					callbackToFire = std::move(it->second.callback);
+					pending_requests_.erase(it);
+					releaseEntry = true;
+					++responses_correlated_;
+				}
+			}
+
+			ErrorCode ec = ErrorCode::Ok;
+			std::string errorMsg;
+			if (response.header.errorCode != 0) {
+				ec = ErrorCode::UnsupportedOperation; /* Map ARL errors later */
+				errorMsg = "Device returned error: " +
+						   std::to_string(response.header.errorCode);
+			}
+
+			if (callbackToFire) {
+				callbackToFire(response, ec, errorMsg);
+			}
+
+			if (!releaseEntry && isCompletePred) {
+				const bool done = isCompletePred(response);
+				if (done) {
+					std::lock_guard<std::mutex> lock(mutex_);
+					const uint64_t key = buildResponseKey(
+						response.header.bstId,
+						static_cast<BemCommandId>(response.header.bemId));
+					auto it = pending_requests_.find(key);
+					if (it != pending_requests_.end()) {
+						pending_requests_.erase(it);
+					}
+					++responses_correlated_;
+				}
 			}
 
 			return true;

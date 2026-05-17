@@ -500,10 +500,35 @@ namespace Actisense
 			 \param[in]  timeout    Timeout for response
 			 \param[in]  callback   Callback to invoke on response or timeout
 			 \return     Sequence ID assigned to this request
+			 \note       One-shot: the entry is released after the first matching
+			             response. For commands whose firmware emits a train of
+			             responses for a single GET (e.g. F2 PGN-list 0x4E/0x4F)
+			             use registerMultiReplyRequest() instead.
 			 *******************************************************************************/
 			uint8_t registerRequest(BemCommandId commandId, BstId bstId,
 									std::chrono::milliseconds timeout,
 									BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Register a pending request that may receive several
+			             responses before completing.
+			 \details    The callback fires once per matching response. The
+			             isComplete predicate is consulted after each callback
+			             invocation; the pending entry is held until it returns
+			             true (or the request times out). The timeout is treated
+			             as an inactivity window: sentAt is refreshed every time
+			             a response is delivered while isComplete is false.
+			 \param[in]  commandId           Command being sent
+			 \param[in]  bstId               Command BST ID
+			 \param[in]  inactivityTimeout   Max gap between successive responses
+			 \param[in]  isComplete          Predicate: response → true if done
+			 \param[in]  callback            Callback invoked per response and on timeout
+			 \return     Sequence ID assigned to this request
+			 *******************************************************************************/
+			uint8_t registerMultiReplyRequest(BemCommandId commandId, BstId bstId,
+											  std::chrono::milliseconds inactivityTimeout,
+											  std::function<bool(const BemResponse&)> isComplete,
+											  BemResponseCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Try to correlate a response with a pending request
@@ -564,6 +589,11 @@ namespace Actisense
 				std::chrono::steady_clock::time_point sentAt;
 				std::chrono::milliseconds timeout;
 				BemResponseCallback callback;
+				/// Optional. nullptr → one-shot (legacy). When set, correlator
+				/// invokes callback on each matching response and keeps the
+				/// entry alive until this returns true. sentAt is refreshed
+				/// per response so timeout is an inactivity window.
+				std::function<bool(const BemResponse&)> isComplete;
 			};
 
 			/**************************************************************************/ /**

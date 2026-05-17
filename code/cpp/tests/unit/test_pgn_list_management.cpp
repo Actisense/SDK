@@ -24,6 +24,8 @@
 
 #include <gtest/gtest.h>
 #include <array>
+#include <chrono>
+#include <thread>
 #include <vector>
 
 namespace Actisense
@@ -634,6 +636,279 @@ TEST_F(PgnListManagementTest, BemCommandIdToString)
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::ParamsPgnEnableLists), "ParamsPgnEnableLists");
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetSetRxPgnEnableListF2), "GetSetRxPgnEnableListF2");
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetSetTxPgnEnableListF2), "GetSetTxPgnEnableListF2");
+}
+
+/* Accumulator helpers ------------------------------------------------------ */
+
+namespace
+{
+	RxPgnEnableListF2Response makeRxSubList(uint8_t xid, uint8_t total, uint8_t first,
+											std::vector<RxPgnEnableEntry> entries)
+	{
+		RxPgnEnableListF2Response msg;
+		msg.transferId = xid;
+		msg.structureVariantId = kRxPgnEnableListF2SvId;
+		msg.totalListSize = total;
+		msg.firstSubIdx = first;
+		msg.subCount = static_cast<uint8_t>(entries.size());
+		msg.entries = std::move(entries);
+		return msg;
+	}
+
+	TxPgnEnableListF2Response makeTxStd(uint8_t xid, uint8_t total, uint8_t first,
+										std::vector<TxPgnEnableEntry> entries)
+	{
+		TxPgnEnableListF2Response msg;
+		msg.transferId = xid;
+		msg.structureVariantId = kTxPgnEnableListF2StdSvId;
+		msg.variant = TxPgnEnableListF2Variant::Standard;
+		msg.stdTotalListSize = total;
+		msg.stdFirstSubIdx = first;
+		msg.stdSubCount = static_cast<uint8_t>(entries.size());
+		msg.stdEntries = std::move(entries);
+		return msg;
+	}
+
+	TxPgnEnableListF2Response makeTxProp(uint8_t xid, std::vector<uint8_t> dp0,
+										 std::vector<uint8_t> dp1)
+	{
+		TxPgnEnableListF2Response msg;
+		msg.transferId = xid;
+		msg.structureVariantId = kTxPgnEnableListF2PropSvId;
+		msg.variant = TxPgnEnableListF2Variant::Proprietary;
+		msg.propDp0Bitmap = std::move(dp0);
+		msg.propDp1Bitmap = std::move(dp1);
+		return msg;
+	}
+} /* namespace */
+
+/* Rx F2 accumulator -------------------------------------------------------- */
+
+TEST_F(PgnListManagementTest, RxAccumulator_SingleMessageFullList)
+{
+	RxPgnEnableListF2Accumulator acc;
+	const auto msg = makeRxSubList(5, 2, 0, {{0x01, 0x01}, {0x02, 0x01}});
+	EXPECT_EQ(acc.feed(msg, m_error), PgnListAccumulatorStatus::Done);
+	EXPECT_TRUE(m_error.empty());
+	EXPECT_EQ(acc.result().transferId, 5u);
+	EXPECT_EQ(acc.result().totalListSize, 2u);
+	ASSERT_EQ(acc.result().entries.size(), 2u);
+	EXPECT_EQ(acc.result().entries[0].pgnIndex, 0x01u);
+	EXPECT_EQ(acc.result().entries[1].pgnIndex, 0x02u);
+}
+
+TEST_F(PgnListManagementTest, RxAccumulator_ThreeSubListTrain)
+{
+	RxPgnEnableListF2Accumulator acc;
+	std::vector<RxPgnEnableEntry> e1(96), e2(96), e3(8);
+	for (std::size_t i = 0; i < e1.size(); ++i) e1[i] = {static_cast<uint8_t>(i), 1};
+	for (std::size_t i = 0; i < e2.size(); ++i)
+		e2[i] = {static_cast<uint8_t>(96 + i), 1};
+	for (std::size_t i = 0; i < e3.size(); ++i)
+		e3[i] = {static_cast<uint8_t>(192 + i), 1};
+
+	EXPECT_EQ(acc.feed(makeRxSubList(7, 200, 0, e1), m_error),
+			  PgnListAccumulatorStatus::Continue);
+	EXPECT_EQ(acc.feed(makeRxSubList(7, 200, 96, e2), m_error),
+			  PgnListAccumulatorStatus::Continue);
+	EXPECT_EQ(acc.feed(makeRxSubList(7, 200, 192, e3), m_error),
+			  PgnListAccumulatorStatus::Done);
+	EXPECT_TRUE(m_error.empty());
+	EXPECT_EQ(acc.result().entries.size(), 200u);
+	EXPECT_EQ(acc.result().entries[0].pgnIndex, 0x00u);
+	EXPECT_EQ(acc.result().entries[199].pgnIndex, 199u);
+}
+
+TEST_F(PgnListManagementTest, RxAccumulator_TransferIdMismatch)
+{
+	RxPgnEnableListF2Accumulator acc;
+	(void)acc.feed(makeRxSubList(1, 4, 0, {{0x10, 1}, {0x11, 1}}), m_error);
+	EXPECT_EQ(acc.feed(makeRxSubList(2, 4, 2, {{0x12, 1}, {0x13, 1}}), m_error),
+			  PgnListAccumulatorStatus::Mismatch);
+	EXPECT_NE(m_error.find("transferId"), std::string::npos);
+}
+
+TEST_F(PgnListManagementTest, RxAccumulator_RepeatedSubListDoesNotDoubleCount)
+{
+	RxPgnEnableListF2Accumulator acc;
+	const auto sub = makeRxSubList(3, 4, 0, {{0xAA, 1}, {0xBB, 1}});
+	EXPECT_EQ(acc.feed(sub, m_error), PgnListAccumulatorStatus::Continue);
+	EXPECT_EQ(acc.feed(sub, m_error), PgnListAccumulatorStatus::Continue);
+	EXPECT_EQ(acc.feed(makeRxSubList(3, 4, 2, {{0xCC, 1}, {0xDD, 1}}), m_error),
+			  PgnListAccumulatorStatus::Done);
+}
+
+/* Tx F2 accumulator -------------------------------------------------------- */
+
+TEST_F(PgnListManagementTest, TxAccumulator_StdOnlyNeverDone)
+{
+	TxPgnEnableListF2Accumulator acc;
+	EXPECT_EQ(acc.feed(makeTxStd(4, 1, 0, {{0x01, 3, 100}}), m_error),
+			  PgnListAccumulatorStatus::Continue);
+	EXPECT_FALSE(acc.result().proprietaryReceived);
+}
+
+TEST_F(PgnListManagementTest, TxAccumulator_EmptyStdPlusEmptyProp)
+{
+	TxPgnEnableListF2Accumulator acc;
+	EXPECT_EQ(acc.feed(makeTxStd(9, 0, 0, {}), m_error),
+			  PgnListAccumulatorStatus::Continue);
+	EXPECT_EQ(acc.feed(makeTxProp(9, std::vector<uint8_t>(32, 0),
+								  std::vector<uint8_t>(32, 0)),
+					   m_error),
+			  PgnListAccumulatorStatus::Done);
+	EXPECT_TRUE(acc.result().proprietaryReceived);
+	EXPECT_TRUE(acc.result().proprietary.enabledPgns.empty());
+}
+
+TEST_F(PgnListManagementTest, TxAccumulator_DP0LutByte0_0x05_yields_FF00_and_FF02)
+{
+	TxPgnEnableListF2Accumulator acc;
+	(void)acc.feed(makeTxStd(2, 0, 0, {}), m_error);
+	std::vector<uint8_t> dp0(32, 0);
+	dp0[0] = 0x05; /* bits 0 and 2 */
+	EXPECT_EQ(acc.feed(makeTxProp(2, dp0, std::vector<uint8_t>(32, 0)), m_error),
+			  PgnListAccumulatorStatus::Done);
+	const auto& pgns = acc.result().proprietary.enabledPgns;
+	ASSERT_EQ(pgns.size(), 2u);
+	EXPECT_EQ(pgns[0], 0x0000FF00u);
+	EXPECT_EQ(pgns[1], 0x0000FF02u);
+}
+
+TEST_F(PgnListManagementTest, TxAccumulator_DP1LutByte1Bit7_yields_1FF0F)
+{
+	TxPgnEnableListF2Accumulator acc;
+	(void)acc.feed(makeTxStd(8, 0, 0, {}), m_error);
+	std::vector<uint8_t> dp1(32, 0);
+	dp1[1] = 0x80; /* bit 7 of byte 1 → offset 15 */
+	EXPECT_EQ(acc.feed(makeTxProp(8, std::vector<uint8_t>(32, 0), dp1), m_error),
+			  PgnListAccumulatorStatus::Done);
+	const auto& pgns = acc.result().proprietary.enabledPgns;
+	ASSERT_EQ(pgns.size(), 1u);
+	EXPECT_EQ(pgns[0], 0x0001FF0Fu);
+}
+
+TEST_F(PgnListManagementTest, TxAccumulator_BothPagesSortedDp0ThenDp1)
+{
+	TxPgnEnableListF2Accumulator acc;
+	(void)acc.feed(makeTxStd(11, 0, 0, {}), m_error);
+	std::vector<uint8_t> dp0(32, 0), dp1(32, 0);
+	dp0[0] = 0x02;       /* PGN 0xFF01 */
+	dp0[31] = 0x80;      /* PGN 0xFFFF */
+	dp1[0] = 0x01;       /* PGN 0x1FF00 */
+	(void)acc.feed(makeTxProp(11, dp0, dp1), m_error);
+	const auto& pgns = acc.result().proprietary.enabledPgns;
+	ASSERT_EQ(pgns.size(), 3u);
+	EXPECT_EQ(pgns[0], 0x0000FF01u);
+	EXPECT_EQ(pgns[1], 0x0000FFFFu);
+	EXPECT_EQ(pgns[2], 0x0001FF00u);
+}
+
+TEST_F(PgnListManagementTest, TxAccumulator_RawLutsPreserved)
+{
+	TxPgnEnableListF2Accumulator acc;
+	(void)acc.feed(makeTxStd(1, 0, 0, {}), m_error);
+	std::vector<uint8_t> dp0(32, 0), dp1(32, 0);
+	dp0[5] = 0xA5;
+	dp1[10] = 0x42;
+	(void)acc.feed(makeTxProp(1, dp0, dp1), m_error);
+	EXPECT_EQ(acc.result().proprietary.dp0RawLut[5], 0xA5u);
+	EXPECT_EQ(acc.result().proprietary.dp1RawLut[10], 0x42u);
+}
+
+TEST_F(PgnListManagementTest, TxAccumulator_TransferIdMismatchOnProp)
+{
+	TxPgnEnableListF2Accumulator acc;
+	(void)acc.feed(makeTxStd(5, 1, 0, {{0x01, 3, 100}}), m_error);
+	m_error.clear();
+	EXPECT_EQ(acc.feed(makeTxProp(6, std::vector<uint8_t>(32, 0),
+								  std::vector<uint8_t>(32, 0)),
+					   m_error),
+			  PgnListAccumulatorStatus::Mismatch);
+	EXPECT_NE(m_error.find("transferId"), std::string::npos);
+}
+
+/* Multi-reply correlator --------------------------------------------------- */
+
+namespace
+{
+	BemResponse makeBemResponse(BemCommandId cmd, std::vector<uint8_t> data = {})
+	{
+		BemResponse r;
+		r.header.bstId = BstId::Bem_GP_A0;
+		r.header.bemId = static_cast<uint8_t>(cmd);
+		r.header.errorCode = 0;
+		r.data = std::move(data);
+		return r;
+	}
+} /* namespace */
+
+TEST_F(PgnListManagementTest, MultiReplyCorrelator_PredicateFalseThenTrue)
+{
+	BemProtocol bem;
+	int callbackCount = 0;
+	int predicateCount = 0;
+
+	auto isComplete = [&predicateCount](const BemResponse&) {
+		return ++predicateCount == 2;
+	};
+	auto callback = [&callbackCount](const std::optional<BemResponse>&, ErrorCode,
+									 std::string_view) { ++callbackCount; };
+
+	bem.registerMultiReplyRequest(BemCommandId::GetSetRxPgnEnableListF2, BstId::Bem_PG_A1,
+								  std::chrono::seconds(10), isComplete, callback);
+
+	const auto rsp = makeBemResponse(BemCommandId::GetSetRxPgnEnableListF2);
+	EXPECT_TRUE(bem.correlateResponse(rsp));
+	EXPECT_EQ(callbackCount, 1);
+	EXPECT_EQ(predicateCount, 1);
+	EXPECT_EQ(bem.pendingRequestCount(), 1u);
+
+	EXPECT_TRUE(bem.correlateResponse(rsp));
+	EXPECT_EQ(callbackCount, 2);
+	EXPECT_EQ(predicateCount, 2);
+	EXPECT_EQ(bem.pendingRequestCount(), 0u);
+}
+
+TEST_F(PgnListManagementTest, MultiReplyCorrelator_TimeoutWhileWaitingFiresCallback)
+{
+	BemProtocol bem;
+	int timeoutCount = 0;
+	auto isComplete = [](const BemResponse&) { return false; };
+	auto callback = [&timeoutCount](const std::optional<BemResponse>& rsp, ErrorCode ec,
+									std::string_view) {
+		if (ec == ErrorCode::Timeout && !rsp.has_value()) {
+			++timeoutCount;
+		}
+	};
+
+	bem.registerMultiReplyRequest(BemCommandId::GetSetRxPgnEnableListF2, BstId::Bem_PG_A1,
+								  std::chrono::milliseconds(0), isComplete, callback);
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	const auto fired = bem.processTimeouts();
+	EXPECT_EQ(fired, 1u);
+	EXPECT_EQ(timeoutCount, 1);
+	EXPECT_EQ(bem.pendingRequestCount(), 0u);
+}
+
+TEST_F(PgnListManagementTest, MultiReplyCorrelator_ResponseRefreshesInactivityWindow)
+{
+	BemProtocol bem;
+	auto isComplete = [](const BemResponse&) { return false; };
+	auto callback = [](const std::optional<BemResponse>&, ErrorCode, std::string_view) {};
+
+	/* Long enough that the second response, delivered after a short pause,
+	   refreshes sentAt so the immediately-following timeout sweep finds the
+	   request still inside its window. */
+	bem.registerMultiReplyRequest(BemCommandId::GetSetRxPgnEnableListF2, BstId::Bem_PG_A1,
+								  std::chrono::milliseconds(50), isComplete, callback);
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(30));
+	const auto rsp = makeBemResponse(BemCommandId::GetSetRxPgnEnableListF2);
+	EXPECT_TRUE(bem.correlateResponse(rsp));   /* refreshes sentAt */
+	EXPECT_EQ(bem.processTimeouts(), 0u);      /* still within window */
+	EXPECT_EQ(bem.pendingRequestCount(), 1u);
 }
 
 } /* namespace Test */
