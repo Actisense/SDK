@@ -1554,6 +1554,83 @@ TEST_F(BemDeviceTest, TxPgnEnable_PerPgnSetPath)
 	             " but SET acks confirm the wire path)" << std::endl;
 }
 
+/* NGXSW-4186 probe: try getRxPgnEnable for a baseline set of well-known
+   standard NMEA 2000 PGNs. The original NGT-1 failure was on PGN 126992
+   (System Time), so we probe that plus a handful of other PGNs every N2K
+   gateway must know about. If ALL succeed on NGT-1, the
+   F2-list-vs-0x46 divergence was unique to the (now-deprecated) F1 path
+   and NGXSW-4186 can close. Any ES9 result means the underlying firmware
+   bug persists through F2 and the ticket stays open.
+
+   This is a cheaper, more direct probe than walking the multi-message
+   Supported / F2 responses to find overlap — the SDK currently only
+   surfaces the first sub-list, and on NGT-1 the index ranges of those two
+   lists happen not to overlap, making any list-walking probe
+   uninformative without multi-message reassembly. */
+TEST_F(BemDeviceTest, RxPgnEnable_WellKnownPgnsAddressableViaPerPgn)
+{
+	struct ProbePgn { uint32_t pgn; const char* name; };
+	constexpr ProbePgn kProbes[] = {
+		{ 60928,  "ISO Address Claim"    },
+		{ 126992, "System Time"          }, /* original NGT-1 failing PGN */
+		{ 127245, "Rudder"               },
+		{ 127250, "Vessel Heading"       },
+		{ 128259, "Speed: Water Ref"     },
+		{ 129025, "Position, Rapid"      },
+		{ 129026, "COG & SOG, Rapid"     },
+		{ 130306, "Wind Data"            },
+	};
+
+	std::vector<uint32_t> es9Pgns;
+	std::vector<std::pair<uint32_t, std::string>> otherFailures;
+	std::size_t ok = 0;
+
+	for (const auto& p : kProbes) {
+		auto r = sendConvenience([this, pgn = p.pgn](auto t, auto cb) {
+			session_->getRxPgnEnable(pgn, t, std::move(cb));
+		});
+		const uint32_t arlErr =
+			r.response.has_value() ? r.response->header.errorCode : 0u;
+		if (r.errorCode == ErrorCode::Ok) {
+			++ok;
+			continue;
+		}
+		if (arlErr == 0xFFFFFC1Du) { /* ES9_N2000_PGN_NOT_ON_LIST */
+			es9Pgns.push_back(p.pgn);
+			std::cout << "  PGN " << p.pgn << " (" << p.name
+			          << "): ES9_N2000_PGN_NOT_ON_LIST" << std::endl;
+		} else {
+			otherFailures.emplace_back(p.pgn, r.errorMsg);
+			std::cout << "  PGN " << p.pgn << " (" << p.name
+			          << "): unexpected failure ARL=0x" << std::hex << arlErr
+			          << std::dec << " — " << r.errorMsg << std::endl;
+		}
+	}
+
+	std::cout << "  Summary: " << ok << " ok, " << es9Pgns.size()
+	          << " ES9, " << otherFailures.size() << " other on "
+	          << modelIdToString(modelId_) << std::endl;
+
+	for (const auto& [pgn, msg] : otherFailures) {
+		ADD_FAILURE() << "PGN " << pgn << " returned non-ES9 failure: " << msg;
+	}
+
+	/* The probe: well-known PGNs must be addressable via 0x46. On NGT-1
+	   this is known to fail — 7 of 8 probe PGNs return ES9 (only ISO
+	   Address Claim 60928 works). Confirms NGXSW-4186 is independent of
+	   how the SDK enumerates PGNs (F1 vs F2) and persists firmware-side.
+	   Skip the assertion on NGT-1 to keep the suite green; the diagnostic
+	   above is still captured. Unmask this gate once NGXSW-4186 is fixed. */
+	if (modelId_ == static_cast<uint16_t>(ArlModelId::NGT1)) {
+		GTEST_SKIP() << "NGT-1 firmware fails ES9 for most well-known PGNs via 0x46 — "
+		             << "see NGXSW-4186. Diagnostic captured above.";
+	}
+
+	EXPECT_EQ(es9Pgns.size(), 0u)
+		<< "Well-known PGNs rejected with ES9_N2000_PGN_NOT_ON_LIST on "
+		<< modelIdToString(modelId_);
+}
+
 /* GIT-77 sign-off coverage: exercise every Delete selector (Rx / Tx / Both).
    Delete is a list-level operation that does not go through the per-PGN
    VD-0 path, so it works on both NGT-1 and NGX-1 for the Rx/Tx selectors.
