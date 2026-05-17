@@ -2,7 +2,7 @@
 
 Enables or disables reception of specific Parameter Group Numbers (PGNs) on NMEA 2000 or J1939 interfaces. This command allows selective filtering of received messages by PGN with configurable mask settings for address filtering.
 
-This command supports both Get (read current enable state) and Set (enable/disable reception) operations for individual PGNs. For managing multiple PGNs efficiently, see [Rx PGN Enable List](rx-pgn-enable-list.md).
+This command supports both Get (read current enable state) and Set (enable/disable reception) operations for individual PGNs. For managing multiple PGNs efficiently, see [Rx PGN Enable List](rx-pgn-enable-list-f2.md).
 
 ## Command Ids
 
@@ -203,7 +203,7 @@ Response showing PGN 129025 enabled with mask 0xFFFFFFFF (accept from all source
   - 130306 (0x1FD02): Wind Data
 
 - **See Also**:
-  - [Rx PGN Enable List](rx-pgn-enable-list.md) - Retrieve complete list of enabled Rx PGNs
+  - [Rx PGN Enable List](rx-pgn-enable-list-f2.md) - Retrieve complete list of enabled Rx PGNs
   - [Tx PGN Enable](tx-pgn-enable.md) - Configure transmission of PGNs
   - [Supported PGN List](supported-pgn-list.md) - Query which PGNs device supports
   - [Activate PGN Enable Lists](activate-pgn-enable-lists.md) - Apply PGN filter changes

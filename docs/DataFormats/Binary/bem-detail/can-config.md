@@ -221,7 +221,7 @@ This indicates the device attempted to claim address 42 but failed (likely anoth
   4. Applications should monitor for Startup Status or System Status messages to confirm successful re-claim
 
 - **See Also**:
-  - [CAN Info Field 1-3](can-info-field1.md) - Device installation and manufacturer information
+  - [CAN Info Field 1-3](can-info-field-123.md) - Device installation and manufacturer information
   - [Supported PGN List](supported-pgn-list.md) - NMEA 2000 PGN support
   - [Commit To EEPROM](commit-to-eeprom.md) - Make configuration changes persistent
   - ISO 11783-5 - Network Management

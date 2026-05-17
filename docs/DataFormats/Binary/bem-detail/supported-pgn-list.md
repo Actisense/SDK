@@ -195,8 +195,8 @@ PGN IDs are 24-bit values stored in little-endian format:
   - 129026 (0x01F802) - COG & SOG, Rapid Update
 
 - **See Also**:
-  - [Rx PGN Enable List](rx-pgn-enable-list.md) - Configure which PGNs to receive
-  - [Tx PGN Enable List](tx-pgn-enable-list.md) - Configure which PGNs to transmit
+  - [Rx PGN Enable List](rx-pgn-enable-list-f2.md) - Configure which PGNs to receive
+  - [Tx PGN Enable List](tx-pgn-enable-list-f2.md) - Configure which PGNs to transmit
   - [CAN Config](can-config.md) - CAN bus configuration
   - ARLStructureVariants.h - Structure variant definitions
   - NMEA 2000 specification for complete PGN definitions

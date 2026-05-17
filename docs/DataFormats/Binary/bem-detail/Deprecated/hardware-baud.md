@@ -2,7 +2,7 @@
 
 > **⚠️ DEPRECATION WARNING**
 > This command is **DEPRECATED** and should not be used in new applications.
-> Use [Port Baudrate](port-baudrate.md) (BEM ID 0x17) instead, which provides:
+> Use [Port Baudrate](../port-baudrate.md) (BEM ID 0x17) instead, which provides:
 > - Unified control of both session (hardware) and store (EEPROM) baudrates
 > - Direct baudrate values instead of baud codes
 > - Single command for complete baudrate management
@@ -22,7 +22,7 @@ This command has been superseded by **BEMCMD_PortBaudrate (0x17)**, which manage
 
 ## Replacement Command
 
-**Use [Port Baudrate](port-baudrate.md) (0x17) for all new development.**
+**Use [Port Baudrate](../port-baudrate.md) (0x17) for all new development.**
 
 The Port Baudrate command provides superior functionality:
 - **Session Baudrate**: Replaces Hardware Baud (0x16) - immediate hardware changes
@@ -65,7 +65,7 @@ Port Baudrate (0x17):
 Then send: Commit To EEPROM (0x01)
 ```
 
-See [Port Baudrate](port-baudrate.md) documentation for detailed examples.
+See [Port Baudrate](../port-baudrate.md) documentation for detailed examples.
 
 ## Legacy Information
 
@@ -98,6 +98,6 @@ For historical reference:
 - **No Decode Function**: The decode function for this command has been removed from current SDK versions
 - **Connection Warning**: Changing session baudrates interrupts the active connection. Applications must close, wait, and reconnect at the new baudrate
 - **See Also**:
-  - [Port Baudrate](port-baudrate.md) - Recommended replacement for both session and store baudrate control
+  - [Port Baudrate](../port-baudrate.md) - Recommended replacement for both session and store baudrate control
   - [Port Baud Config](port-baud-config.md) - Also deprecated, use Port Baudrate (0x17)
-  - [Commit To EEPROM](commit-to-eeprom.md) - Required after changing store baudrate
+  - [Commit To EEPROM](../commit-to-eeprom.md) - Required after changing store baudrate

@@ -20,7 +20,7 @@ As a binary format, the BST D0 protocol header fields are not easy to read. The 
 
 ## Format of BST D0
 
-Messages sent in this format are binary encoded using [BDTP Protocol](../../DataProtocols/bdtp-protocol.md)
+Messages sent in this format are binary encoded using [BDTP Protocol](../../../DataProtocols/bdtp-protocol.md)
 
 The output from the BDTP decoder is a BST message. The first byte identifies the message type. If it is D0 Hex, it is a BST D0 message. The message has a fixed length header of 13 bytes (including BST Id and length) and a variable length payload.
 
@@ -38,7 +38,7 @@ The output from the BDTP decoder is a BST message. The first byte identifies the
 | 6 | `PDUF` | 1 byte | PDU Format - PDU Format is the high byte of a PGN number. It also determines the way PDUS is decoded |
 | 7 | `DPP` | 1 byte | Data page and priority - See section below for bit details |
 | 8 | `C` | 1 byte | Control - PGN control ID bits and 3-bit Fast-Packet sequence ID - See section below for bit details |
-| 9-12 | `T₀T₁T₂T₃` | 4 bytes | [Timestamp](binary-timestamp-example.md) - 32-bit timestamp in milliseconds, little endian |
+| 9-12 | `T₀T₁T₂T₃` | 4 bytes | [Timestamp](../binary-timestamp-example.md) - 32-bit timestamp in milliseconds, little endian |
 | 13+ | `b0...bn` | Variable | Message data - Message's data payload |
 | Last | Checksum | 1 byte | Zero-sum checksum (not included in length field) |
 
@@ -152,4 +152,4 @@ function calculate_pgn(dpp, pduf, pdus):
 
 ---
 
-[1] [BDTP Protocol](../../DataProtocols/bdtp-protocol.md)
+[1] [BDTP Protocol](../../../DataProtocols/bdtp-protocol.md)

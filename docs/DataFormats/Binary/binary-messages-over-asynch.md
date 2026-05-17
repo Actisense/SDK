@@ -49,7 +49,7 @@ We want to transmit an NMEA 2000 Engine Parameters message (PGN 127488) with the
 
 ### Step 1: Encode the BST 95 binary message data block
 
-Using the [BST 95 format](BST-95-can-frame.md), we construct the message containing PGN 127488 = 0x1F200:
+Using the [BST 95 format](bst-detail/BST-95-can-frame.md), we construct the message containing PGN 127488 = 0x1F200:
 
 **Assembling the BST 95 message:**
 

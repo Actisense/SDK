@@ -58,7 +58,7 @@ If a message is sent via addressed fast packet to a remote device over CAN bus, 
 
 ## BST "Type 2"
 
-To overcome the data length considerations, BST type 2 - messages with BST ID of D0 Hex to DF Hex use BST type 2. These can only be sent over a local link due to message length limiations of fast packets. See [BST-D0](BST-D0.md) for an example using BST Type 2.
+To overcome the data length considerations, BST type 2 - messages with BST ID of D0 Hex to DF Hex use BST type 2. These can only be sent over a local link due to message length limiations of fast packets. See [BST-D0](bst-detail/BST-D0.md) for an example using BST Type 2.
 
 | Byte | Field | Size | Description |
 | ------ | ------- | ------ | ------------- |

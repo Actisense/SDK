@@ -295,10 +295,10 @@ Each message has BST Length = 0x2C (44 bytes total) and contains the full 32-byt
 - **PGN 126996 Correspondence**: Product Info data corresponds to NMEA 2000 PGN 126996 (Product Information) fields. The device may also transmit this information on the NMEA 2000 bus in PGN 126996 format.
 
 - **Discovery Sequence**: Typical device discovery workflow:
-  1. Enumerate devices using [Device List](device-list.md) or transport enumeration
+  1. Enumerate devices using transport enumeration
   2. Query [CAN Config](can-config.md) for CAN NAME and address
   3. Query Product Info for model, version, serial number
-  4. Query [CAN Info Fields](can-info-field1.md) for installation description
+  4. Query [CAN Info Fields](can-info-field-123.md) for installation description
   5. Display complete device identity to user
 
 - **Caching**: Product Info rarely changes (only with firmware updates):
@@ -314,7 +314,7 @@ Each message has BST Length = 0x2C (44 bytes total) and contains the full 32-byt
 
 - **See Also**:
   - [CAN Config](can-config.md) - CAN NAME and Manufacturer Code
-  - [CAN Info Field 1-3](can-info-field1.md) - Device installation information
+  - [CAN Info Field 1-3](can-info-field-123.md) - Device installation information
   - [Startup Status](startup-status.md) - Device initialization and firmware version
   - [Supported PGN List](supported-pgn-list.md) - Device PGN capabilities
   - NMEA 2000 PGN 126996 - Product Information

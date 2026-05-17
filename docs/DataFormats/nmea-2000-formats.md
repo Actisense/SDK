@@ -27,6 +27,6 @@ Unlike the [CAN Frame formats](can-frame-formats.md), NMEA 2000 formats deliver 
 - Receiving NMEA 2000 navigation data (GPS position, depth, wind, AIS)
 - Sending NMEA 2000 messages to the bus from a host application
 - Cloud-forwarding of marine data from onboard gateways
-- Logging and replaying NMEA 2000 traffic (see also [EBL file format](../FileFormats/ebl-file-format.md))
+- Logging and replaying NMEA 2000 traffic (see also [EBL file format](../FileFormats/ebl/ebl-file-format.md))
 
 Updated 15th Dec 2025

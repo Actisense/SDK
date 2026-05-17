@@ -45,4 +45,4 @@ So for a data length of 8 bytes, `L` = 14 and `DL` = 8, thus the whole BST frame
 
 ---
 
-[1] [BST](BST.md)
+[1] [BST](../BST.md)

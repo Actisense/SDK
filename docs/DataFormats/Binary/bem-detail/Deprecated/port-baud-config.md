@@ -2,7 +2,7 @@
 
 > **⚠️ DEPRECATION WARNING**
 > This command is **DEPRECATED** and should not be used in new applications.
-> Use [Port Baudrate](port-baudrate.md) (BEM ID 0x17) instead, which provides:
+> Use [Port Baudrate](../port-baudrate.md) (BEM ID 0x17) instead, which provides:
 > - Direct baudrate values instead of baud codes
 > - Separate session and store baudrate control
 > - Improved device compatibility
@@ -22,7 +22,7 @@ This command has been superseded by **BEMCMD_PortBaudrate (0x17)**, which uses a
 
 ## Replacement Command
 
-**Use [Port Baudrate](port-baudrate.md) (0x17) for all new development.**
+**Use [Port Baudrate](../port-baudrate.md) (0x17) for all new development.**
 
 The Port Baudrate command provides superior functionality:
 - **Direct values**: Set baudrates as numbers (115200, 230400, etc.) instead of device-specific codes
@@ -51,7 +51,7 @@ Send command 0x17 with:
 Follow with Commit To EEPROM (0x01) if store baudrate was changed
 ```
 
-See [Port Baudrate](port-baudrate.md) documentation for detailed examples.
+See [Port Baudrate](../port-baudrate.md) documentation for detailed examples.
 
 ## Legacy Information
 
@@ -72,5 +72,5 @@ For historical reference:
 - **Device Support**: Newer devices may not support this legacy command
 - **No Decode Function**: The decode function for this command has been removed from current SDK versions
 - **See Also**:
-  - [Port Baudrate](port-baudrate.md) - Recommended replacement
+  - [Port Baudrate](../port-baudrate.md) - Recommended replacement
   - [Hardware Baud](hardware-baud.md) - Also deprecated, use Port Baudrate (0x17)

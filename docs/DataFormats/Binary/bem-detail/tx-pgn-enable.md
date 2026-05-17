@@ -2,7 +2,7 @@
 
 Enables or disables transmission of specific Parameter Group Numbers (PGNs) on NMEA 2000 or J1939 interfaces. This command allows selective control of transmitted messages by PGN with configurable transmission rate and priority.
 
-This command supports both Get (read current enable state) and Set (enable/disable transmission) operations for individual PGNs. For managing multiple PGNs efficiently, see [Tx PGN Enable List](tx-pgn-enable-list.md).
+This command supports both Get (read current enable state) and Set (enable/disable transmission) operations for individual PGNs. For managing multiple PGNs efficiently, see [Tx PGN Enable List](tx-pgn-enable-list-f2.md).
 
 ## Command Ids
 
@@ -235,7 +235,7 @@ Response showing PGN 127488 enabled with 100ms rate, priority 3:
   - Consult NMEA 2000 Appendix A for PGN-specific requirements
 
 - **See Also**:
-  - [Tx PGN Enable List](tx-pgn-enable-list.md) - Retrieve complete list of enabled Tx PGNs
+  - [Tx PGN Enable List](tx-pgn-enable-list-f2.md) - Retrieve complete list of enabled Tx PGNs
   - [Rx PGN Enable](rx-pgn-enable.md) - Configure reception of PGNs
   - [Supported PGN List](supported-pgn-list.md) - Query which PGNs device supports
   - [Activate PGN Enable Lists](activate-pgn-enable-lists.md) - Apply PGN configuration changes
