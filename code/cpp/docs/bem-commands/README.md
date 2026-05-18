@@ -70,7 +70,7 @@ page covering the C++ build/decode API, parameters, and any quirks per command.
 | Device information | [device-information.md](device-information.md) | `GetSetOperatingMode` (11H), `GetSetTotalTime` (15H), `Echo` (18H) |
 | Port configuration | [port-configuration.md](port-configuration.md) | `GetSetPortPCode` (13H), `GetSetPortBaudrate` (17H) |
 | NMEA 2000 product information | [nmea2000-product-info.md](nmea2000-product-info.md) | `GetProductInfo` (41H), `GetSetCanConfig` (42H), `GetSetCanInfoField1/2/3` (43H/44H/45H) |
-| PGN list & enable | [pgn-enable-lists.md](pgn-enable-lists.md) | `GetSupportedPgnList` (40H), `GetSetRxPgnEnable` (46H), `GetSetTxPgnEnable` (47H), `RxPgnEnableListF1/F2` (48H/4EH), `TxPgnEnableListF1/F2` (49H/4FH), `DeletePgnEnableLists` (4AH), `ActivatePgnEnableLists` (4BH), `DefaultPgnEnableList` (4CH), `ParamsPgnEnableLists` (4DH) |
+| PGN list & enable | [pgn-enable-lists.md](pgn-enable-lists.md) | `GetSupportedPgnList` (40H), `GetSetRxPgnEnable` (46H), `GetSetTxPgnEnable` (47H), `RxPgnEnableListF2` (4EH), `TxPgnEnableListF2` (4FH), `DeletePgnEnableLists` (4AH), `ActivatePgnEnableLists` (4BH), `DefaultPgnEnableList` (4CH), `ParamsPgnEnableLists` (4DH) |
 | Unsolicited messages | [unsolicited-messages.md](unsolicited-messages.md) | `StartupStatus` (F0H), `ErrorReport` (F1H), `SystemStatus` (F2H), `NegativeAck` (F4H) |
 
 ---

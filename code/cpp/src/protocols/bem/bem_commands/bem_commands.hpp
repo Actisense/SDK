@@ -27,14 +27,12 @@
 #include "protocols/bem/bem_commands/product_info.hpp"
 #include "protocols/bem/bem_commands/reinit_main_app.hpp"
 #include "protocols/bem/bem_commands/rx_pgn_enable.hpp"
-#include "protocols/bem/bem_commands/rx_pgn_enable_list_f1.hpp"
 #include "protocols/bem/bem_commands/rx_pgn_enable_list_f2.hpp"
 #include "protocols/bem/bem_commands/startup_status.hpp"
 #include "protocols/bem/bem_commands/supported_pgn_list.hpp"
 #include "protocols/bem/bem_commands/system_status.hpp"
 #include "protocols/bem/bem_commands/total_time.hpp"
 #include "protocols/bem/bem_commands/tx_pgn_enable.hpp"
-#include "protocols/bem/bem_commands/tx_pgn_enable_list_f1.hpp"
 #include "protocols/bem/bem_commands/tx_pgn_enable_list_f2.hpp"
 #include "public/operating_mode.hpp"
 
@@ -80,12 +78,6 @@ namespace Actisense
 
 			/* PGN List Management Commands */
 			GetSupportedPgnList = 0x40,		///< Get list of supported PGNs (multi-message, transferId)
-			GetSetRxPgnEnableListF1 [[deprecated("Use GetSetRxPgnEnableListF2 (0x4E); F1 is "
-												  "superseded and will be removed.")]]
-				= 0x48,						///< Get/Set Rx PGN enable list (Format 1, deprecated)
-			GetSetTxPgnEnableListF1 [[deprecated("Use GetSetTxPgnEnableListF2 (0x4F); F1 is "
-												  "superseded and will be removed.")]]
-				= 0x49,						///< Get/Set Tx PGN enable list (Format 1, deprecated)
 			DeletePgnEnableLists = 0x4A,	///< Delete PGN enable lists from session
 			ActivatePgnEnableLists = 0x4B,	///< Activate session PGN enable lists
 			DefaultPgnEnableList = 0x4C,	///< Restore default PGN enable lists
@@ -145,22 +137,6 @@ namespace Actisense
 				/* PGN List Management Commands */
 				case BemCommandId::GetSupportedPgnList:
 					return "GetSupportedPgnList";
-#if defined(__GNUC__) || defined(__clang__)
-#	pragma GCC diagnostic push
-#	pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#elif defined(_MSC_VER)
-#	pragma warning(push)
-#	pragma warning(disable : 4996)
-#endif
-				case BemCommandId::GetSetRxPgnEnableListF1:
-					return "GetSetRxPgnEnableListF1";
-				case BemCommandId::GetSetTxPgnEnableListF1:
-					return "GetSetTxPgnEnableListF1";
-#if defined(__GNUC__) || defined(__clang__)
-#	pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#	pragma warning(pop)
-#endif
 				case BemCommandId::DeletePgnEnableLists:
 					return "DeletePgnEnableLists";
 				case BemCommandId::ActivatePgnEnableLists:

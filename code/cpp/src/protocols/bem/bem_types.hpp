@@ -108,7 +108,7 @@ namespace Actisense
 			EMU1 = 0x0011,	   ///< EMU-1 Engine Monitor
 			PRO_NDC1 = 0x0020, ///< PRO-NDC-1-E2K
 			WGX1 = 0x0030,	   ///< WGX Wireless Gateway
-			NGX1 = 0x003B	   ///< NGX-1 NMEA 2000 X-over Gateway (does not support PGN list F1)
+			NGX1 = 0x003B	   ///< NGX-1 NMEA 2000 X-over Gateway
 		};
 
 		/**************************************************************************/ /**

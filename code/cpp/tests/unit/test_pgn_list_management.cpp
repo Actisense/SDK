@@ -4,7 +4,7 @@
 \details    Tests encode/decode for Supported PGN List (0x40), Delete PGN
             Enable Lists (0x4A), Activate PGN Enable Lists (0x4B), Default
             PGN Enable List (0x4C), Params PGN Enable Lists (0x4D), and PGN
-            Enable List F1/F2 (0x48-0x4F)
+            Enable List F2 (0x4E-0x4F)
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 *******************************************************************************/
@@ -15,8 +15,6 @@
 #include "protocols/bem/bem_commands/activate_pgn_enable_lists.hpp"
 #include "protocols/bem/bem_commands/default_pgn_enable_list.hpp"
 #include "protocols/bem/bem_commands/params_pgn_enable_lists.hpp"
-#include "protocols/bem/bem_commands/rx_pgn_enable_list_f1.hpp"
-#include "protocols/bem/bem_commands/tx_pgn_enable_list_f1.hpp"
 #include "protocols/bem/bem_commands/rx_pgn_enable_list_f2.hpp"
 #include "protocols/bem/bem_commands/tx_pgn_enable_list_f2.hpp"
 #include "protocols/bem/bem_commands/bem_commands.hpp"
@@ -455,148 +453,6 @@ TEST_F(PgnListManagementTest, TxPgnEnableListF2_Builder)
 	EXPECT_FALSE(m_frame.empty());
 }
 
-/* Rx PGN Enable List F1 (0x48) Tests --------------------------------------- */
-
-TEST_F(PgnListManagementTest, RxPgnEnableListF1_EncodeGetRequest)
-{
-	std::vector<uint8_t> data;
-	encodeRxPgnEnableListF1GetRequest(0, data);
-
-	EXPECT_EQ(data.size(), kRxPgnEnableListF1GetRequestSize);
-	EXPECT_EQ(data[0], 0u);
-}
-
-TEST_F(PgnListManagementTest, RxPgnEnableListF1_DecodeResponse)
-{
-	/* Response: message 0, 2 PGNs */
-	const std::array<uint8_t, 10> data = {
-		0x00,              /* Message index 0 */
-		0x02,              /* PGN count = 2 */
-		0x10, 0x27, 0x00, 0x00,  /* PGN 10000 */
-		0x20, 0x4E, 0x00, 0x00   /* PGN 20000 */
-	};
-
-	RxPgnEnableListF1Response response;
-	EXPECT_TRUE(decodeRxPgnEnableListF1Response(data, response, m_error));
-	EXPECT_TRUE(m_error.empty());
-
-	EXPECT_EQ(response.messageIndex, 0u);
-	EXPECT_EQ(response.pgnCount, 2u);
-	EXPECT_TRUE(response.isFirstMessage());
-	EXPECT_FALSE(response.isLastMessage());
-	EXPECT_EQ(response.pgns[0], 10000u);
-	EXPECT_EQ(response.pgns[1], 20000u);
-}
-
-/* The buildGet*PgnEnableListF1 protocol helpers are [[deprecated]] in favour
-   of the F2 variants, but the underlying codec still works and these tests
-   are the only thing guarding it against regression until removal. Silence
-   the deprecation warning locally so the suite still builds clean. */
-#if defined(__GNUC__) || defined(__clang__)
-#	pragma GCC diagnostic push
-#	pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#elif defined(_MSC_VER)
-#	pragma warning(push)
-#	pragma warning(disable : 4996)
-#endif
-
-TEST_F(PgnListManagementTest, RxPgnEnableListF1_BuilderValid)
-{
-	EXPECT_TRUE(m_protocol.buildGetRxPgnEnableListF1(0, m_frame, m_error));
-	EXPECT_TRUE(m_error.empty());
-	EXPECT_FALSE(m_frame.empty());
-
-	m_frame.clear();
-	EXPECT_TRUE(m_protocol.buildGetRxPgnEnableListF1(1, m_frame, m_error));
-	EXPECT_TRUE(m_error.empty());
-}
-
-TEST_F(PgnListManagementTest, RxPgnEnableListF1_BuilderInvalid)
-{
-	EXPECT_FALSE(m_protocol.buildGetRxPgnEnableListF1(2, m_frame, m_error));
-	EXPECT_FALSE(m_error.empty());
-}
-
-/* Tx PGN Enable List F1 (0x49) Tests --------------------------------------- */
-
-TEST_F(PgnListManagementTest, TxPgnEnableListF1_EncodeGetRequest)
-{
-	std::vector<uint8_t> data;
-	encodeTxPgnEnableListF1GetRequest(2, data);
-
-	EXPECT_EQ(data.size(), kTxPgnEnableListF1GetRequestSize);
-	EXPECT_EQ(data[0], 2u);
-}
-
-TEST_F(PgnListManagementTest, TxPgnEnableListF1_DecodeResponsePgnList)
-{
-	/* Response: message 0 (PGN list), 2 PGNs */
-	const std::array<uint8_t, 10> data = {
-		0x00,              /* Message index 0 (PGN list) */
-		0x02,              /* Entry count = 2 */
-		0x10, 0x27, 0x00, 0x00,  /* PGN 10000 */
-		0x20, 0x4E, 0x00, 0x00   /* PGN 20000 */
-	};
-
-	TxPgnEnableListF1Response response;
-	EXPECT_TRUE(decodeTxPgnEnableListF1Response(data, response, m_error));
-	EXPECT_TRUE(m_error.empty());
-
-	EXPECT_EQ(response.messageIndex, 0u);
-	EXPECT_EQ(response.entryCount, 2u);
-	EXPECT_TRUE(response.isPgnListMessage());
-	EXPECT_EQ(response.pgns.size(), 2u);
-	EXPECT_EQ(response.pgns[0], 10000u);
-	EXPECT_EQ(response.pgns[1], 20000u);
-}
-
-TEST_F(PgnListManagementTest, TxPgnEnableListF1_DecodeResponseRatePriority)
-{
-	/* Response: message 1 (rate/priority), 2 entries */
-	const std::array<uint8_t, 6> data = {
-		0x01,         /* Message index 1 (rate/priority) */
-		0x02,         /* Entry count = 2 */
-		0x05, 0x03,   /* Rate 5, Priority 3 */
-		0x0A, 0x06    /* Rate 10, Priority 6 */
-	};
-
-	TxPgnEnableListF1Response response;
-	EXPECT_TRUE(decodeTxPgnEnableListF1Response(data, response, m_error));
-	EXPECT_TRUE(m_error.empty());
-
-	EXPECT_EQ(response.messageIndex, 1u);
-	EXPECT_EQ(response.entryCount, 2u);
-	EXPECT_TRUE(response.isRatePriorityMessage());
-	EXPECT_EQ(response.ratePriority.size(), 2u);
-	EXPECT_EQ(response.ratePriority[0].first, 5u);
-	EXPECT_EQ(response.ratePriority[0].second, 3u);
-	EXPECT_EQ(response.ratePriority[1].first, 10u);
-	EXPECT_EQ(response.ratePriority[1].second, 6u);
-}
-
-TEST_F(PgnListManagementTest, TxPgnEnableListF1_BuilderValid)
-{
-	for (uint8_t i = 0; i <= 3; ++i) {
-		m_frame.clear();
-		m_error.clear();
-		EXPECT_TRUE(m_protocol.buildGetTxPgnEnableListF1(i, m_frame, m_error))
-			<< "Failed for message index " << static_cast<int>(i);
-		EXPECT_TRUE(m_error.empty());
-	}
-}
-
-TEST_F(PgnListManagementTest, TxPgnEnableListF1_BuilderInvalid)
-{
-	EXPECT_FALSE(m_protocol.buildGetTxPgnEnableListF1(4, m_frame, m_error));
-	EXPECT_FALSE(m_error.empty());
-}
-
-#if defined(__GNUC__) || defined(__clang__)
-#	pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#	pragma warning(pop)
-#endif
-
 /* Constants Tests ---------------------------------------------------------- */
 
 TEST_F(PgnListManagementTest, Constants)
@@ -607,8 +463,6 @@ TEST_F(PgnListManagementTest, Constants)
 	EXPECT_EQ(kParamsPgnEnableListsResponseSize, 14u);
 	EXPECT_EQ(kRxPgnEnableListF2MaxEntriesPerSubList, 96u);
 	EXPECT_EQ(kTxPgnEnableListF2StdMaxEntriesPerSubList, 48u);
-	EXPECT_EQ(kRxPgnEnableListF1MaxPgns, 50u);
-	EXPECT_EQ(kTxPgnEnableListF1MaxPgns, 50u);
 }
 
 /* BEM Command ID String Tests ---------------------------------------------- */
@@ -616,20 +470,6 @@ TEST_F(PgnListManagementTest, Constants)
 TEST_F(PgnListManagementTest, BemCommandIdToString)
 {
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetSupportedPgnList), "GetSupportedPgnList");
-#if defined(__GNUC__) || defined(__clang__)
-#	pragma GCC diagnostic push
-#	pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#elif defined(_MSC_VER)
-#	pragma warning(push)
-#	pragma warning(disable : 4996)
-#endif
-	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetSetRxPgnEnableListF1), "GetSetRxPgnEnableListF1");
-	EXPECT_EQ(bemCommandIdToString(BemCommandId::GetSetTxPgnEnableListF1), "GetSetTxPgnEnableListF1");
-#if defined(__GNUC__) || defined(__clang__)
-#	pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#	pragma warning(pop)
-#endif
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::DeletePgnEnableLists), "DeletePgnEnableLists");
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::ActivatePgnEnableLists), "ActivatePgnEnableLists");
 	EXPECT_EQ(bemCommandIdToString(BemCommandId::DefaultPgnEnableList), "DefaultPgnEnableList");

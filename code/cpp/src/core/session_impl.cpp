@@ -700,30 +700,6 @@ namespace Actisense
 
 		/* PGN List Management Commands ----------------------------------------- */
 
-		/* F1 helpers are deprecated. Every firmware that ever responded to F1
-		   (NGT-1 / NGW-1, since 2015) also responds to F2, and AMKLib-based
-		   products (NGX-1, W2K-1) never implemented F1. The helpers short-
-		   circuit to ErrorCode::UnsupportedOperation without touching the wire so
-		   existing callers compile and link but get a clear runtime signal
-		   to migrate to F2. Slated for removal in a future release. */
-		void SessionImpl::getRxPgnEnableListF1([[maybe_unused]] uint8_t messageIndex,
-											   [[maybe_unused]] std::chrono::milliseconds timeout,
-											   BemResponseCallback callback) {
-			if (callback) {
-				callback(std::nullopt, ErrorCode::UnsupportedOperation,
-						 "F1 PGN-list commands are deprecated; use getRxPgnEnableListF2()");
-			}
-		}
-
-		void SessionImpl::getTxPgnEnableListF1([[maybe_unused]] uint8_t messageIndex,
-											   [[maybe_unused]] std::chrono::milliseconds timeout,
-											   BemResponseCallback callback) {
-			if (callback) {
-				callback(std::nullopt, ErrorCode::UnsupportedOperation,
-						 "F1 PGN-list commands are deprecated; use getTxPgnEnableListF2()");
-			}
-		}
-
 		void SessionImpl::getRxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
 											   RxPgnEnableListF2ResultCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnableListF2);

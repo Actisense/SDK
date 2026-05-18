@@ -456,53 +456,6 @@ namespace Actisense
 									   outFrame, outError);
 		}
 
-/* The F1 builders below are themselves [[deprecated]], so calling out the
-   deprecated enum values from within their own bodies is intentional. */
-#if defined(__GNUC__) || defined(__clang__)
-#	pragma GCC diagnostic push
-#	pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#elif defined(_MSC_VER)
-#	pragma warning(push)
-#	pragma warning(disable : 4996)
-#endif
-
-		bool BemProtocol::buildGetRxPgnEnableListF1(uint8_t messageIndex,
-													std::vector<uint8_t>& outFrame,
-													std::string& outError) {
-			if (messageIndex > 1) {
-				outError = "Invalid message index for Rx F1: must be 0 or 1";
-				return false;
-			}
-
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetRxPgnEnableListF1;
-			cmd.data.push_back(messageIndex);
-
-			return encodeCommand(cmd, outFrame, outError);
-		}
-
-		bool BemProtocol::buildGetTxPgnEnableListF1(uint8_t messageIndex,
-													std::vector<uint8_t>& outFrame,
-													std::string& outError) {
-			if (messageIndex > 3) {
-				outError = "Invalid message index for Tx F1: must be 0-3";
-				return false;
-			}
-
-			BemCommand cmd;
-			cmd.bstId = BstId::Bem_PG_A1;
-			cmd.bemId = BemCommandId::GetSetTxPgnEnableListF1;
-			cmd.data.push_back(messageIndex);
-
-			return encodeCommand(cmd, outFrame, outError);
-		}
-
-#if defined(__GNUC__) || defined(__clang__)
-#	pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#	pragma warning(pop)
-#endif
 		bool BemProtocol::isBemResponse(const BstDatagram& datagram) const {
 			return Actisense::Sdk::isBemResponse(static_cast<BstId>(datagram.bstId));
 		}

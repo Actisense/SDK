@@ -39,7 +39,6 @@
             GetOperatingMode and stores it in modelId_. Tests that depend on
             specific firmware behaviour use member helpers:
 
-              - deviceSupportsPgnListF1()      F1 PGN list (NOT NGX)
               - deviceEchoIsReliable()         Echo (firmware-buggy on NGX)
               - deviceSupportsCommitToFlash()  FLASH commit (NGX only)
 
@@ -59,8 +58,6 @@
 #include "protocols/bem/bem_commands/product_info.hpp"
 #include "protocols/bem/bem_commands/can_config.hpp"
 #include "protocols/bem/bem_commands/supported_pgn_list.hpp"
-#include "protocols/bem/bem_commands/rx_pgn_enable_list_f1.hpp"
-#include "protocols/bem/bem_commands/tx_pgn_enable_list_f1.hpp"
 #include "protocols/bem/bem_commands/rx_pgn_enable_list_f2.hpp"
 #include "protocols/bem/bem_commands/tx_pgn_enable_list_f2.hpp"
 #include "protocols/bem/bem_commands/params_pgn_enable_lists.hpp"
@@ -155,13 +152,6 @@ protected:
 		modelId_ = modelFuture.get();
 		std::cout << "  Detected device model: " << modelIdToString(modelId_)
 		          << " (0x" << std::hex << modelId_ << std::dec << ")" << std::endl;
-	}
-
-	/* True for devices that pre-date PGN List F2; F1 (0x48/0x49) is supported
-	   on NGT/NGW-class but explicitly NOT on NGX-1 (0x003B). */
-	bool deviceSupportsPgnListF1() const noexcept
-	{
-		return static_cast<ArlModelId>(modelId_) != ArlModelId::NGX1;
 	}
 
 	/* Historical NGX-1 workaround for GIT-75 / NGXSW-4136: prior to the
@@ -1055,169 +1045,6 @@ TEST_F(BemDeviceTest, GetTxPgnEnableListF2)
 	          << " propEnabled=" << result->proprietary.enabledPgns.size() << std::endl;
 }
 
-/* The F1 enum values BemCommandId::GetSetRxPgnEnableListF1 and
-   GetSetTxPgnEnableListF1 are [[deprecated]]; these legacy integration
-   tests still exercise the codec on devices that respond to F1
-   (NGT-1 / NGW-1) until removal. Silence the deprecation warning locally. */
-#if defined(__GNUC__) || defined(__clang__)
-#	pragma GCC diagnostic push
-#	pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#elif defined(_MSC_VER)
-#	pragma warning(push)
-#	pragma warning(disable : 4996)
-#endif
-
-TEST_F(BemDeviceTest, GetRxPgnEnableListF1_Message0)
-{
-	if (!deviceSupportsPgnListF1()) {
-		GTEST_SKIP() << "PGN List F1 not supported on " << modelIdToString(modelId_)
-		             << " (use F2)";
-	}
-	/* Legacy format: request message 0 (first 25 PGNs) */
-	auto cmd = makeCommand(BemCommandId::GetSetRxPgnEnableListF1, {0x00});
-	auto result = sendSync(cmd);
-
-	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
-	ASSERT_TRUE(result.response.has_value());
-
-	const auto& data = result.response->data;
-	std::cout << "  Rx PGN Enable List F1 (msg 0) response: " << data.size() << " data bytes" << std::endl;
-
-	RxPgnEnableListF1Response rxResp;
-	std::string error;
-	if (decodeRxPgnEnableListF1Response(std::span<const uint8_t>(data), rxResp, error)) {
-		std::cout << formatRxPgnEnableListF1(rxResp);
-	} else {
-		std::cout << "  Rx F1 msg 0 decode note: " << error << std::endl;
-	}
-}
-
-TEST_F(BemDeviceTest, GetRxPgnEnableListF1_Message1)
-{
-	if (!deviceSupportsPgnListF1()) {
-		GTEST_SKIP() << "PGN List F1 not supported on " << modelIdToString(modelId_)
-		             << " (use F2)";
-	}
-	/* Legacy format: request message 1 (next 25 PGNs) */
-	auto cmd = makeCommand(BemCommandId::GetSetRxPgnEnableListF1, {0x01});
-	auto result = sendSync(cmd);
-
-	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
-	ASSERT_TRUE(result.response.has_value());
-
-	const auto& data = result.response->data;
-	std::cout << "  Rx PGN Enable List F1 (msg 1) response: " << data.size() << " data bytes" << std::endl;
-
-	RxPgnEnableListF1Response rxResp;
-	std::string error;
-	if (decodeRxPgnEnableListF1Response(std::span<const uint8_t>(data), rxResp, error)) {
-		std::cout << formatRxPgnEnableListF1(rxResp);
-	} else {
-		std::cout << "  Rx F1 msg 1 decode note: " << error << std::endl;
-	}
-}
-
-TEST_F(BemDeviceTest, GetTxPgnEnableListF1_Message0)
-{
-	if (!deviceSupportsPgnListF1()) {
-		GTEST_SKIP() << "PGN List F1 not supported on " << modelIdToString(modelId_)
-		             << " (use F2)";
-	}
-	auto cmd = makeCommand(BemCommandId::GetSetTxPgnEnableListF1, {0x00});
-	auto result = sendSync(cmd);
-
-	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
-	ASSERT_TRUE(result.response.has_value());
-
-	const auto& data = result.response->data;
-	std::cout << "  Tx PGN Enable List F1 (msg 0) response: " << data.size() << " data bytes" << std::endl;
-
-	TxPgnEnableListF1Response txResp;
-	std::string error;
-	if (decodeTxPgnEnableListF1Response(std::span<const uint8_t>(data), txResp, error)) {
-		std::cout << formatTxPgnEnableListF1(txResp);
-	} else {
-		std::cout << "  Tx F1 msg 0 decode note: " << error << std::endl;
-	}
-}
-
-TEST_F(BemDeviceTest, GetTxPgnEnableListF1_Message1)
-{
-	if (!deviceSupportsPgnListF1()) {
-		GTEST_SKIP() << "PGN List F1 not supported on " << modelIdToString(modelId_)
-		             << " (use F2)";
-	}
-	auto cmd = makeCommand(BemCommandId::GetSetTxPgnEnableListF1, {0x01});
-	auto result = sendSync(cmd);
-
-	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
-	ASSERT_TRUE(result.response.has_value());
-
-	const auto& data = result.response->data;
-	std::cout << "  Tx PGN Enable List F1 (msg 1) response: " << data.size() << " data bytes" << std::endl;
-
-	TxPgnEnableListF1Response txResp;
-	std::string error;
-	if (decodeTxPgnEnableListF1Response(std::span<const uint8_t>(data), txResp, error)) {
-		std::cout << formatTxPgnEnableListF1(txResp);
-	} else {
-		std::cout << "  Tx F1 msg 1 decode note: " << error << std::endl;
-	}
-}
-
-TEST_F(BemDeviceTest, GetTxPgnEnableListF1_Message2)
-{
-	if (!deviceSupportsPgnListF1()) {
-		GTEST_SKIP() << "PGN List F1 not supported on " << modelIdToString(modelId_)
-		             << " (use F2)";
-	}
-	auto cmd = makeCommand(BemCommandId::GetSetTxPgnEnableListF1, {0x02});
-	auto result = sendSync(cmd);
-
-	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
-	ASSERT_TRUE(result.response.has_value());
-
-	const auto& data = result.response->data;
-	std::cout << "  Tx PGN Enable List F1 (msg 2) response: " << data.size() << " data bytes" << std::endl;
-
-	TxPgnEnableListF1Response txResp;
-	std::string error;
-	if (decodeTxPgnEnableListF1Response(std::span<const uint8_t>(data), txResp, error)) {
-		std::cout << formatTxPgnEnableListF1(txResp);
-	} else {
-		std::cout << "  Tx F1 msg 2 decode note: " << error << std::endl;
-	}
-}
-
-TEST_F(BemDeviceTest, GetTxPgnEnableListF1_Message3)
-{
-	if (!deviceSupportsPgnListF1()) {
-		GTEST_SKIP() << "PGN List F1 not supported on " << modelIdToString(modelId_)
-		             << " (use F2)";
-	}
-	auto cmd = makeCommand(BemCommandId::GetSetTxPgnEnableListF1, {0x03});
-	auto result = sendSync(cmd);
-
-	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
-	ASSERT_TRUE(result.response.has_value());
-
-	const auto& data = result.response->data;
-	std::cout << "  Tx PGN Enable List F1 (msg 3) response: " << data.size() << " data bytes" << std::endl;
-
-	TxPgnEnableListF1Response txResp;
-	std::string error;
-	if (decodeTxPgnEnableListF1Response(std::span<const uint8_t>(data), txResp, error)) {
-		std::cout << formatTxPgnEnableListF1(txResp);
-	} else {
-		std::cout << "  Tx F1 msg 3 decode note: " << error << std::endl;
-	}
-}
-
-#if defined(__GNUC__) || defined(__clang__)
-#	pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#	pragma warning(pop)
-#endif
 
 /* ========================================================================== */
 /* GIT-74: PGN List Wire-Format Diagnostic                                    */
@@ -1338,39 +1165,6 @@ TEST_F(BemDeviceTest, PgnListWireDiagnostic)
 	/* 0x4F Tx PGN Enable List F2 */
 	dumpResponse("0x4F GetTxPgnEnableListF2",
 	             sendSync(makeGetCommand(BemCommandId::GetSetTxPgnEnableListF2)));
-
-	/* 0x48 / 0x49 F1 — gated on model: NGX-1 won't respond. NGT/NGW will
-	   serve up multi-message chunks indexed 0/1 (Rx) and 0..3 (Tx). The F1
-	   enum values are [[deprecated]] but this diagnostic still exercises
-	   them intentionally; silence the warning locally. */
-#if defined(__GNUC__) || defined(__clang__)
-#	pragma GCC diagnostic push
-#	pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#elif defined(_MSC_VER)
-#	pragma warning(push)
-#	pragma warning(disable : 4996)
-#endif
-	if (deviceSupportsPgnListF1()) {
-		for (uint8_t msg = 0; msg < 2; ++msg) {
-			char label[64];
-			std::snprintf(label, sizeof(label), "0x48 GetRxPgnEnableListF1 (msg=%u)", msg);
-			dumpResponse(label,
-			             sendSync(makeCommand(BemCommandId::GetSetRxPgnEnableListF1, {msg})));
-		}
-		for (uint8_t msg = 0; msg < 4; ++msg) {
-			char label[64];
-			std::snprintf(label, sizeof(label), "0x49 GetTxPgnEnableListF1 (msg=%u)", msg);
-			dumpResponse(label,
-			             sendSync(makeCommand(BemCommandId::GetSetTxPgnEnableListF1, {msg})));
-		}
-	} else {
-		std::cout << "=== F1 (0x48/0x49) skipped on this model ===\n";
-	}
-#if defined(__GNUC__) || defined(__clang__)
-#	pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#	pragma warning(pop)
-#endif
 
 	std::cout << "----- end PGN List Wire Diagnostic -----\n\n";
 }

@@ -418,7 +418,7 @@ BST command-to-response ID mapping:
 | `0x43`-`0x45` | GetSetCanInfoField 1-3 | Command |
 | `0x46` | GetSetRxPgnEnable | Command |
 | `0x47` | GetSetTxPgnEnable | Command |
-| `0x48`-`0x4F` | PGN List Management | Command |
+| `0x4A`-`0x4F` | PGN List Management | Command |
 | `0xF0` | StartupStatus | Unsolicited |
 | `0xF1` | ErrorReport | Unsolicited |
 | `0xF2` | SystemStatus | Unsolicited |

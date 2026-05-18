@@ -12,19 +12,12 @@ batch of changes.
 | Get Supported PGN List | `0x40` | `buildGetSupportedPgnList()` |
 | Get/Set Rx PGN Enable | `0x46` | `buildGetRxPgnEnable()`, `buildSetRxPgnEnable()`, `buildSetRxPgnEnableWithMask()` |
 | Get/Set Tx PGN Enable | `0x47` | `buildGetTxPgnEnable()`, `buildSetTxPgnEnable()`, `buildSetTxPgnEnableWithRate()` |
-| Rx PGN Enable List F1 (legacy) | `0x48` | `buildGetRxPgnEnableListF1()` |
-| Tx PGN Enable List F1 (legacy) | `0x49` | `buildGetTxPgnEnableListF1()` |
 | Delete PGN Enable Lists | `0x4A` | `buildDeletePgnEnableLists()` |
 | Activate PGN Enable Lists | `0x4B` | `buildActivatePgnEnableLists()` |
 | Default PGN Enable List | `0x4C` | `buildDefaultPgnEnableList()` |
 | Params PGN Enable Lists | `0x4D` | `buildGetParamsPgnEnableLists()` |
 | Rx PGN Enable List F2 | `0x4E` | `buildGetRxPgnEnableListF2()`, `buildSetRxPgnEnableListF2()` |
 | Tx PGN Enable List F2 | `0x4F` | `buildGetTxPgnEnableListF2()`, `buildSetTxPgnEnableListF2()` |
-
-> **F1 vs F2.** F1 is the legacy multi-message format; F2 is the modern
-> single-list format. **NGX-1** does not support F1 and only responds to
-> F2 commands &mdash; check the device model before sending F1 reads. See
-> [`bem_types.hpp`](../../src/protocols/bem/bem_types.hpp) for `ArlModelId::NGX1`.
 
 ---
 
@@ -169,31 +162,6 @@ std::vector<TxPgnEnableEntry> entries = {
 };
 bem.buildSetTxPgnEnableListF2(entries, frame, err);
 ```
-
----
-
-## Legacy: PGN Enable List F1 (`0x48` / `0x49`)
-
-Format-1 lists are split across multiple BST messages; the host requests
-them by message index. Read-only via the C++ SDK helpers (use F2 setters
-to write).
-
-```cpp
-[[nodiscard]] bool buildGetRxPgnEnableListF1(uint8_t messageIndex,
-                                             std::vector<uint8_t>& outFrame,
-                                             std::string& outError);
-
-[[nodiscard]] bool buildGetTxPgnEnableListF1(uint8_t messageIndex,
-                                             std::vector<uint8_t>& outFrame,
-                                             std::string& outError);
-```
-
-For Rx F1 valid `messageIndex` values are 0-1; for Tx F1 they are 0-3.
-Wire-protocol detail:
-[rx-pgn-enable-list-f1.md](../../../../docs/DataFormats/Binary/bem-detail/rx-pgn-enable-list-f1.md),
-[tx-pgn-enable-list-f1.md](../../../../docs/DataFormats/Binary/bem-detail/tx-pgn-enable-list-f1.md).
-
-> NGX-1 does not implement F1; you'll get a NegativeAck if you ask for it.
 
 ---
 
