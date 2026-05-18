@@ -408,11 +408,11 @@ namespace Actisense
 					result_.proprietary.dp0RawLut.fill(0);
 					result_.proprietary.dp1RawLut.fill(0);
 					const std::size_t dp0Bytes =
-						std::min(msg.propDp0Bitmap.size(),
-								 result_.proprietary.dp0RawLut.size());
+						(std::min)(msg.propDp0Bitmap.size(),
+								   result_.proprietary.dp0RawLut.size());
 					const std::size_t dp1Bytes =
-						std::min(msg.propDp1Bitmap.size(),
-								 result_.proprietary.dp1RawLut.size());
+						(std::min)(msg.propDp1Bitmap.size(),
+								   result_.proprietary.dp1RawLut.size());
 					for (std::size_t i = 0; i < dp0Bytes; ++i) {
 						result_.proprietary.dp0RawLut[i] = msg.propDp0Bitmap[i];
 					}
