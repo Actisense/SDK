@@ -19,6 +19,7 @@
 #include <string>
 #include <string_view>
 
+#include "public/bem_callbacks.hpp"
 #include "public/error.hpp"
 #include "public/hardware_info.hpp"
 #include "public/metrics.hpp"
@@ -39,30 +40,9 @@ namespace Actisense
 		 *******************************************************************************/
 		using SendCompletion = std::function<void(ErrorCode code)>;
 
-		/**************************************************************************/ /**
-		 \brief      Generic BEM result callback (acknowledgement only)
-		 \param[in]  code      ErrorCode::Ok on success, otherwise the failure
-		 \param[in]  errorMsg  Human-readable error description (empty on success)
-		 *******************************************************************************/
-		using BemResultCallback = std::function<void(ErrorCode code, std::string_view errorMsg)>;
-
-		/**************************************************************************/ /**
-		 \brief      Operating-mode callback (used by Session::getOperatingMode)
-		 \param[in]  code      ErrorCode::Ok on success, otherwise the failure
-		 \param[in]  errorMsg  Human-readable error description (empty on success)
-		 \param[in]  mode      Decoded operating mode (empty on failure)
-		 *******************************************************************************/
-		using OperatingModeCallback = std::function<void(
-			ErrorCode code, std::string_view errorMsg, std::optional<OperatingMode> mode)>;
-
-		/**************************************************************************/ /**
-		 \brief      Hardware-info callback (used by Session::getHardwareInfo)
-		 \param[in]  code      ErrorCode::Ok on success, otherwise the failure
-		 \param[in]  errorMsg  Human-readable error description (empty on success)
-		 \param[in]  info      Decoded hardware info (empty on failure)
-		 *******************************************************************************/
-		using HardwareInfoCallback = std::function<void(
-			ErrorCode code, std::string_view errorMsg, const std::optional<HardwareInfo>& info)>;
+		/* Typed BEM callback aliases (BemResultCallback, OperatingModeCallback,
+		   HardwareInfoCallback, plus the verb-specific ones) live in
+		   public/bem_callbacks.hpp — shared between Session and RemoteDevice. */
 
 		/**************************************************************************/ /**
 		 \brief      Abstract session interface for device communication
@@ -152,6 +132,22 @@ namespace Actisense
 			 *******************************************************************************/
 			[[nodiscard]] virtual std::unique_ptr<RemoteDevice>
 			openRemote(uint8_t n2kSourceAddress) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Transport label reported in ResponseOrigin::transportId
+			             on every typed BEM callback this Session (and its
+			             RemoteDevice handles) deliver.
+			 \details    Defaults to a value derived from the open transport
+			             config (e.g. the serial port name "COM5"). Useful when
+			             one user callback aggregates replies from multiple
+			             concurrent Sessions and needs to disambiguate.
+			 *******************************************************************************/
+			[[nodiscard]] virtual std::string_view transportLabel() const noexcept = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Override the transport label used in ResponseOrigin.
+			 *******************************************************************************/
+			virtual void setTransportLabel(std::string label) = 0;
 
 			/**************************************************************************/ /**
 			 \brief      Close the session gracefully

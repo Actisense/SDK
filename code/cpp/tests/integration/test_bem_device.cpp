@@ -1004,8 +1004,8 @@ TEST_F(BemDeviceTest, GetRxPgnEnableListF2)
 	auto f = p.get_future();
 	session_->getRxPgnEnableListF2(
 		std::chrono::seconds(5),
-		[&p](std::optional<RxPgnEnableListF2Result> result, ErrorCode ec,
-			 std::string_view errMsg) {
+		[&p](ErrorCode ec, std::string_view errMsg,
+			 std::optional<RxPgnEnableListF2Result> result, ResponseOrigin) {
 			p.set_value({std::move(result), ec, std::string(errMsg)});
 		});
 
@@ -1027,8 +1027,8 @@ TEST_F(BemDeviceTest, GetTxPgnEnableListF2)
 	auto f = p.get_future();
 	session_->getTxPgnEnableListF2(
 		std::chrono::seconds(5),
-		[&p](std::optional<TxPgnEnableListF2Result> result, ErrorCode ec,
-			 std::string_view errMsg) {
+		[&p](ErrorCode ec, std::string_view errMsg,
+			 std::optional<TxPgnEnableListF2Result> result, ResponseOrigin) {
 			p.set_value({std::move(result), ec, std::string(errMsg)});
 		});
 
@@ -1054,8 +1054,8 @@ TEST_F(BemDeviceTest, GetSupportedPgnList_All)
 	auto f = p.get_future();
 	session_->getSupportedPgnList_All(
 		std::chrono::seconds(5),
-		[&p](std::optional<SupportedPgnListResult> result, ErrorCode ec,
-			 std::string_view errMsg) {
+		[&p](ErrorCode ec, std::string_view errMsg,
+			 std::optional<SupportedPgnListResult> result, ResponseOrigin) {
 			p.set_value({std::move(result), ec, std::string(errMsg)});
 		});
 

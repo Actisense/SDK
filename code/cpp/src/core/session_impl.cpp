@@ -65,6 +65,24 @@ namespace Actisense
 			close();
 		}
 
+		ResponseOrigin SessionImpl::makeLocalOrigin() const {
+			ResponseOrigin origin;
+			origin.n2kSourceAddress = kLocalSrcAddr;
+			origin.transportId = transport_label_;
+			origin.path = TransportPath::Local;
+			origin.receivedAt = std::chrono::steady_clock::now();
+			return origin;
+		}
+
+		ResponseOrigin SessionImpl::makeRemoteOrigin(uint8_t remoteN2kSourceAddress) const {
+			ResponseOrigin origin;
+			origin.n2kSourceAddress = remoteN2kSourceAddress;
+			origin.transportId = transport_label_;
+			origin.path = TransportPath::Remote;
+			origin.receivedAt = std::chrono::steady_clock::now();
+			return origin;
+		}
+
 		void SessionImpl::asyncSend(const std::string& protocol, std::span<const uint8_t> payload,
 									SendCompletion completion) {
 			if (!isConnected()) {
@@ -294,11 +312,39 @@ namespace Actisense
 			std::vector<uint8_t> wrappedPayload;
 			wrapBemInPgn126720(innerBst, wrappedPayload);
 
-			/* PGN 126720 priority is per the Tx PGN object configured in firmware;
-			   3 is the conventional fast-packet proprietary priority that the
-			   ACCompLib reference path uses. */
-			return BstFrame::create94(kPgn126720, targetN2kSourceAddress, wrappedPayload,
-									  /*priority=*/3);
+			/* Hand-roll the BST-94 wrap to match ACCompLib::BSTWrapBSTN2K
+			   byte-for-byte. The generic BstFrame::create94 helper writes
+			   the destination into the PDUS field for PDU1 PGNs (matching
+			   J1939's logical model), but NGT firmware parses the BST-94
+			   wrap with PDUS = the raw PGN low byte (0x00 for PGN 126720).
+			   Sending PDUS = destination here causes the NGT to fail its
+			   PGN-library lookup and reply with ES6_LIBRARY_MATCH_SEARCH_FAILED
+			   (-697). The destination always goes in byte 6 regardless of
+			   PDU class. NGX understands both, but the gateway-in-the-middle
+			   determines what the host must emit; ACCompLib's runtime path
+			   (which Toolkit uses) always emits BST-94 in this format. */
+			constexpr uint8_t kPgnByte0 = static_cast<uint8_t>((kPgn126720) & 0xFF);
+			constexpr uint8_t kPgnByte1 = static_cast<uint8_t>((kPgn126720 >> 8) & 0xFF);
+			constexpr uint8_t kPgnByte2 = static_cast<uint8_t>((kPgn126720 >> 16) & 0x03);
+			constexpr uint8_t kPriority = 3;
+			constexpr uint8_t kFastPacketId = 0;
+
+			const uint8_t dataLen = static_cast<uint8_t>(wrappedPayload.size());
+			const uint8_t storeLen = static_cast<uint8_t>(6 + dataLen); /* priority+pgn(3)+dest+len */
+
+			std::vector<uint8_t> raw;
+			raw.reserve(2 + storeLen);
+			raw.push_back(static_cast<uint8_t>(BstId::Nmea2000_PCToGateway));
+			raw.push_back(storeLen);
+			raw.push_back(kPriority);
+			raw.push_back(kPgnByte0);
+			raw.push_back(kPgnByte1);
+			raw.push_back(kPgnByte2 | (kFastPacketId << 5));
+			raw.push_back(targetN2kSourceAddress);
+			raw.push_back(dataLen);
+			raw.insert(raw.end(), wrappedPayload.begin(), wrappedPayload.end());
+
+			return BstFrame(std::move(raw));
 		}
 
 		void SessionImpl::sendBemCommandRemote(uint8_t targetN2kSourceAddress,
@@ -395,71 +441,87 @@ namespace Actisense
 		void SessionImpl::getOperatingMode(std::chrono::milliseconds timeout,
 										   OperatingModeCallback callback) {
 			getOperatingMode(timeout,
-				[cb = std::move(callback)](const std::optional<BemResponse>& response,
-										   ErrorCode code, std::string_view errorMsg) {
+				[this, cb = std::move(callback)](const std::optional<BemResponse>& response,
+												  ErrorCode code, std::string_view errorMsg) {
 					if (!cb) {
 						return;
 					}
+					ResponseOrigin origin = makeLocalOrigin();
+					if (response) {
+						origin.modelId = response->header.modelId;
+						origin.serialNumber = response->header.serialNumber;
+					}
 					if (code != ErrorCode::Ok || !response) {
-						cb(code, errorMsg, std::nullopt);
+						cb(code, errorMsg, std::nullopt, std::move(origin));
 						return;
 					}
 					if (response->header.errorCode != 0) {
 						cb(ErrorCode::MalformedFrame,
-						   "Device returned BEM error code", std::nullopt);
+						   "Device returned BEM error code", std::nullopt, std::move(origin));
 						return;
 					}
 					OperatingMode decoded{};
 					std::string decodeError;
 					if (!decodeOperatingModeResponse(response->data, decoded, decodeError)) {
-						cb(ErrorCode::MalformedFrame, decodeError, std::nullopt);
+						cb(ErrorCode::MalformedFrame, decodeError, std::nullopt, std::move(origin));
 						return;
 					}
-					cb(ErrorCode::Ok, {}, std::make_optional(decoded));
+					cb(ErrorCode::Ok, {}, std::make_optional(decoded), std::move(origin));
 				});
 		}
 
 		void SessionImpl::setOperatingMode(OperatingMode mode, std::chrono::milliseconds timeout,
 										   BemResultCallback callback) {
 			setOperatingMode(static_cast<uint16_t>(mode), timeout,
-				[cb = std::move(callback)](const std::optional<BemResponse>& response,
-										   ErrorCode code, std::string_view errorMsg) {
+				[this, cb = std::move(callback)](const std::optional<BemResponse>& response,
+												  ErrorCode code, std::string_view errorMsg) {
 					if (!cb) {
 						return;
 					}
+					ResponseOrigin origin = makeLocalOrigin();
+					if (response) {
+						origin.modelId = response->header.modelId;
+						origin.serialNumber = response->header.serialNumber;
+					}
 					if (code != ErrorCode::Ok || !response) {
-						cb(code, errorMsg);
+						cb(code, errorMsg, std::move(origin));
 						return;
 					}
 					if (response->header.errorCode != 0) {
-						cb(ErrorCode::MalformedFrame, "Device returned BEM error code");
+						cb(ErrorCode::MalformedFrame, "Device returned BEM error code",
+						   std::move(origin));
 						return;
 					}
-					cb(ErrorCode::Ok, {});
+					cb(ErrorCode::Ok, {}, std::move(origin));
 				});
 		}
 
 		void SessionImpl::getHardwareInfo(std::chrono::milliseconds timeout,
 										  HardwareInfoCallback callback) {
 			getProductInfo(timeout,
-				[cb = std::move(callback)](const std::optional<BemResponse>& response,
-										   ErrorCode code, std::string_view errorMsg) {
+				[this, cb = std::move(callback)](const std::optional<BemResponse>& response,
+												  ErrorCode code, std::string_view errorMsg) {
 					if (!cb) {
 						return;
 					}
+					ResponseOrigin origin = makeLocalOrigin();
+					if (response) {
+						origin.modelId = response->header.modelId;
+						origin.serialNumber = response->header.serialNumber;
+					}
 					if (code != ErrorCode::Ok || !response) {
-						cb(code, errorMsg, std::nullopt);
+						cb(code, errorMsg, std::nullopt, std::move(origin));
 						return;
 					}
 					if (response->header.errorCode != 0) {
 						cb(ErrorCode::MalformedFrame,
-						   "Device returned BEM error code", std::nullopt);
+						   "Device returned BEM error code", std::nullopt, std::move(origin));
 						return;
 					}
 					ProductInfoResponse decoded;
 					std::string decodeError;
 					if (!decodeProductInfoResponse(response->data, decoded, decodeError)) {
-						cb(ErrorCode::MalformedFrame, decodeError, std::nullopt);
+						cb(ErrorCode::MalformedFrame, decodeError, std::nullopt, std::move(origin));
 						return;
 					}
 					HardwareInfo info;
@@ -471,7 +533,7 @@ namespace Actisense
 					info.modelSerialCode = decoded.modelSerialCode;
 					info.certificationLevel = decoded.certificationLevel;
 					info.loadEquivalency = decoded.loadEquivalency;
-					cb(ErrorCode::Ok, {}, std::make_optional(std::move(info)));
+					cb(ErrorCode::Ok, {}, std::make_optional(std::move(info)), std::move(origin));
 				});
 		}
 
@@ -749,7 +811,12 @@ namespace Actisense
 			auto state = std::make_shared<State>();
 			state->userCallback = std::move(userCallback);
 
-			auto isComplete = [state, decodeFn](const BemResponse& response) -> bool {
+			auto makeOrigin = [this, srcAddr]() {
+				return srcAddr == kLocalSrcAddr ? makeLocalOrigin()
+												: makeRemoteOrigin(srcAddr);
+			};
+
+			auto isComplete = [state, decodeFn, makeOrigin](const BemResponse& response) -> bool {
 				if (state->delivered) {
 					return true;
 				}
@@ -759,8 +826,8 @@ namespace Actisense
 													   response.data.size()),
 							  decoded, decodeError)) {
 					if (state->userCallback) {
-						state->userCallback(std::nullopt, ErrorCode::InvalidArgument,
-											decodeError);
+						state->userCallback(ErrorCode::InvalidArgument, decodeError,
+											std::nullopt, makeOrigin());
 					}
 					state->delivered = true;
 					return true;
@@ -769,16 +836,16 @@ namespace Actisense
 				const auto status = state->accumulator.feed(decoded, feedError);
 				if (status == PgnListAccumulatorStatus::Mismatch) {
 					if (state->userCallback) {
-						state->userCallback(std::nullopt, ErrorCode::InvalidArgument,
-											feedError);
+						state->userCallback(ErrorCode::InvalidArgument, feedError,
+											std::nullopt, makeOrigin());
 					}
 					state->delivered = true;
 					return true;
 				}
 				if (status == PgnListAccumulatorStatus::Done) {
 					if (state->userCallback) {
-						state->userCallback(state->accumulator.result(), ErrorCode::Ok,
-											std::string_view{});
+						state->userCallback(ErrorCode::Ok, std::string_view{},
+											state->accumulator.result(), makeOrigin());
 					}
 					state->delivered = true;
 					return true;
@@ -786,8 +853,8 @@ namespace Actisense
 				return false;
 			};
 
-			auto perResponseCallback = [state](const std::optional<BemResponse>& response,
-											   ErrorCode ec, std::string_view errMsg) {
+			auto perResponseCallback = [state, makeOrigin](const std::optional<BemResponse>& response,
+														   ErrorCode ec, std::string_view errMsg) {
 				if (state->delivered) {
 					return;
 				}
@@ -798,7 +865,7 @@ namespace Actisense
 						if (acc.initialised()) {
 							partial = acc.result();
 						}
-						state->userCallback(std::move(partial), ec, errMsg);
+						state->userCallback(ec, errMsg, std::move(partial), makeOrigin());
 					}
 					state->delivered = true;
 				}
@@ -835,14 +902,20 @@ namespace Actisense
 			   we clear *sendOne on every terminal path. */
 			auto sendOne = std::make_shared<std::function<void(uint8_t, uint8_t)>>();
 
-			auto deliver = [state, sendOne](std::optional<SupportedPgnListResult> result,
-											ErrorCode ec, std::string_view errMsg) {
+			auto makeOrigin = [this, srcAddr]() {
+				return srcAddr == kLocalSrcAddr ? makeLocalOrigin()
+												: makeRemoteOrigin(srcAddr);
+			};
+
+			auto deliver = [state, sendOne, makeOrigin](
+				std::optional<SupportedPgnListResult> result, ErrorCode ec,
+				std::string_view errMsg) {
 				if (state->delivered) {
 					return;
 				}
 				state->delivered = true;
 				if (state->userCallback) {
-					state->userCallback(std::move(result), ec, errMsg);
+					state->userCallback(ec, errMsg, std::move(result), makeOrigin());
 				}
 				*sendOne = nullptr; /* break sendOne <-> callback cycle */
 			};
@@ -935,7 +1008,8 @@ namespace Actisense
 			std::vector<uint8_t> frame;
 			if (!bem_.encodeCommand(cmd, frame, encodeError)) {
 				if (callback) {
-					callback(std::nullopt, ErrorCode::InvalidArgument, encodeError);
+					callback(ErrorCode::InvalidArgument, encodeError, std::nullopt,
+							 makeLocalOrigin());
 				}
 				return;
 			}
@@ -961,7 +1035,8 @@ namespace Actisense
 			std::vector<uint8_t> frame;
 			if (!bem_.encodeCommand(cmd, frame, encodeError)) {
 				if (callback) {
-					callback(std::nullopt, ErrorCode::InvalidArgument, encodeError);
+					callback(ErrorCode::InvalidArgument, encodeError, std::nullopt,
+							 makeLocalOrigin());
 				}
 				return;
 			}
@@ -990,7 +1065,8 @@ namespace Actisense
 				buildRemoteBemFrame(targetN2kSourceAddress, cmd, encodeError);
 			if (!frame) {
 				if (callback) {
-					callback(std::nullopt, ErrorCode::InvalidArgument, encodeError);
+					callback(ErrorCode::InvalidArgument, encodeError, std::nullopt,
+							 makeRemoteOrigin(targetN2kSourceAddress));
 				}
 				return;
 			}
@@ -1021,7 +1097,8 @@ namespace Actisense
 				buildRemoteBemFrame(targetN2kSourceAddress, cmd, encodeError);
 			if (!frame) {
 				if (callback) {
-					callback(std::nullopt, ErrorCode::InvalidArgument, encodeError);
+					callback(ErrorCode::InvalidArgument, encodeError, std::nullopt,
+							 makeRemoteOrigin(targetN2kSourceAddress));
 				}
 				return;
 			}
@@ -1389,6 +1466,7 @@ namespace Actisense
 
 			auto session = std::make_unique<SessionImpl>(
 				std::move(transport), std::move(eventCallback), std::move(errorCallback));
+			session->setTransportLabel(config.port);
 
 			session->startReceiving();
 

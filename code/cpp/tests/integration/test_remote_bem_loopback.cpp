@@ -330,7 +330,8 @@ TEST_F(RemoteBemLoopbackTest, GetOperatingMode_RoundTripsThroughPgn126720)
 	std::promise<std::tuple<ErrorCode, std::string, std::optional<OperatingMode>>>
 		promise;
 	remote->getOperatingMode(std::chrono::seconds(2),
-		[&](ErrorCode ec, std::string_view msg, std::optional<OperatingMode> m) {
+		[&](ErrorCode ec, std::string_view msg, std::optional<OperatingMode> m,
+		    ResponseOrigin) {
 			promise.set_value({ec, std::string(msg), m});
 		});
 
@@ -383,7 +384,7 @@ TEST_F(RemoteBemLoopbackTest, SetOperatingMode_AckedReply)
 	std::promise<std::pair<ErrorCode, std::string>> promise;
 	remote->setOperatingMode(
 		OperatingMode::OM_NGTransferNormalMode, std::chrono::seconds(2),
-		[&](ErrorCode ec, std::string_view msg) {
+		[&](ErrorCode ec, std::string_view msg, ResponseOrigin) {
 			promise.set_value({ec, std::string(msg)});
 		});
 
@@ -409,7 +410,8 @@ TEST_F(RemoteBemLoopbackTest, DeviceErrorCode_SurfacesAsError)
 	std::promise<std::tuple<ErrorCode, std::string, std::optional<OperatingMode>>>
 		promise;
 	remote->getOperatingMode(std::chrono::seconds(2),
-		[&](ErrorCode ec, std::string_view msg, std::optional<OperatingMode> m) {
+		[&](ErrorCode ec, std::string_view msg, std::optional<OperatingMode> m,
+		    ResponseOrigin) {
 			promise.set_value({ec, std::string(msg), m});
 		});
 
@@ -442,7 +444,7 @@ TEST_F(RemoteBemLoopbackTest, ReplyFromWrongSourceAddressDoesNotResolve)
 	std::atomic<bool> fired{false};
 	remote->getOperatingMode(std::chrono::milliseconds(400),
 		[&](ErrorCode /*ec*/, std::string_view /*msg*/,
-			std::optional<OperatingMode> /*m*/) { fired.store(true); });
+			std::optional<OperatingMode> /*m*/, ResponseOrigin /*origin*/) { fired.store(true); });
 
 	auto sent = gateway_->waitForSent(std::chrono::seconds(1));
 	ASSERT_TRUE(sent.has_value());
@@ -578,11 +580,11 @@ namespace
 TEST_F(RemoteBemLoopbackTest, GetRxPgnEnableListF2_AggregatesMultiReplyTrain)
 {
 	auto remote = session_->openRemote(kRemoteAddr);
-	auto* impl = static_cast<RemoteDeviceImpl*>(remote.get());
 
 	std::promise<std::tuple<ErrorCode, std::optional<RxPgnEnableListF2Result>>> promise;
-	impl->getRxPgnEnableListF2(std::chrono::seconds(2),
-		[&](std::optional<RxPgnEnableListF2Result> r, ErrorCode ec, std::string_view) {
+	remote->getRxPgnEnableListF2(std::chrono::seconds(2),
+		[&](ErrorCode ec, std::string_view, std::optional<RxPgnEnableListF2Result> r,
+		    ResponseOrigin) {
 			promise.set_value({ec, std::move(r)});
 		});
 
@@ -631,11 +633,11 @@ TEST_F(RemoteBemLoopbackTest, GetRxPgnEnableListF2_AggregatesMultiReplyTrain)
 TEST_F(RemoteBemLoopbackTest, GetTxPgnEnableListF2_TerminatesOnProprietaryMessage)
 {
 	auto remote = session_->openRemote(kRemoteAddr);
-	auto* impl = static_cast<RemoteDeviceImpl*>(remote.get());
 
 	std::promise<std::tuple<ErrorCode, std::optional<TxPgnEnableListF2Result>>> promise;
-	impl->getTxPgnEnableListF2(std::chrono::seconds(2),
-		[&](std::optional<TxPgnEnableListF2Result> r, ErrorCode ec, std::string_view) {
+	remote->getTxPgnEnableListF2(std::chrono::seconds(2),
+		[&](ErrorCode ec, std::string_view, std::optional<TxPgnEnableListF2Result> r,
+		    ResponseOrigin) {
 			promise.set_value({ec, std::move(r)});
 		});
 
@@ -684,11 +686,11 @@ TEST_F(RemoteBemLoopbackTest, GetTxPgnEnableListF2_TerminatesOnProprietaryMessag
 TEST_F(RemoteBemLoopbackTest, GetSupportedPgnList_All_WalksChunksOverWrappedRoundTrip)
 {
 	auto remote = session_->openRemote(kRemoteAddr);
-	auto* impl = static_cast<RemoteDeviceImpl*>(remote.get());
 
 	std::promise<std::tuple<ErrorCode, std::optional<SupportedPgnListResult>>> promise;
-	impl->getSupportedPgnList_All(std::chrono::seconds(2),
-		[&](std::optional<SupportedPgnListResult> r, ErrorCode ec, std::string_view) {
+	remote->getSupportedPgnList_All(std::chrono::seconds(2),
+		[&](ErrorCode ec, std::string_view, std::optional<SupportedPgnListResult> r,
+		    ResponseOrigin) {
 			promise.set_value({ec, std::move(r)});
 		});
 
@@ -734,11 +736,11 @@ TEST_F(RemoteBemLoopbackTest, GetSupportedPgnList_All_WalksChunksOverWrappedRoun
 TEST_F(RemoteBemLoopbackTest, GetRxPgnEnableListF2_TimeoutDeliversPartialResult)
 {
 	auto remote = session_->openRemote(kRemoteAddr);
-	auto* impl = static_cast<RemoteDeviceImpl*>(remote.get());
 
 	std::promise<std::tuple<ErrorCode, std::optional<RxPgnEnableListF2Result>>> promise;
-	impl->getRxPgnEnableListF2(std::chrono::milliseconds(100),
-		[&](std::optional<RxPgnEnableListF2Result> r, ErrorCode ec, std::string_view) {
+	remote->getRxPgnEnableListF2(std::chrono::milliseconds(100),
+		[&](ErrorCode ec, std::string_view, std::optional<RxPgnEnableListF2Result> r,
+		    ResponseOrigin) {
 			promise.set_value({ec, std::move(r)});
 		});
 

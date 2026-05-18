@@ -24,7 +24,10 @@
 /* Dependent includes ------------------------------------------------------- */
 #include <chrono>
 #include <cstdint>
+#include <span>
+#include <string>
 
+#include "public/bem_callbacks.hpp"
 #include "public/session.hpp"
 
 namespace Actisense
@@ -101,6 +104,241 @@ namespace Actisense
 			 *******************************************************************************/
 			virtual void commitToFlash(std::chrono::milliseconds timeout,
 									   BemResultCallback callback) = 0;
+
+			/* Port baudrate ----------------------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Get a port's baudrate (session + stored values + total
+			             port count + protocol).
+			 \param[in]  portNumber  Port to query (0-based)
+			 \param[in]  timeout     Response timeout
+			 \param[in]  callback    Invoked with decoded PortBaudrateResponse
+			 *******************************************************************************/
+			virtual void getPortBaudrate(uint8_t portNumber,
+										 std::chrono::milliseconds timeout,
+										 PortBaudrateCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Set a port's session and/or stored baudrate.
+			 \param[in]  portNumber   Port to configure (0-based)
+			 \param[in]  sessionBaud  Session baudrate (kBaudRateNoChange to skip)
+			 \param[in]  storeBaud    Stored baudrate (kBaudRateNoChange to skip)
+			 \param[in]  timeout      Response timeout
+			 \param[in]  callback     Invoked with the device's acknowledgement
+			 *******************************************************************************/
+			virtual void setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud,
+										 uint32_t storeBaud,
+										 std::chrono::milliseconds timeout,
+										 BemResultCallback callback) = 0;
+
+			/* Port P-Code ------------------------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Get the device's per-port P-Code values.
+			 *******************************************************************************/
+			virtual void getPortPCode(std::chrono::milliseconds timeout,
+									  PortPCodeCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Set per-port P-Code values.
+			 \param[in]  pCodes    One P-Code value per port
+			 *******************************************************************************/
+			virtual void setPortPCode(std::span<const uint8_t> pCodes,
+									  std::chrono::milliseconds timeout,
+									  BemResultCallback callback) = 0;
+
+			/* Rx PGN Enable ----------------------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Get the Rx-enable state for a single PGN.
+			 *******************************************************************************/
+			virtual void getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+										RxPgnEnableCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Set the Rx-enable state for a single PGN.
+			 \param[in]  pgn     PGN to configure
+			 \param[in]  enable  0 = disabled, 1 = enabled, 2 = respond mode
+			 *******************************************************************************/
+			virtual void setRxPgnEnable(uint32_t pgn, uint8_t enable,
+										std::chrono::milliseconds timeout,
+										BemResultCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Set Rx-enable for a PGN with an explicit instance/group mask.
+			 *******************************************************************************/
+			virtual void setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
+												std::chrono::milliseconds timeout,
+												BemResultCallback callback) = 0;
+
+			/* Tx PGN Enable ----------------------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Get the Tx-enable state for a single PGN.
+			 *******************************************************************************/
+			virtual void getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+										TxPgnEnableCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Set the Tx-enable state for a single PGN.
+			 *******************************************************************************/
+			virtual void setTxPgnEnable(uint32_t pgn, uint8_t enable,
+										std::chrono::milliseconds timeout,
+										BemResultCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Set Tx-enable for a PGN with an explicit transmit rate (ms).
+			 *******************************************************************************/
+			virtual void setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable,
+												uint32_t txRate,
+												std::chrono::milliseconds timeout,
+												BemResultCallback callback) = 0;
+
+			/* Aggregated PGN-list verbs ---------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Fetch the full Rx PGN Enable List F2 (multi-message walk).
+			 \param[in]  inactivityTimeout  Per-message timeout
+			 *******************************************************************************/
+			virtual void getRxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
+											  RxPgnEnableListF2ResultCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Fetch the full Tx PGN Enable List F2 (multi-message walk +
+			             trailing proprietary bitmap).
+			 *******************************************************************************/
+			virtual void getTxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
+											  TxPgnEnableListF2ResultCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Fetch one sub-list of the Supported PGN List (0x40).
+			 \details    Caller drives the walk by re-issuing with the device's
+			             returned transferId and the next index. For the common
+			             "give me the whole thing" use case, prefer
+			             getSupportedPgnList_All.
+			 *******************************************************************************/
+			virtual void getSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
+											 std::chrono::milliseconds timeout,
+											 BemResultCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Walk the device's Supported PGN List end-to-end and
+			             deliver the merged result.
+			 *******************************************************************************/
+			virtual void getSupportedPgnList_All(std::chrono::milliseconds perGetTimeout,
+												 SupportedPgnListResultCallback callback) = 0;
+
+			/* Total time ------------------------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Get the device's total operating time.
+			 *******************************************************************************/
+			virtual void getTotalTime(std::chrono::milliseconds timeout,
+									  TotalTimeCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Set the device's total operating time (requires passkey).
+			 *******************************************************************************/
+			virtual void setTotalTime(uint32_t totalTime, uint32_t passkey,
+									  std::chrono::milliseconds timeout,
+									  BemResultCallback callback) = 0;
+
+			/* Echo -------------------------------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Round-trip up to 252 bytes through the remote device.
+			 *******************************************************************************/
+			virtual void echo(std::span<const uint8_t> data,
+							  std::chrono::milliseconds timeout,
+							  EchoCallback callback) = 0;
+
+			/* Product info ----------------------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Get the raw Product Information record from the remote device.
+			 \details    Use getHardwareInfo() if you want the SDK's curated
+			             HardwareInfo view; this verb returns the wire-level
+			             ProductInfoResponse with its raw byte field layout.
+			 *******************************************************************************/
+			virtual void getProductInfo(std::chrono::milliseconds timeout,
+										ProductInfoCallback callback) = 0;
+
+			/* CAN config / info ------------------------------------------------ */
+
+			/**************************************************************************/ /**
+			 \brief      Get the device's NMEA 2000 NAME + stored source address.
+			 *******************************************************************************/
+			virtual void getCanConfig(std::chrono::milliseconds timeout,
+									  CanConfigCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Set the device's NMEA 2000 NAME and stored preferred SA.
+			 *******************************************************************************/
+			virtual void setCanConfig(uint64_t name, uint8_t sourceAddress,
+									  std::chrono::milliseconds timeout,
+									  BemResultCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Get CAN Info Field 1 (Installation Description 1).
+			 *******************************************************************************/
+			virtual void getCanInfoField1(std::chrono::milliseconds timeout,
+										  CanInfoFieldCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Set CAN Info Field 1 (max 70 chars).
+			 *******************************************************************************/
+			virtual void setCanInfoField1(const std::string& text,
+										  std::chrono::milliseconds timeout,
+										  BemResultCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Get CAN Info Field 2 (Installation Description 2).
+			 *******************************************************************************/
+			virtual void getCanInfoField2(std::chrono::milliseconds timeout,
+										  CanInfoFieldCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Set CAN Info Field 2 (max 70 chars).
+			 *******************************************************************************/
+			virtual void setCanInfoField2(const std::string& text,
+										  std::chrono::milliseconds timeout,
+										  BemResultCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Get CAN Info Field 3 (Manufacturer Info, read-only).
+			 *******************************************************************************/
+			virtual void getCanInfoField3(std::chrono::milliseconds timeout,
+										  CanInfoFieldCallback callback) = 0;
+
+			/* PGN enable-list management --------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Delete (clear) PGN enable list(s).
+			 \param[in]  selector  0=Rx, 1=Tx, 2=Both
+			 *******************************************************************************/
+			virtual void deletePgnEnableLists(uint8_t selector,
+											  std::chrono::milliseconds timeout,
+											  BemResultCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Activate the device's session PGN-enable lists.
+			 *******************************************************************************/
+			virtual void activatePgnEnableLists(std::chrono::milliseconds timeout,
+												BemResultCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Restore the operating-mode default Rx/Tx enable list(s).
+			 *******************************************************************************/
+			virtual void defaultPgnEnableList(DeletePgnListSelector selector,
+											  std::chrono::milliseconds timeout,
+											  BemResultCallback callback) = 0;
+
+			/**************************************************************************/ /**
+			 \brief      Query the parameters / status of the device's PGN enable
+			             lists.
+			 *******************************************************************************/
+			virtual void getParamsPgnEnableLists(std::chrono::milliseconds timeout,
+												 ParamsPgnEnableListsCallback callback) = 0;
 
 		protected:
 			RemoteDevice() = default;

@@ -244,7 +244,8 @@ TEST_F(SessionPgnListManagementTest, GetSupportedPgnList_All_ThreeChunkWalkMerge
 	bool callbackFired = false;
 
 	session_->getSupportedPgnList_All(kTimeout,
-		[&](std::optional<SupportedPgnListResult> r, ErrorCode ec, std::string_view) {
+		[&](ErrorCode ec, std::string_view, std::optional<SupportedPgnListResult> r,
+			ResponseOrigin) {
 			capturedResult = std::move(r);
 			capturedCode = ec;
 			callbackFired = true;
@@ -326,7 +327,8 @@ TEST_F(SessionPgnListManagementTest, GetSupportedPgnList_All_TimeoutMidWalkDeliv
 	   pending entry is registered will fire the inactivity branch. */
 	const auto kPerGet = std::chrono::milliseconds(0);
 	session_->getSupportedPgnList_All(kPerGet,
-		[&](std::optional<SupportedPgnListResult> r, ErrorCode ec, std::string_view) {
+		[&](ErrorCode ec, std::string_view, std::optional<SupportedPgnListResult> r,
+			ResponseOrigin) {
 			capturedResult = std::move(r);
 			capturedCode = ec;
 			callbackFired = true;

@@ -612,7 +612,7 @@ TEST_F(SessionEblWireTraceTest, BemCommandTxBytesMatchEncodedFrame)
 	}();
 
 	session_->getOperatingMode(std::chrono::milliseconds(50),
-		[](ErrorCode, std::string_view, std::optional<OperatingMode>) {});
+		[](ErrorCode, std::string_view, std::optional<OperatingMode>, ResponseOrigin) {});
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(150));
 

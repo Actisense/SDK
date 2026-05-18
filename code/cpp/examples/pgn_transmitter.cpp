@@ -405,7 +405,8 @@ int main(int argc, char* argv[]) {
 	if (restoreMode) {
 		SyncSignal sig;
 		session->getOperatingMode(2s, [&](ErrorCode code, std::string_view msg,
-										  std::optional<OperatingMode> mode) {
+										  std::optional<OperatingMode> mode,
+										  ResponseOrigin) {
 			if (code == ErrorCode::Ok && mode) {
 				previousMode = mode;
 				std::cout << "[INIT] Captured prior operating mode: "
@@ -427,7 +428,7 @@ int main(int argc, char* argv[]) {
 	{
 		SyncSignal sig;
 		session->setOperatingMode(OperatingMode::OM_NGTransferNormalMode, 5s,
-			[&](ErrorCode code, std::string_view msg) {
+			[&](ErrorCode code, std::string_view msg, ResponseOrigin) {
 				if (code == ErrorCode::Ok) {
 					modeSet = true;
 					std::cout << "[INIT] Operating mode set.\n";
@@ -448,7 +449,8 @@ int main(int argc, char* argv[]) {
 	{
 		SyncSignal sig;
 		session->getHardwareInfo(5s, [&](ErrorCode code, std::string_view msg,
-										 const std::optional<HardwareInfo>& info) {
+										 const std::optional<HardwareInfo>& info,
+										 ResponseOrigin) {
 			if (code == ErrorCode::Ok && info) {
 				std::cout << "[INFO] Model: " << info->modelId
 						  << "  S/N: " << info->modelSerialCode
@@ -559,7 +561,7 @@ int main(int argc, char* argv[]) {
 				  << "\n";
 		SyncSignal sig;
 		session->setOperatingMode(*previousMode, 3s,
-			[&](ErrorCode code, std::string_view msg) {
+			[&](ErrorCode code, std::string_view msg, ResponseOrigin) {
 				if (code != ErrorCode::Ok) {
 					std::cerr << "[WARN] Restore mode failed: " << msg << "\n";
 				}

@@ -6,6 +6,10 @@ add_sdk_test(test_bdtp_loopback test_bdtp_loopback.cpp)
 add_sdk_test(test_bem_device test_bem_device.cpp)
 # Remote BEM via PGN 126720 wrapping over a fake-gateway loopback (GIT-88)
 add_sdk_test(test_remote_bem_loopback test_remote_bem_loopback.cpp)
+# Remote BEM sweep against a real remote device on the N2K bus (GIT-92)
+# Requires ACTISENSE_TEST_PORT (local gateway) and optionally
+# ACTISENSE_TEST_REMOTE_ADDR (defaults to 200).
+add_sdk_test(test_bem_remote_device test_bem_remote_device.cpp)
 
 # Add integration test files here as they are developed
 

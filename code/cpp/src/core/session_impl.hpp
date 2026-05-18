@@ -34,26 +34,9 @@ namespace Actisense
 {
 	namespace Sdk
 	{
-		/**************************************************************************/ /**
-		 \brief      Callback delivered the fully-aggregated Rx PGN Enable
-		             List F2 result (or an error / timeout).
-		 *******************************************************************************/
-		using RxPgnEnableListF2ResultCallback = std::function<void(
-			std::optional<RxPgnEnableListF2Result>, ErrorCode, std::string_view)>;
-
-		/**************************************************************************/ /**
-		 \brief      Callback delivered the fully-aggregated Tx PGN Enable
-		             List F2 result (or an error / timeout).
-		 *******************************************************************************/
-		using TxPgnEnableListF2ResultCallback = std::function<void(
-			std::optional<TxPgnEnableListF2Result>, ErrorCode, std::string_view)>;
-
-		/**************************************************************************/ /**
-		 \brief      Callback delivered the fully-aggregated Supported PGN
-		             List result from a chunked walk (or an error / timeout).
-		 *******************************************************************************/
-		using SupportedPgnListResultCallback = std::function<void(
-			std::optional<SupportedPgnListResult>, ErrorCode, std::string_view)>;
+		/* RxPgnEnableListF2ResultCallback, TxPgnEnableListF2ResultCallback,
+		   SupportedPgnListResultCallback now live in public/bem_callbacks.hpp
+		   (included transitively via public/session.hpp). */
 
 		/**************************************************************************/ /**
 		 \brief      Concrete session implementation
@@ -96,6 +79,30 @@ namespace Actisense
 
 			[[nodiscard]] std::unique_ptr<RemoteDevice>
 			openRemote(uint8_t n2kSourceAddress) override;
+
+			[[nodiscard]] std::string_view transportLabel() const noexcept override {
+				return transport_label_;
+			}
+
+			void setTransportLabel(std::string label) override {
+				transport_label_ = std::move(label);
+			}
+
+			/**************************************************************************/ /**
+			 \brief      Build a ResponseOrigin for a reply that came back over
+			             this session via the direct (local-gateway) BEM path.
+			 \details    Stamps the current steady-clock time; intended to be
+			             called at the moment a typed callback is about to fire.
+			 *******************************************************************************/
+			[[nodiscard]] ResponseOrigin makeLocalOrigin() const;
+
+			/**************************************************************************/ /**
+			 \brief      Build a ResponseOrigin for a reply unwrapped from a
+			             PGN 126720 round-trip via this session's gateway.
+			 \param[in]  remoteN2kSourceAddress  SA of the remote responder.
+			 *******************************************************************************/
+			[[nodiscard]] ResponseOrigin
+			makeRemoteOrigin(uint8_t remoteN2kSourceAddress) const;
 
 			void close() override;
 
@@ -705,6 +712,7 @@ namespace Actisense
 			TransportPtr transport_;
 			EventCallback eventCallback_;
 			ErrorCallback errorCallback_;
+			std::string transport_label_;
 
 			BdtpProtocol bdtp_;
 			BstDecoder bstDecoder_;

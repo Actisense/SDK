@@ -15,10 +15,17 @@
 #include <utility>
 
 #include "core/session_impl.hpp"
+#include "protocols/bem/bem_commands/can_config.hpp"
 #include "protocols/bem/bem_commands/can_info_fields.hpp"
 #include "protocols/bem/bem_commands/echo.hpp"
 #include "protocols/bem/bem_commands/operating_mode.hpp"
+#include "protocols/bem/bem_commands/params_pgn_enable_lists.hpp"
+#include "protocols/bem/bem_commands/port_baudrate.hpp"
+#include "protocols/bem/bem_commands/port_pcode.hpp"
 #include "protocols/bem/bem_commands/product_info.hpp"
+#include "protocols/bem/bem_commands/rx_pgn_enable.hpp"
+#include "protocols/bem/bem_commands/total_time.hpp"
+#include "protocols/bem/bem_commands/tx_pgn_enable.hpp"
 #include "util/endian.hpp"
 
 namespace Actisense
@@ -34,6 +41,85 @@ namespace Actisense
 				cmd.bemId = id;
 				return cmd;
 			}
+
+			/* Translate a BEM response into "ack" semantics: invoke the typed
+			   ack callback with origin, mapping device errorCode != 0 to
+			   ErrorCode::MalformedFrame so callers see a non-Ok result. */
+			/* Populate the responder-identity fields on @p origin from the
+			   BEM reply header. Called when a response is in hand. */
+			void stampOriginFromResponse(ResponseOrigin& origin,
+										 const BemResponse& response) noexcept
+			{
+				origin.modelId = response.header.modelId;
+				origin.serialNumber = response.header.serialNumber;
+			}
+
+			template <typename AckCallback>
+			BemResponseCallback
+			wrapAck(SessionImpl& session, uint8_t srcAddr, AckCallback callback)
+			{
+				return BemResponseCallback{
+					[&session, srcAddr, cb = std::move(callback)](
+						const std::optional<BemResponse>& response, ErrorCode code,
+						std::string_view errorMsg) {
+						if (!cb) {
+							return;
+						}
+						ResponseOrigin origin = session.makeRemoteOrigin(srcAddr);
+						if (response) {
+							stampOriginFromResponse(origin, *response);
+						}
+						if (code != ErrorCode::Ok || !response) {
+							cb(code, errorMsg, std::move(origin));
+							return;
+						}
+						if (response->header.errorCode != 0) {
+							cb(ErrorCode::MalformedFrame,
+							   "Device returned BEM error code", std::move(origin));
+							return;
+						}
+						cb(ErrorCode::Ok, {}, std::move(origin));
+					}};
+			}
+
+			/* Translate a BEM response into a typed get-result: decode and
+			   invoke the typed callback (code, errMsg, optional<value>, origin). */
+			template <typename DecodedT, typename Decoder, typename TypedCallback>
+			BemResponseCallback wrapTyped(SessionImpl& session, uint8_t srcAddr,
+										   Decoder decoder, TypedCallback callback)
+			{
+				return BemResponseCallback{
+					[&session, srcAddr, decoder, cb = std::move(callback)](
+						const std::optional<BemResponse>& response, ErrorCode code,
+						std::string_view errorMsg) {
+						if (!cb) {
+							return;
+						}
+						ResponseOrigin origin = session.makeRemoteOrigin(srcAddr);
+						if (response) {
+							stampOriginFromResponse(origin, *response);
+						}
+						if (code != ErrorCode::Ok || !response) {
+							cb(code, errorMsg, std::nullopt, std::move(origin));
+							return;
+						}
+						if (response->header.errorCode != 0) {
+							cb(ErrorCode::MalformedFrame,
+							   "Device returned BEM error code", std::nullopt,
+							   std::move(origin));
+							return;
+						}
+						DecodedT decoded;
+						std::string decodeError;
+						if (!decoder(response->data, decoded, decodeError)) {
+							cb(ErrorCode::MalformedFrame, decodeError,
+							   std::nullopt, std::move(origin));
+							return;
+						}
+						cb(ErrorCode::Ok, {}, std::make_optional(std::move(decoded)),
+						   std::move(origin));
+					}};
+			}
 		} /* namespace */
 
 		RemoteDeviceImpl::RemoteDeviceImpl(SessionImpl& session, uint8_t n2kSourceAddress) noexcept
@@ -43,29 +129,8 @@ namespace Actisense
 												OperatingModeCallback callback)
 		{
 			getOperatingMode(timeout,
-				BemResponseCallback{
-					[cb = std::move(callback)](const std::optional<BemResponse>& response,
-											   ErrorCode code, std::string_view errorMsg) {
-						if (!cb) {
-							return;
-						}
-						if (code != ErrorCode::Ok || !response) {
-							cb(code, errorMsg, std::nullopt);
-							return;
-						}
-						if (response->header.errorCode != 0) {
-							cb(ErrorCode::MalformedFrame,
-							   "Device returned BEM error code", std::nullopt);
-							return;
-						}
-						OperatingMode decoded{};
-						std::string decodeError;
-						if (!decodeOperatingModeResponse(response->data, decoded, decodeError)) {
-							cb(ErrorCode::MalformedFrame, decodeError, std::nullopt);
-							return;
-						}
-						cb(ErrorCode::Ok, {}, std::make_optional(decoded));
-					}});
+				wrapTyped<OperatingMode>(session_, src_addr_,
+										 &decodeOperatingModeResponse, std::move(callback)));
 		}
 
 		void RemoteDeviceImpl::setOperatingMode(OperatingMode mode,
@@ -73,85 +138,28 @@ namespace Actisense
 												BemResultCallback callback)
 		{
 			setOperatingMode(static_cast<uint16_t>(mode), timeout,
-				BemResponseCallback{
-					[cb = std::move(callback)](const std::optional<BemResponse>& response,
-											   ErrorCode code, std::string_view errorMsg) {
-						if (!cb) {
-							return;
-						}
-						if (code != ErrorCode::Ok || !response) {
-							cb(code, errorMsg);
-							return;
-						}
-						if (response->header.errorCode != 0) {
-							cb(ErrorCode::MalformedFrame, "Device returned BEM error code");
-							return;
-						}
-						cb(ErrorCode::Ok, {});
-					}});
+							 wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDeviceImpl::reInitMainApp(std::chrono::milliseconds timeout,
 											 BemResultCallback callback)
 		{
 			sendBemCommand(makeBemA1(BemCommandId::ReInitMainApp), timeout,
-				[cb = std::move(callback)](const std::optional<BemResponse>& response,
-										   ErrorCode code, std::string_view errorMsg) {
-					if (!cb) {
-						return;
-					}
-					if (code != ErrorCode::Ok || !response) {
-						cb(code, errorMsg);
-						return;
-					}
-					if (response->header.errorCode != 0) {
-						cb(ErrorCode::MalformedFrame, "Device returned BEM error code");
-						return;
-					}
-					cb(ErrorCode::Ok, {});
-				});
+						   wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDeviceImpl::commitToEeprom(std::chrono::milliseconds timeout,
 											  BemResultCallback callback)
 		{
 			sendBemCommand(makeBemA1(BemCommandId::CommitToEeprom), timeout,
-				[cb = std::move(callback)](const std::optional<BemResponse>& response,
-										   ErrorCode code, std::string_view errorMsg) {
-					if (!cb) {
-						return;
-					}
-					if (code != ErrorCode::Ok || !response) {
-						cb(code, errorMsg);
-						return;
-					}
-					if (response->header.errorCode != 0) {
-						cb(ErrorCode::MalformedFrame, "Device returned BEM error code");
-						return;
-					}
-					cb(ErrorCode::Ok, {});
-				});
+						   wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDeviceImpl::commitToFlash(std::chrono::milliseconds timeout,
 											 BemResultCallback callback)
 		{
 			sendBemCommand(makeBemA1(BemCommandId::CommitToFlash), timeout,
-				[cb = std::move(callback)](const std::optional<BemResponse>& response,
-										   ErrorCode code, std::string_view errorMsg) {
-					if (!cb) {
-						return;
-					}
-					if (code != ErrorCode::Ok || !response) {
-						cb(code, errorMsg);
-						return;
-					}
-					if (response->header.errorCode != 0) {
-						cb(ErrorCode::MalformedFrame, "Device returned BEM error code");
-						return;
-					}
-					cb(ErrorCode::Ok, {});
-				});
+						   wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		/* Concrete-only BemResponseCallback verbs ------------------------------ */
@@ -488,24 +496,28 @@ namespace Actisense
 		{
 			getProductInfo(timeout,
 				BemResponseCallback{
-					[cb = std::move(callback)](const std::optional<BemResponse>& response,
-											   ErrorCode code, std::string_view errorMsg) {
+					[&session = session_, srcAddr = src_addr_, cb = std::move(callback)](
+						const std::optional<BemResponse>& response, ErrorCode code,
+						std::string_view errorMsg) {
 						if (!cb) {
 							return;
 						}
+						ResponseOrigin origin = session.makeRemoteOrigin(srcAddr);
 						if (code != ErrorCode::Ok || !response) {
-							cb(code, errorMsg, std::nullopt);
+							cb(code, errorMsg, std::nullopt, std::move(origin));
 							return;
 						}
 						if (response->header.errorCode != 0) {
 							cb(ErrorCode::MalformedFrame,
-							   "Device returned BEM error code", std::nullopt);
+							   "Device returned BEM error code", std::nullopt,
+							   std::move(origin));
 							return;
 						}
 						ProductInfoResponse decoded;
 						std::string decodeError;
 						if (!decodeProductInfoResponse(response->data, decoded, decodeError)) {
-							cb(ErrorCode::MalformedFrame, decodeError, std::nullopt);
+							cb(ErrorCode::MalformedFrame, decodeError, std::nullopt,
+							   std::move(origin));
 							return;
 						}
 						HardwareInfo info;
@@ -517,8 +529,252 @@ namespace Actisense
 						info.modelSerialCode = decoded.modelSerialCode;
 						info.certificationLevel = decoded.certificationLevel;
 						info.loadEquivalency = decoded.loadEquivalency;
-						cb(ErrorCode::Ok, {}, std::make_optional(info));
+						cb(ErrorCode::Ok, {}, std::make_optional(info), std::move(origin));
 					}});
+		}
+
+		/* Public typed-callback overrides (GIT-93) -------------------------------
+		   Each delegates to the BemResponseCallback overload above and wraps the
+		   raw response into the typed callback via wrapAck / wrapTyped helpers,
+		   which also synthesize the ResponseOrigin (path=Remote, sa=src_addr_,
+		   transportId from owning Session). */
+
+		void RemoteDeviceImpl::getPortBaudrate(uint8_t portNumber,
+											   std::chrono::milliseconds timeout,
+											   PortBaudrateCallback callback)
+		{
+			getPortBaudrate(portNumber, timeout,
+				wrapTyped<PortBaudrateResponse>(session_, src_addr_,
+												&decodePortBaudrateResponse,
+												std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud,
+											   uint32_t storeBaud,
+											   std::chrono::milliseconds timeout,
+											   BemResultCallback callback)
+		{
+			setPortBaudrate(portNumber, sessionBaud, storeBaud, timeout,
+							wrapAck(session_, src_addr_, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::getPortPCode(std::chrono::milliseconds timeout,
+											PortPCodeCallback callback)
+		{
+			getPortPCode(timeout,
+						 wrapTyped<PortPCodeResponse>(session_, src_addr_,
+													  &decodePortPCodeResponse,
+													  std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::setPortPCode(std::span<const uint8_t> pCodes,
+											std::chrono::milliseconds timeout,
+											BemResultCallback callback)
+		{
+			setPortPCode(pCodes, timeout,
+						 wrapAck(session_, src_addr_, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::getRxPgnEnable(uint32_t pgn,
+											  std::chrono::milliseconds timeout,
+											  RxPgnEnableCallback callback)
+		{
+			getRxPgnEnable(pgn, timeout,
+						   wrapTyped<RxPgnEnableResponse>(session_, src_addr_,
+														   &decodeRxPgnEnableResponse,
+														   std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::setRxPgnEnable(uint32_t pgn, uint8_t enable,
+											  std::chrono::milliseconds timeout,
+											  BemResultCallback callback)
+		{
+			setRxPgnEnable(pgn, enable, timeout,
+						   wrapAck(session_, src_addr_, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable,
+													  uint32_t mask,
+													  std::chrono::milliseconds timeout,
+													  BemResultCallback callback)
+		{
+			setRxPgnEnableWithMask(pgn, enable, mask, timeout,
+								   wrapAck(session_, src_addr_, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::getTxPgnEnable(uint32_t pgn,
+											  std::chrono::milliseconds timeout,
+											  TxPgnEnableCallback callback)
+		{
+			getTxPgnEnable(pgn, timeout,
+						   wrapTyped<TxPgnEnableResponse>(session_, src_addr_,
+														   &decodeTxPgnEnableResponse,
+														   std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::setTxPgnEnable(uint32_t pgn, uint8_t enable,
+											  std::chrono::milliseconds timeout,
+											  BemResultCallback callback)
+		{
+			setTxPgnEnable(pgn, enable, timeout,
+						   wrapAck(session_, src_addr_, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable,
+													  uint32_t txRate,
+													  std::chrono::milliseconds timeout,
+													  BemResultCallback callback)
+		{
+			setTxPgnEnableWithRate(pgn, enable, txRate, timeout,
+								   wrapAck(session_, src_addr_, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::getSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
+												   std::chrono::milliseconds timeout,
+												   BemResultCallback callback)
+		{
+			/* Single-chunk getter: device may return a useful per-chunk payload,
+			   but for the public ack-shape verb we just surface success/error
+			   semantics — callers wanting the merged result should use
+			   getSupportedPgnList_All instead. */
+			getSupportedPgnList(pgnIndex, transferId, timeout,
+								wrapAck(session_, src_addr_, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::getTotalTime(std::chrono::milliseconds timeout,
+											TotalTimeCallback callback)
+		{
+			getTotalTime(timeout,
+						 wrapTyped<TotalTimeResponse>(session_, src_addr_,
+													   &decodeTotalTimeResponse,
+													   std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::setTotalTime(uint32_t totalTime, uint32_t passkey,
+											std::chrono::milliseconds timeout,
+											BemResultCallback callback)
+		{
+			setTotalTime(totalTime, passkey, timeout,
+						 wrapAck(session_, src_addr_, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::echo(std::span<const uint8_t> data,
+									std::chrono::milliseconds timeout,
+									EchoCallback callback)
+		{
+			echo(data, timeout,
+				 wrapTyped<EchoResponse>(session_, src_addr_,
+										  &decodeEchoResponse, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::getProductInfo(std::chrono::milliseconds timeout,
+											  ProductInfoCallback callback)
+		{
+			getProductInfo(timeout,
+				wrapTyped<ProductInfoResponse>(session_, src_addr_,
+											   &decodeProductInfoResponse,
+											   std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::getCanConfig(std::chrono::milliseconds timeout,
+											CanConfigCallback callback)
+		{
+			getCanConfig(timeout,
+						 wrapTyped<CanConfigResponse>(session_, src_addr_,
+													   &decodeCanConfigResponse,
+													   std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::setCanConfig(uint64_t name, uint8_t sourceAddress,
+											std::chrono::milliseconds timeout,
+											BemResultCallback callback)
+		{
+			setCanConfig(name, sourceAddress, timeout,
+						 wrapAck(session_, src_addr_, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::getCanInfoField1(std::chrono::milliseconds timeout,
+												CanInfoFieldCallback callback)
+		{
+			getCanInfoField1(timeout,
+				wrapTyped<CanInfoFieldResponse>(session_, src_addr_,
+					[](std::span<const uint8_t> d, CanInfoFieldResponse& r, std::string& e) {
+						return decodeCanInfoFieldResponse(d, CanInfoField::InstallationDesc1,
+														   r, e);
+					},
+					std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::setCanInfoField1(const std::string& text,
+												std::chrono::milliseconds timeout,
+												BemResultCallback callback)
+		{
+			setCanInfoField1(text, timeout,
+							 wrapAck(session_, src_addr_, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::getCanInfoField2(std::chrono::milliseconds timeout,
+												CanInfoFieldCallback callback)
+		{
+			getCanInfoField2(timeout,
+				wrapTyped<CanInfoFieldResponse>(session_, src_addr_,
+					[](std::span<const uint8_t> d, CanInfoFieldResponse& r, std::string& e) {
+						return decodeCanInfoFieldResponse(d, CanInfoField::InstallationDesc2,
+														   r, e);
+					},
+					std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::setCanInfoField2(const std::string& text,
+												std::chrono::milliseconds timeout,
+												BemResultCallback callback)
+		{
+			setCanInfoField2(text, timeout,
+							 wrapAck(session_, src_addr_, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::getCanInfoField3(std::chrono::milliseconds timeout,
+												CanInfoFieldCallback callback)
+		{
+			getCanInfoField3(timeout,
+				wrapTyped<CanInfoFieldResponse>(session_, src_addr_,
+					[](std::span<const uint8_t> d, CanInfoFieldResponse& r, std::string& e) {
+						return decodeCanInfoFieldResponse(d, CanInfoField::ManufacturerInfo,
+														   r, e);
+					},
+					std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::deletePgnEnableLists(uint8_t selector,
+													std::chrono::milliseconds timeout,
+													BemResultCallback callback)
+		{
+			deletePgnEnableLists(selector, timeout,
+								 wrapAck(session_, src_addr_, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::activatePgnEnableLists(std::chrono::milliseconds timeout,
+													  BemResultCallback callback)
+		{
+			activatePgnEnableLists(timeout,
+								   wrapAck(session_, src_addr_, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::defaultPgnEnableList(DeletePgnListSelector selector,
+													std::chrono::milliseconds timeout,
+													BemResultCallback callback)
+		{
+			defaultPgnEnableList(selector, timeout,
+								 wrapAck(session_, src_addr_, std::move(callback)));
+		}
+
+		void RemoteDeviceImpl::getParamsPgnEnableLists(std::chrono::milliseconds timeout,
+													   ParamsPgnEnableListsCallback callback)
+		{
+			getParamsPgnEnableLists(timeout,
+				wrapTyped<ParamsPgnEnableListsResponse>(session_, src_addr_,
+														 &decodeParamsPgnEnableListsResponse,
+														 std::move(callback)));
 		}
 
 	} /* namespace Sdk */

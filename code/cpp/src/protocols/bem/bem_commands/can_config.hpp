@@ -158,7 +158,13 @@ namespace Actisense
 		struct CanConfigResponse
 		{
 			Nmea2000Name name;			  ///< NMEA 2000 NAME
-			uint8_t sourceAddress = 0xFE; ///< Current source address (0xFE = not claimed)
+			uint8_t sourceAddress = 0xFE; ///< Stored preferred / previous source address
+										  ///< — i.e. the value last written via SET CAN
+										  ///< Config (0x42), NOT the live ISO 11783-5
+										  ///< claimed SA. Address-claim arbitration on the
+										  ///< bus can move the device's live SA away from
+										  ///< this value (e.g. claim contested, increment
+										  ///< walk). 0xFE = no preferred address stored.
 		};
 
 		/* Helper Functions ----------------------------------------------------- */

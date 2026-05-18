@@ -334,7 +334,7 @@ protected:
 TEST_F(SessionOperatingModeTest, GetOperatingMode_SendsBareCommandWithBemId)
 {
 	session_->getOperatingMode(kTimeout,
-		[](ErrorCode, std::string_view, std::optional<OperatingMode>) {});
+		[](ErrorCode, std::string_view, std::optional<OperatingMode>, ResponseOrigin) {});
 
 	const auto dgm = captureSentDatagram();
 	EXPECT_EQ(dgm.bstId, static_cast<uint8_t>(BstId::Bem_PG_A1));
