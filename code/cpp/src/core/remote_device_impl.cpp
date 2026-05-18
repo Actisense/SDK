@@ -331,6 +331,32 @@ namespace Actisense
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
+		/* Aggregated PGN-list verbs (GIT-90) ------------------------------- */
+
+		void RemoteDeviceImpl::getRxPgnEnableListF2(
+			std::chrono::milliseconds inactivityTimeout,
+			RxPgnEnableListF2ResultCallback callback)
+		{
+			session_.getRxPgnEnableListF2Remote(src_addr_, inactivityTimeout,
+												std::move(callback));
+		}
+
+		void RemoteDeviceImpl::getTxPgnEnableListF2(
+			std::chrono::milliseconds inactivityTimeout,
+			TxPgnEnableListF2ResultCallback callback)
+		{
+			session_.getTxPgnEnableListF2Remote(src_addr_, inactivityTimeout,
+												std::move(callback));
+		}
+
+		void RemoteDeviceImpl::getSupportedPgnList_All(
+			std::chrono::milliseconds perGetTimeout,
+			SupportedPgnListResultCallback callback)
+		{
+			session_.getSupportedPgnList_AllRemote(src_addr_, perGetTimeout,
+												   std::move(callback));
+		}
+
 		void RemoteDeviceImpl::getProductInfo(std::chrono::milliseconds timeout,
 											  BemResponseCallback callback)
 		{

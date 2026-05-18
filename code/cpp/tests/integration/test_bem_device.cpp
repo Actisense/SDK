@@ -1045,6 +1045,34 @@ TEST_F(BemDeviceTest, GetTxPgnEnableListF2)
 	          << " propEnabled=" << result->proprietary.enabledPgns.size() << std::endl;
 }
 
+TEST_F(BemDeviceTest, GetSupportedPgnList_All)
+{
+	/* GIT-86: drive the 0x40 chunked walk via the aggregating Session
+	   verb so the SDK issues follow-up GETs with the device-set
+	   transferId until the whole index→PGN table is in hand. */
+	std::promise<std::tuple<std::optional<SupportedPgnListResult>, ErrorCode, std::string>> p;
+	auto f = p.get_future();
+	session_->getSupportedPgnList_All(
+		std::chrono::seconds(5),
+		[&p](std::optional<SupportedPgnListResult> result, ErrorCode ec,
+			 std::string_view errMsg) {
+			p.set_value({std::move(result), ec, std::string(errMsg)});
+		});
+
+	ASSERT_EQ(f.wait_for(std::chrono::seconds(15)), std::future_status::ready)
+		<< "Supported PGN List walk never completed";
+	auto [result, ec, errMsg] = f.get();
+	ASSERT_EQ(ec, ErrorCode::Ok) << errMsg;
+	ASSERT_TRUE(result.has_value());
+
+	EXPECT_EQ(result->entries.size(), result->totalListSize);
+	std::cout << "Supported PGN List: transferId=" << static_cast<int>(result->transferId)
+	          << " dbVer=" << (result->nmea2000DbVersion / 1000) << "."
+	          << (result->nmea2000DbVersion % 1000)
+	          << " totalListSize=" << static_cast<int>(result->totalListSize)
+	          << " entries=" << result->entries.size() << std::endl;
+}
+
 
 /* ========================================================================== */
 /* GIT-74: PGN List Wire-Format Diagnostic                                    */

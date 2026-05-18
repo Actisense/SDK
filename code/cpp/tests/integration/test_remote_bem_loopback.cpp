@@ -24,6 +24,9 @@
 #include "core/session_impl.hpp"
 #include "protocols/bdtp/bdtp_protocol.hpp"
 #include "protocols/bem/bem_commands/bem_commands.hpp"
+#include "protocols/bem/bem_commands/rx_pgn_enable_list_f2.hpp"
+#include "protocols/bem/bem_commands/supported_pgn_list.hpp"
+#include "protocols/bem/bem_commands/tx_pgn_enable_list_f2.hpp"
 #include "protocols/bem/bem_wrap_126720.hpp"
 #include "protocols/bst/bst_frame.hpp"
 #include "transport/transport.hpp"
@@ -469,6 +472,304 @@ TEST_F(RemoteBemLoopbackTest, ReplyFromWrongSourceAddressDoesNotResolve)
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}
 	EXPECT_TRUE(fired.load());
+}
+
+/* ----------------------------------------------------------------------- */
+/* GIT-90: Aggregated PGN-list verbs over PGN 126720                       */
+/* ----------------------------------------------------------------------- */
+
+namespace
+{
+	/* Build the post-BEM-header payload for one Rx F2 (0x4E) reply message. */
+	std::vector<uint8_t> rxF2Payload(uint8_t xid, uint8_t total, uint8_t first,
+									  std::span<const RxPgnEnableEntry> entries)
+	{
+		std::vector<uint8_t> out;
+		out.reserve(kRxPgnEnableListF2ResponseHeaderSize + 2 * entries.size());
+		out.push_back(xid);
+		/* SVID 0x00001101 LE */
+		out.push_back(0x01);
+		out.push_back(0x11);
+		out.push_back(0x00);
+		out.push_back(0x00);
+		out.push_back(total);
+		out.push_back(first);
+		out.push_back(static_cast<uint8_t>(entries.size()));
+		for (const auto& e : entries) {
+			out.push_back(e.pgnIndex);
+			out.push_back(e.rxMask);
+		}
+		return out;
+	}
+
+	/* Build the post-BEM-header payload for a Tx F2 (0x4F) standard-variant
+	   reply message. */
+	std::vector<uint8_t> txF2StdPayload(uint8_t xid, uint8_t total, uint8_t first,
+										 std::span<const TxPgnEnableEntry> entries)
+	{
+		std::vector<uint8_t> out;
+		out.reserve(kTxPgnEnableListF2StdHeaderSize + 4 * entries.size());
+		out.push_back(xid);
+		/* SVID 0x00001102 LE */
+		out.push_back(0x02);
+		out.push_back(0x11);
+		out.push_back(0x00);
+		out.push_back(0x00);
+		out.push_back(total);
+		out.push_back(first);
+		out.push_back(static_cast<uint8_t>(entries.size()));
+		for (const auto& e : entries) {
+			out.push_back(e.pgnIndex);
+			out.push_back(e.priority);
+			out.push_back(static_cast<uint8_t>(e.rateMs & 0xFF));
+			out.push_back(static_cast<uint8_t>((e.rateMs >> 8) & 0xFF));
+		}
+		return out;
+	}
+
+	/* Build the post-BEM-header payload for a Tx F2 (0x4F) proprietary-variant
+	   reply message — the trailing message that signals end-of-train. */
+	std::vector<uint8_t> txF2PropPayload(uint8_t xid, std::span<const uint8_t> dp0,
+										  std::span<const uint8_t> dp1)
+	{
+		std::vector<uint8_t> out;
+		out.reserve(kTxPgnEnableListF2PropHeaderSize + 2 + dp0.size() + dp1.size());
+		out.push_back(xid);
+		/* SVID 0x00001103 LE */
+		out.push_back(0x03);
+		out.push_back(0x11);
+		out.push_back(0x00);
+		out.push_back(0x00);
+		out.push_back(static_cast<uint8_t>(dp0.size()));
+		out.insert(out.end(), dp0.begin(), dp0.end());
+		out.push_back(static_cast<uint8_t>(dp1.size()));
+		out.insert(out.end(), dp1.begin(), dp1.end());
+		return out;
+	}
+
+	/* Build the post-BEM-header payload for one 0x40 SupportedPgnList reply. */
+	std::vector<uint8_t> supportedPgnListPayload(uint8_t xid, uint16_t dbVer,
+												  uint8_t total, uint8_t first,
+												  std::span<const SupportedPgnEntry> entries)
+	{
+		std::vector<uint8_t> out;
+		out.reserve(kSupportedPgnListResponseHeaderSize + 4 * entries.size());
+		out.push_back(xid);
+		/* SVID 0x00001100 LE */
+		out.push_back(0x00);
+		out.push_back(0x11);
+		out.push_back(0x00);
+		out.push_back(0x00);
+		out.push_back(static_cast<uint8_t>(dbVer & 0xFF));
+		out.push_back(static_cast<uint8_t>((dbVer >> 8) & 0xFF));
+		out.push_back(total);
+		out.push_back(first);
+		out.push_back(static_cast<uint8_t>(entries.size()));
+		for (const auto& e : entries) {
+			out.push_back(e.pgnIndex);
+			out.push_back(static_cast<uint8_t>(e.pgn & 0xFF));
+			out.push_back(static_cast<uint8_t>((e.pgn >> 8) & 0xFF));
+			out.push_back(static_cast<uint8_t>((e.pgn >> 16) & 0xFF));
+		}
+		return out;
+	}
+} /* namespace */
+
+TEST_F(RemoteBemLoopbackTest, GetRxPgnEnableListF2_AggregatesMultiReplyTrain)
+{
+	auto remote = session_->openRemote(kRemoteAddr);
+	auto* impl = static_cast<RemoteDeviceImpl*>(remote.get());
+
+	std::promise<std::tuple<ErrorCode, std::optional<RxPgnEnableListF2Result>>> promise;
+	impl->getRxPgnEnableListF2(std::chrono::seconds(2),
+		[&](std::optional<RxPgnEnableListF2Result> r, ErrorCode ec, std::string_view) {
+			promise.set_value({ec, std::move(r)});
+		});
+
+	auto sent = gateway_->waitForSent(std::chrono::seconds(1));
+	ASSERT_TRUE(sent.has_value()) << "Session did not send anything";
+
+	constexpr uint8_t kXid   = 0x77;
+	constexpr uint8_t kTotal = 5;
+
+	/* Reply #1: indices 0..1 */
+	const std::array<RxPgnEnableEntry, 2> chunk1 = {
+		RxPgnEnableEntry{0, kRxPgnMaskEnabled},
+		RxPgnEnableEntry{1, kRxPgnMaskDisabled}};
+	gateway_->injectRx(buildWrappedReply(
+		kRemoteAddr, BstId::Bem_GP_A0, BemCommandId::GetSetRxPgnEnableListF2,
+		0, 0, 0, 0, rxF2Payload(kXid, kTotal, 0, chunk1)));
+
+	/* Reply #2: indices 2..3 */
+	const std::array<RxPgnEnableEntry, 2> chunk2 = {
+		RxPgnEnableEntry{2, kRxPgnMaskEnabled},
+		RxPgnEnableEntry{3, kRxPgnMaskEnabled}};
+	gateway_->injectRx(buildWrappedReply(
+		kRemoteAddr, BstId::Bem_GP_A0, BemCommandId::GetSetRxPgnEnableListF2,
+		0, 0, 0, 0, rxF2Payload(kXid, kTotal, 2, chunk2)));
+
+	/* Reply #3: index 4 — sub-count sum reaches totalListSize, signals Done. */
+	const std::array<RxPgnEnableEntry, 1> chunk3 = {
+		RxPgnEnableEntry{4, kRxPgnMaskDisabled}};
+	gateway_->injectRx(buildWrappedReply(
+		kRemoteAddr, BstId::Bem_GP_A0, BemCommandId::GetSetRxPgnEnableListF2,
+		0, 0, 0, 0, rxF2Payload(kXid, kTotal, 4, chunk3)));
+
+	auto fut = promise.get_future();
+	ASSERT_EQ(fut.wait_for(std::chrono::seconds(2)), std::future_status::ready);
+	auto [ec, result] = fut.get();
+	EXPECT_EQ(ec, ErrorCode::Ok);
+	ASSERT_TRUE(result.has_value());
+	EXPECT_EQ(result->transferId, kXid);
+	EXPECT_EQ(result->totalListSize, kTotal);
+	ASSERT_EQ(result->entries.size(), kTotal);
+	EXPECT_EQ(result->entries[0].rxMask, kRxPgnMaskEnabled);
+	EXPECT_EQ(result->entries[3].rxMask, kRxPgnMaskEnabled);
+	EXPECT_EQ(result->entries[4].rxMask, kRxPgnMaskDisabled);
+}
+
+TEST_F(RemoteBemLoopbackTest, GetTxPgnEnableListF2_TerminatesOnProprietaryMessage)
+{
+	auto remote = session_->openRemote(kRemoteAddr);
+	auto* impl = static_cast<RemoteDeviceImpl*>(remote.get());
+
+	std::promise<std::tuple<ErrorCode, std::optional<TxPgnEnableListF2Result>>> promise;
+	impl->getTxPgnEnableListF2(std::chrono::seconds(2),
+		[&](std::optional<TxPgnEnableListF2Result> r, ErrorCode ec, std::string_view) {
+			promise.set_value({ec, std::move(r)});
+		});
+
+	auto sent = gateway_->waitForSent(std::chrono::seconds(1));
+	ASSERT_TRUE(sent.has_value());
+
+	constexpr uint8_t kXid      = 0x33;
+	constexpr uint8_t kStdTotal = 2;
+
+	/* Std-variant reply #1: index 0 with one entry. */
+	const std::array<TxPgnEnableEntry, 1> std1 = {
+		TxPgnEnableEntry{0, /*priority=*/3, /*rateMs=*/100}};
+	gateway_->injectRx(buildWrappedReply(
+		kRemoteAddr, BstId::Bem_GP_A0, BemCommandId::GetSetTxPgnEnableListF2,
+		0, 0, 0, 0, txF2StdPayload(kXid, kStdTotal, 0, std1)));
+
+	/* Std-variant reply #2: index 1 with one entry. */
+	const std::array<TxPgnEnableEntry, 1> std2 = {
+		TxPgnEnableEntry{1, /*priority=*/6, /*rateMs=*/500}};
+	gateway_->injectRx(buildWrappedReply(
+		kRemoteAddr, BstId::Bem_GP_A0, BemCommandId::GetSetTxPgnEnableListF2,
+		0, 0, 0, 0, txF2StdPayload(kXid, kStdTotal, 1, std2)));
+
+	/* Proprietary-variant trailer: one bit set in DP0 byte 0 (PGN 0xFF00). */
+	const std::array<uint8_t, 1> dp0{0x01};
+	const std::array<uint8_t, 0> dp1{};
+	gateway_->injectRx(buildWrappedReply(
+		kRemoteAddr, BstId::Bem_GP_A0, BemCommandId::GetSetTxPgnEnableListF2,
+		/*seq=*/2, 0, 0, 0, txF2PropPayload(kXid, dp0, dp1)));
+
+	auto fut = promise.get_future();
+	ASSERT_EQ(fut.wait_for(std::chrono::seconds(2)), std::future_status::ready);
+	auto [ec, result] = fut.get();
+	EXPECT_EQ(ec, ErrorCode::Ok);
+	ASSERT_TRUE(result.has_value());
+	EXPECT_EQ(result->transferId, kXid);
+	EXPECT_EQ(result->totalListSize, kStdTotal);
+	ASSERT_EQ(result->entries.size(), kStdTotal);
+	EXPECT_EQ(result->entries[0].rateMs, 100u);
+	EXPECT_EQ(result->entries[1].rateMs, 500u);
+	EXPECT_TRUE(result->proprietaryReceived);
+	ASSERT_EQ(result->proprietary.enabledPgns.size(), 1u);
+	EXPECT_EQ(result->proprietary.enabledPgns[0], kTxPgnPropDp0Base);
+}
+
+TEST_F(RemoteBemLoopbackTest, GetSupportedPgnList_All_WalksChunksOverWrappedRoundTrip)
+{
+	auto remote = session_->openRemote(kRemoteAddr);
+	auto* impl = static_cast<RemoteDeviceImpl*>(remote.get());
+
+	std::promise<std::tuple<ErrorCode, std::optional<SupportedPgnListResult>>> promise;
+	impl->getSupportedPgnList_All(std::chrono::seconds(2),
+		[&](std::optional<SupportedPgnListResult> r, ErrorCode ec, std::string_view) {
+			promise.set_value({ec, std::move(r)});
+		});
+
+	constexpr uint8_t  kXid     = 0x55;
+	constexpr uint8_t  kTotal   = 3;
+	constexpr uint16_t kDbVer   = 2100;
+
+	/* GET #1 should be wrapped to kRemoteAddr. */
+	auto get1 = gateway_->waitForSent(std::chrono::seconds(1));
+	ASSERT_TRUE(get1.has_value());
+
+	/* Reply #1: indices 0..1. */
+	const std::array<SupportedPgnEntry, 2> chunk1 = {
+		SupportedPgnEntry{0, 0x1F101u},
+		SupportedPgnEntry{1, 0x1F102u}};
+	gateway_->injectRx(buildWrappedReply(
+		kRemoteAddr, BstId::Bem_GP_A0, BemCommandId::GetSupportedPgnList,
+		0, 0, 0, 0, supportedPgnListPayload(kXid, kDbVer, kTotal, 0, chunk1)));
+
+	/* SDK should now send GET #2 (wrapped + addressed to kRemoteAddr). */
+	auto get2 = gateway_->waitForSent(std::chrono::seconds(1));
+	ASSERT_TRUE(get2.has_value()) << "SDK did not issue follow-up GET for remote walk";
+
+	/* Reply #2 (final): index 2. */
+	const std::array<SupportedPgnEntry, 1> chunk2 = {
+		SupportedPgnEntry{2, 0x1F103u}};
+	gateway_->injectRx(buildWrappedReply(
+		kRemoteAddr, BstId::Bem_GP_A0, BemCommandId::GetSupportedPgnList,
+		0, 0, 0, 0, supportedPgnListPayload(kXid, kDbVer, kTotal, 2, chunk2)));
+
+	auto fut = promise.get_future();
+	ASSERT_EQ(fut.wait_for(std::chrono::seconds(2)), std::future_status::ready);
+	auto [ec, result] = fut.get();
+	EXPECT_EQ(ec, ErrorCode::Ok);
+	ASSERT_TRUE(result.has_value());
+	EXPECT_EQ(result->transferId, kXid);
+	EXPECT_EQ(result->totalListSize, kTotal);
+	ASSERT_EQ(result->entries.size(), kTotal);
+	EXPECT_EQ(result->entries[0].pgn, 0x1F101u);
+	EXPECT_EQ(result->entries[2].pgn, 0x1F103u);
+}
+
+TEST_F(RemoteBemLoopbackTest, GetRxPgnEnableListF2_TimeoutDeliversPartialResult)
+{
+	auto remote = session_->openRemote(kRemoteAddr);
+	auto* impl = static_cast<RemoteDeviceImpl*>(remote.get());
+
+	std::promise<std::tuple<ErrorCode, std::optional<RxPgnEnableListF2Result>>> promise;
+	impl->getRxPgnEnableListF2(std::chrono::milliseconds(100),
+		[&](std::optional<RxPgnEnableListF2Result> r, ErrorCode ec, std::string_view) {
+			promise.set_value({ec, std::move(r)});
+		});
+
+	auto sent = gateway_->waitForSent(std::chrono::seconds(1));
+	ASSERT_TRUE(sent.has_value());
+
+	/* Inject only the first sub-list; nothing more arrives within the
+	   100ms inactivity window. */
+	constexpr uint8_t kXid   = 0x99;
+	constexpr uint8_t kTotal = 5;
+	const std::array<RxPgnEnableEntry, 2> chunk1 = {
+		RxPgnEnableEntry{0, kRxPgnMaskEnabled},
+		RxPgnEnableEntry{1, kRxPgnMaskEnabled}};
+	gateway_->injectRx(buildWrappedReply(
+		kRemoteAddr, BstId::Bem_GP_A0, BemCommandId::GetSetRxPgnEnableListF2,
+		0, 0, 0, 0, rxF2Payload(kXid, kTotal, 0, chunk1)));
+
+	/* The receive thread fires processTimeouts on its tick — the inactivity
+	   window expiry should produce a partial result. Allow generous slack to
+	   absorb scheduler jitter on CI. */
+	auto fut = promise.get_future();
+	ASSERT_EQ(fut.wait_for(std::chrono::seconds(3)), std::future_status::ready);
+	auto [ec, result] = fut.get();
+	EXPECT_EQ(ec, ErrorCode::Timeout);
+	ASSERT_TRUE(result.has_value()) << "Expected partial result on inactivity timeout";
+	EXPECT_EQ(result->transferId, kXid);
+	EXPECT_EQ(result->totalListSize, kTotal);
+	EXPECT_EQ(result->entries[0].rxMask, kRxPgnMaskEnabled);
+	EXPECT_EQ(result->entries[1].rxMask, kRxPgnMaskEnabled);
+	/* Slots 2..4 are zero-initialised; never received. */
+	EXPECT_EQ(result->entries[4].rxMask, 0);
 }
 
 } /* namespace Test */

@@ -12,9 +12,11 @@
 ==============================================================================*/
 
 /* Dependent includes ------------------------------------------------------- */
+#include <chrono>
 #include <span>
 #include <string>
 
+#include "core/session_impl.hpp"
 #include "protocols/bem/bem_types.hpp"
 #include "public/remote_device.hpp"
 
@@ -22,8 +24,6 @@ namespace Actisense
 {
 	namespace Sdk
 	{
-		/* Forward declarations ------------------------------------------------- */
-		class SessionImpl;
 
 		/* Definitions ---------------------------------------------------------- */
 
@@ -102,6 +102,15 @@ namespace Actisense
 			void getSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
 									 std::chrono::milliseconds timeout,
 									 BemResponseCallback callback);
+
+			/* Aggregated PGN-list verbs (GIT-86 / GIT-90) ----------------- */
+			void getRxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
+									  RxPgnEnableListF2ResultCallback callback);
+			void getTxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
+									  TxPgnEnableListF2ResultCallback callback);
+			void getSupportedPgnList_All(std::chrono::milliseconds perGetTimeout,
+										 SupportedPgnListResultCallback callback);
+
 			void getProductInfo(std::chrono::milliseconds timeout, BemResponseCallback callback);
 
 			void getCanConfig(std::chrono::milliseconds timeout, BemResponseCallback callback);

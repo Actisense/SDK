@@ -16,6 +16,7 @@
 #include "core/session_impl.hpp"
 #include "protocols/bdtp/bdtp_protocol.hpp"
 #include "protocols/bem/bem_commands/bem_commands.hpp"
+#include "protocols/bem/bem_commands/supported_pgn_list.hpp"
 #include "protocols/bem/bem_commands/tx_pgn_enable_list_f2.hpp"
 #include "protocols/bst/bst_types.hpp"
 #include "transport/loopback/loopback_transport.hpp"
@@ -26,6 +27,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <thread>
 #include <vector>
 
 namespace Actisense
@@ -188,6 +190,171 @@ TEST_F(SessionPgnListManagementTest, DefaultPgnEnableList_EncodesSelector)
 	ASSERT_GE(dgm.data.size(), 2u);
 	EXPECT_EQ(dgm.data[0], static_cast<uint8_t>(BemCommandId::DefaultPgnEnableList));
 	EXPECT_EQ(dgm.data[1], 0x02);  /* Both */
+}
+
+/* 0x40 SupportedPgnList chunked walk (GIT-86) ------------------------------ */
+
+namespace
+{
+	/* Wire shape per supported_pgn_list.hpp on-wire response payload spec. */
+	std::vector<uint8_t> makeSupportedPgnListPayload(uint8_t xid, uint16_t dbVer,
+													  uint8_t total, uint8_t first,
+													  uint8_t sub,
+													  std::span<const SupportedPgnEntry> entries)
+	{
+		std::vector<uint8_t> out;
+		out.reserve(kSupportedPgnListResponseHeaderSize + 4 * sub);
+		out.push_back(xid);
+		/* SVID 0x00001100 LE */
+		out.push_back(0x00);
+		out.push_back(0x11);
+		out.push_back(0x00);
+		out.push_back(0x00);
+		out.push_back(static_cast<uint8_t>(dbVer & 0xFF));
+		out.push_back(static_cast<uint8_t>((dbVer >> 8) & 0xFF));
+		out.push_back(total);
+		out.push_back(first);
+		out.push_back(sub);
+		for (const auto& e : entries) {
+			out.push_back(e.pgnIndex);
+			out.push_back(static_cast<uint8_t>(e.pgn & 0xFF));
+			out.push_back(static_cast<uint8_t>((e.pgn >> 8) & 0xFF));
+			out.push_back(static_cast<uint8_t>((e.pgn >> 16) & 0xFF));
+		}
+		return out;
+	}
+
+	BemResponse makeSupportedPgnListResponse(uint8_t xid, uint16_t dbVer, uint8_t total,
+											  uint8_t first, uint8_t sub,
+											  std::span<const SupportedPgnEntry> entries)
+	{
+		BemResponse r;
+		r.header.bstId = BstId::Bem_GP_A0;
+		r.header.bemId = static_cast<uint8_t>(BemCommandId::GetSupportedPgnList);
+		r.header.errorCode = 0;
+		r.data = makeSupportedPgnListPayload(xid, dbVer, total, first, sub, entries);
+		return r;
+	}
+} /* namespace */
+
+TEST_F(SessionPgnListManagementTest, GetSupportedPgnList_All_ThreeChunkWalkMergesEntries)
+{
+	std::optional<SupportedPgnListResult> capturedResult;
+	ErrorCode capturedCode = ErrorCode::Ok;
+	bool callbackFired = false;
+
+	session_->getSupportedPgnList_All(kTimeout,
+		[&](std::optional<SupportedPgnListResult> r, ErrorCode ec, std::string_view) {
+			capturedResult = std::move(r);
+			capturedCode = ec;
+			callbackFired = true;
+		});
+
+	constexpr uint8_t  kTotal     = 5;
+	constexpr uint8_t  kDeviceXid = 0x42;
+	constexpr uint16_t kDbVer     = 2100;
+
+	/* GET #1: caller-supplied pgnIndex=0, transferId=0. */
+	{
+		const auto dgm = captureSentDatagram();
+		EXPECT_EQ(dgm.bstId, static_cast<uint8_t>(BstId::Bem_PG_A1));
+		ASSERT_GE(dgm.data.size(), 3u);
+		EXPECT_EQ(dgm.data[0], static_cast<uint8_t>(BemCommandId::GetSupportedPgnList));
+		EXPECT_EQ(dgm.data[1], 0u);
+		EXPECT_EQ(dgm.data[2], 0u);
+	}
+
+	/* Reply #1: indices 0..1, device assigns xid=0x42. */
+	const std::array<SupportedPgnEntry, 2> chunk1 = {
+		SupportedPgnEntry{0, 0x1F101u},
+		SupportedPgnEntry{1, 0x1F102u}};
+	EXPECT_TRUE(session_->bem().correlateResponse(
+		makeSupportedPgnListResponse(kDeviceXid, kDbVer, kTotal, 0, 2, chunk1)));
+
+	/* GET #2: SDK should advance to pgnIndex=2 and reuse the device xid. */
+	{
+		const auto dgm = captureSentDatagram();
+		ASSERT_GE(dgm.data.size(), 3u);
+		EXPECT_EQ(dgm.data[0], static_cast<uint8_t>(BemCommandId::GetSupportedPgnList));
+		EXPECT_EQ(dgm.data[1], 2u);
+		EXPECT_EQ(dgm.data[2], kDeviceXid);
+	}
+
+	/* Reply #2: indices 2..3. */
+	const std::array<SupportedPgnEntry, 2> chunk2 = {
+		SupportedPgnEntry{2, 0x1F103u},
+		SupportedPgnEntry{3, 0x1F104u}};
+	EXPECT_TRUE(session_->bem().correlateResponse(
+		makeSupportedPgnListResponse(kDeviceXid, kDbVer, kTotal, 2, 2, chunk2)));
+
+	/* GET #3: pgnIndex=4, xid=0x42. */
+	{
+		const auto dgm = captureSentDatagram();
+		ASSERT_GE(dgm.data.size(), 3u);
+		EXPECT_EQ(dgm.data[1], 4u);
+		EXPECT_EQ(dgm.data[2], kDeviceXid);
+	}
+
+	/* Reply #3 (final): index 4 — supportedPgnListHasMore() is now false. */
+	const std::array<SupportedPgnEntry, 1> chunk3 = {
+		SupportedPgnEntry{4, 0x1F105u}};
+	EXPECT_TRUE(session_->bem().correlateResponse(
+		makeSupportedPgnListResponse(kDeviceXid, kDbVer, kTotal, 4, 1, chunk3)));
+
+	/* Walk complete: callback fires once with the merged list. */
+	EXPECT_TRUE(callbackFired);
+	EXPECT_EQ(capturedCode, ErrorCode::Ok);
+	ASSERT_TRUE(capturedResult.has_value());
+	EXPECT_EQ(capturedResult->transferId, kDeviceXid);
+	EXPECT_EQ(capturedResult->nmea2000DbVersion, kDbVer);
+	EXPECT_EQ(capturedResult->totalListSize, kTotal);
+	ASSERT_EQ(capturedResult->entries.size(), kTotal);
+	EXPECT_EQ(capturedResult->entries[0].pgn, 0x1F101u);
+	EXPECT_EQ(capturedResult->entries[1].pgn, 0x1F102u);
+	EXPECT_EQ(capturedResult->entries[2].pgn, 0x1F103u);
+	EXPECT_EQ(capturedResult->entries[3].pgn, 0x1F104u);
+	EXPECT_EQ(capturedResult->entries[4].pgn, 0x1F105u);
+}
+
+TEST_F(SessionPgnListManagementTest, GetSupportedPgnList_All_TimeoutMidWalkDeliversPartial)
+{
+	std::optional<SupportedPgnListResult> capturedResult;
+	ErrorCode capturedCode = ErrorCode::Ok;
+	bool callbackFired = false;
+
+	/* perGetTimeout of 0 means the next processTimeouts() sweep after the
+	   pending entry is registered will fire the inactivity branch. */
+	const auto kPerGet = std::chrono::milliseconds(0);
+	session_->getSupportedPgnList_All(kPerGet,
+		[&](std::optional<SupportedPgnListResult> r, ErrorCode ec, std::string_view) {
+			capturedResult = std::move(r);
+			capturedCode = ec;
+			callbackFired = true;
+		});
+
+	/* Drain GET #1 and inject reply #1. */
+	captureSentDatagram();
+	const std::array<SupportedPgnEntry, 2> chunk1 = {
+		SupportedPgnEntry{0, 0x1F101u},
+		SupportedPgnEntry{1, 0x1F102u}};
+	EXPECT_TRUE(session_->bem().correlateResponse(
+		makeSupportedPgnListResponse(0x42, 2100, /*total=*/5, /*first=*/0, /*sub=*/2,
+									  chunk1)));
+
+	/* Drain GET #2; do NOT reply. */
+	captureSentDatagram();
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	EXPECT_EQ(session_->bem().processTimeouts(), 1u);
+
+	EXPECT_TRUE(callbackFired);
+	EXPECT_EQ(capturedCode, ErrorCode::Timeout);
+	ASSERT_TRUE(capturedResult.has_value());
+	EXPECT_EQ(capturedResult->totalListSize, 5);
+	EXPECT_EQ(capturedResult->entries[0].pgn, 0x1F101u);
+	EXPECT_EQ(capturedResult->entries[1].pgn, 0x1F102u);
+	/* Slots 2..4 stay zero-initialised since they never arrived. */
+	EXPECT_EQ(capturedResult->entries[4].pgn, 0u);
 }
 
 } /* namespace Test */

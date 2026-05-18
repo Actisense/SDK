@@ -282,18 +282,13 @@ namespace Actisense
 			return std::make_unique<RemoteDeviceImpl>(*this, n2kSourceAddress);
 		}
 
-		void SessionImpl::sendBemCommandRemote(uint8_t targetN2kSourceAddress,
-											   const BemCommand& command,
-											   std::chrono::milliseconds timeout,
-											   BemResponseCallback callback) {
-			std::string error;
+		std::optional<BstFrame>
+		SessionImpl::buildRemoteBemFrame(uint8_t targetN2kSourceAddress,
+										 const BemCommand& command,
+										 std::string& outEncodeError) {
 			std::vector<uint8_t> innerBst;
-
-			if (!bem_.encodeCommandInnerBst(command, innerBst, error)) {
-				if (callback) {
-					callback(std::nullopt, ErrorCode::InvalidArgument, error);
-				}
-				return;
+			if (!bem_.encodeCommandInnerBst(command, innerBst, outEncodeError)) {
+				return std::nullopt;
 			}
 
 			std::vector<uint8_t> wrappedPayload;
@@ -302,16 +297,54 @@ namespace Actisense
 			/* PGN 126720 priority is per the Tx PGN object configured in firmware;
 			   3 is the conventional fast-packet proprietary priority that the
 			   ACCompLib reference path uses. */
-			const BstFrame frame =
-				BstFrame::create94(kPgn126720, targetN2kSourceAddress, wrappedPayload,
-								   /*priority=*/3);
+			return BstFrame::create94(kPgn126720, targetN2kSourceAddress, wrappedPayload,
+									  /*priority=*/3);
+		}
+
+		void SessionImpl::sendBemCommandRemote(uint8_t targetN2kSourceAddress,
+											   const BemCommand& command,
+											   std::chrono::milliseconds timeout,
+											   BemResponseCallback callback) {
+			std::string encodeError;
+			auto frame = buildRemoteBemFrame(targetN2kSourceAddress, command, encodeError);
+			if (!frame) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument, encodeError);
+				}
+				return;
+			}
 
 			bem_.registerRequest(command.bemId, command.bstId, timeout, std::move(callback),
 								 targetN2kSourceAddress);
 
-			asyncSend("bst", frame.rawData(), [this](ErrorCode code) {
+			asyncSend("bst", frame->rawData(), [this](ErrorCode code) {
 				if (code != ErrorCode::Ok && errorCallback_) {
 					errorCallback_(code, "Failed to send remote BEM command");
+				}
+			});
+		}
+
+		void SessionImpl::sendBemCommandRemoteMultiReply(
+			uint8_t targetN2kSourceAddress, const BemCommand& command,
+			std::chrono::milliseconds inactivityTimeout,
+			std::function<bool(const BemResponse&)> isComplete,
+			BemResponseCallback callback) {
+			std::string encodeError;
+			auto frame = buildRemoteBemFrame(targetN2kSourceAddress, command, encodeError);
+			if (!frame) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument, encodeError);
+				}
+				return;
+			}
+
+			bem_.registerMultiReplyRequest(command.bemId, command.bstId, inactivityTimeout,
+										   std::move(isComplete), std::move(callback),
+										   targetN2kSourceAddress);
+
+			asyncSend("bst", frame->rawData(), [this](ErrorCode code) {
+				if (code != ErrorCode::Ok && errorCallback_) {
+					errorCallback_(code, "Failed to send remote BEM command (multi-reply)");
 				}
 			});
 		}
@@ -700,37 +733,31 @@ namespace Actisense
 
 		/* PGN List Management Commands ----------------------------------------- */
 
-		void SessionImpl::getRxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
-											   RxPgnEnableListF2ResultCallback callback) {
-			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnableListF2);
-
-			std::string encodeError;
-			std::vector<uint8_t> frame;
-			if (!bem_.encodeCommand(cmd, frame, encodeError)) {
-				if (callback) {
-					callback(std::nullopt, ErrorCode::InvalidArgument, encodeError);
-				}
-				return;
-			}
-
+		template <typename Accumulator, typename DecodedResponse, typename Result,
+				  typename ResultCallback>
+		void SessionImpl::registerAggregatedReply(
+			BemCommandId cmdId, BstId bstId,
+			std::chrono::milliseconds inactivityTimeout,
+			bool (*decodeFn)(std::span<const uint8_t>, DecodedResponse&, std::string&),
+			ResultCallback userCallback, uint8_t srcAddr) {
 			struct State
 			{
-				RxPgnEnableListF2Accumulator accumulator;
-				RxPgnEnableListF2ResultCallback userCallback;
+				Accumulator accumulator;
+				ResultCallback userCallback;
 				bool delivered = false;
 			};
 			auto state = std::make_shared<State>();
-			state->userCallback = std::move(callback);
+			state->userCallback = std::move(userCallback);
 
-			auto isComplete = [state](const BemResponse& response) -> bool {
+			auto isComplete = [state, decodeFn](const BemResponse& response) -> bool {
 				if (state->delivered) {
 					return true;
 				}
-				RxPgnEnableListF2Response decoded;
+				DecodedResponse decoded;
 				std::string decodeError;
-				if (!decodeRxPgnEnableListF2Response(
-						std::span<const uint8_t>(response.data.data(), response.data.size()),
-						decoded, decodeError)) {
+				if (!decodeFn(std::span<const uint8_t>(response.data.data(),
+													   response.data.size()),
+							  decoded, decodeError)) {
 					if (state->userCallback) {
 						state->userCallback(std::nullopt, ErrorCode::InvalidArgument,
 											decodeError);
@@ -767,7 +794,7 @@ namespace Actisense
 				if (ec == ErrorCode::Timeout || !response.has_value()) {
 					if (state->userCallback) {
 						const auto& acc = state->accumulator;
-						std::optional<RxPgnEnableListF2Result> partial;
+						std::optional<Result> partial;
 						if (acc.initialised()) {
 							partial = acc.result();
 						}
@@ -778,9 +805,146 @@ namespace Actisense
 				/* Successful per-response delivery is handled in isComplete. */
 			};
 
-			bem_.registerMultiReplyRequest(cmd.bemId, cmd.bstId, inactivityTimeout,
+			bem_.registerMultiReplyRequest(cmdId, bstId, inactivityTimeout,
 										   std::move(isComplete),
-										   std::move(perResponseCallback));
+										   std::move(perResponseCallback), srcAddr);
+		}
+
+		void SessionImpl::runSupportedPgnListWalk(
+			uint8_t srcAddr, std::chrono::milliseconds perGetTimeout,
+			SupportedPgnListResultCallback callback,
+			std::function<void(const BemCommand&)> submitFn) {
+			struct State
+			{
+				SupportedPgnListAccumulator accumulator;
+				SupportedPgnListResultCallback userCallback;
+				std::function<void(const BemCommand&)> submitFn;
+				std::chrono::milliseconds perGetTimeout{0};
+				uint8_t srcAddr = kLocalSrcAddr;
+				bool delivered = false;
+			};
+			auto state = std::make_shared<State>();
+			state->userCallback = std::move(callback);
+			state->submitFn = std::move(submitFn);
+			state->perGetTimeout = perGetTimeout;
+			state->srcAddr = srcAddr;
+
+			/* sendOne is reused for each follow-up GET. perResponseCallback
+			   captures sendOne so it can recurse on Continue. To avoid a
+			   reference cycle (sendOne -> perResponseCallback -> sendOne)
+			   we clear *sendOne on every terminal path. */
+			auto sendOne = std::make_shared<std::function<void(uint8_t, uint8_t)>>();
+
+			auto deliver = [state, sendOne](std::optional<SupportedPgnListResult> result,
+											ErrorCode ec, std::string_view errMsg) {
+				if (state->delivered) {
+					return;
+				}
+				state->delivered = true;
+				if (state->userCallback) {
+					state->userCallback(std::move(result), ec, errMsg);
+				}
+				*sendOne = nullptr; /* break sendOne <-> callback cycle */
+			};
+
+			auto perResponseCallback = [state, sendOne, deliver](
+				const std::optional<BemResponse>& response, ErrorCode ec,
+				std::string_view errMsg) {
+				if (state->delivered) {
+					return;
+				}
+				if (ec != ErrorCode::Ok || !response.has_value()) {
+					std::optional<SupportedPgnListResult> partial;
+					if (state->accumulator.initialised()) {
+						partial = state->accumulator.result();
+					}
+					deliver(std::move(partial), ec, errMsg);
+					return;
+				}
+
+				SupportedPgnListResponse decoded;
+				std::string decodeError;
+				if (!decodeSupportedPgnListResponse(
+						std::span<const uint8_t>(response->data.data(),
+												 response->data.size()),
+						decoded, decodeError)) {
+					deliver(std::nullopt, ErrorCode::InvalidArgument, decodeError);
+					return;
+				}
+
+				std::string feedError;
+				const auto status = state->accumulator.feed(decoded, feedError);
+				if (status == PgnListAccumulatorStatus::Mismatch) {
+					deliver(std::nullopt, ErrorCode::InvalidArgument, feedError);
+					return;
+				}
+				if (status == PgnListAccumulatorStatus::Done) {
+					deliver(state->accumulator.result(), ErrorCode::Ok, std::string_view{});
+					return;
+				}
+
+				/* Continue: issue next GET using device-set transferId and
+				   the next pgnIndex past the sub-list we just absorbed. */
+				const uint8_t nextIdx =
+					static_cast<uint8_t>(decoded.firstSubIdx + decoded.subCount);
+				(*sendOne)(nextIdx, decoded.transferId);
+			};
+
+			*sendOne = [state, perResponseCallback, this](uint8_t pgnIndex,
+														   uint8_t transferId) {
+				BemCommand cmd = makeBemA1(BemCommandId::GetSupportedPgnList);
+				encodeSupportedPgnListGetRequest(pgnIndex, transferId, cmd.data);
+
+				bem_.registerRequest(cmd.bemId, cmd.bstId, state->perGetTimeout,
+									 perResponseCallback, state->srcAddr);
+				state->submitFn(cmd);
+			};
+
+			/* Kick off the walk: device assigns transferId on reply #1 when
+			   the caller passes 0. */
+			(*sendOne)(0, 0);
+		}
+
+		void SessionImpl::getSupportedPgnList_All(std::chrono::milliseconds perGetTimeout,
+												  SupportedPgnListResultCallback callback) {
+			auto submit = [this](const BemCommand& cmd) {
+				std::string encodeError;
+				std::vector<uint8_t> frame;
+				if (!bem_.encodeCommand(cmd, frame, encodeError)) {
+					if (errorCallback_) {
+						errorCallback_(ErrorCode::InvalidArgument, encodeError);
+					}
+					return;
+				}
+				asyncSendRaw(frame, [this](ErrorCode code, std::size_t /*written*/) {
+					if (code != ErrorCode::Ok && errorCallback_) {
+						errorCallback_(code, "Failed to send Get Supported PGN List");
+					}
+				});
+			};
+
+			runSupportedPgnListWalk(kLocalSrcAddr, perGetTimeout, std::move(callback),
+									std::move(submit));
+		}
+
+		void SessionImpl::getRxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
+											   RxPgnEnableListF2ResultCallback callback) {
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnableListF2);
+
+			std::string encodeError;
+			std::vector<uint8_t> frame;
+			if (!bem_.encodeCommand(cmd, frame, encodeError)) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument, encodeError);
+				}
+				return;
+			}
+
+			registerAggregatedReply<RxPgnEnableListF2Accumulator,
+									RxPgnEnableListF2Response, RxPgnEnableListF2Result,
+									RxPgnEnableListF2ResultCallback>(
+				cmd.bemId, cmd.bstId, inactivityTimeout,
+				decodeRxPgnEnableListF2Response, std::move(callback));
 
 			asyncSendRaw(frame, [this](ErrorCode code, std::size_t /*written*/) {
 				if (code != ErrorCode::Ok && errorCallback_) {
@@ -802,79 +966,105 @@ namespace Actisense
 				return;
 			}
 
-			struct State
-			{
-				TxPgnEnableListF2Accumulator accumulator;
-				TxPgnEnableListF2ResultCallback userCallback;
-				bool delivered = false;
-			};
-			auto state = std::make_shared<State>();
-			state->userCallback = std::move(callback);
-
-			auto isComplete = [state](const BemResponse& response) -> bool {
-				if (state->delivered) {
-					return true;
-				}
-				TxPgnEnableListF2Response decoded;
-				std::string decodeError;
-				if (!decodeTxPgnEnableListF2Response(
-						std::span<const uint8_t>(response.data.data(), response.data.size()),
-						decoded, decodeError)) {
-					if (state->userCallback) {
-						state->userCallback(std::nullopt, ErrorCode::InvalidArgument,
-											decodeError);
-					}
-					state->delivered = true;
-					return true;
-				}
-				std::string feedError;
-				const auto status = state->accumulator.feed(decoded, feedError);
-				if (status == PgnListAccumulatorStatus::Mismatch) {
-					if (state->userCallback) {
-						state->userCallback(std::nullopt, ErrorCode::InvalidArgument,
-											feedError);
-					}
-					state->delivered = true;
-					return true;
-				}
-				if (status == PgnListAccumulatorStatus::Done) {
-					if (state->userCallback) {
-						state->userCallback(state->accumulator.result(), ErrorCode::Ok,
-											std::string_view{});
-					}
-					state->delivered = true;
-					return true;
-				}
-				return false;
-			};
-
-			auto perResponseCallback = [state](const std::optional<BemResponse>& response,
-											   ErrorCode ec, std::string_view errMsg) {
-				if (state->delivered) {
-					return;
-				}
-				if (ec == ErrorCode::Timeout || !response.has_value()) {
-					if (state->userCallback) {
-						const auto& acc = state->accumulator;
-						std::optional<TxPgnEnableListF2Result> partial;
-						if (acc.initialised()) {
-							partial = acc.result();
-						}
-						state->userCallback(std::move(partial), ec, errMsg);
-					}
-					state->delivered = true;
-				}
-			};
-
-			bem_.registerMultiReplyRequest(cmd.bemId, cmd.bstId, inactivityTimeout,
-										   std::move(isComplete),
-										   std::move(perResponseCallback));
+			registerAggregatedReply<TxPgnEnableListF2Accumulator,
+									TxPgnEnableListF2Response, TxPgnEnableListF2Result,
+									TxPgnEnableListF2ResultCallback>(
+				cmd.bemId, cmd.bstId, inactivityTimeout,
+				decodeTxPgnEnableListF2Response, std::move(callback));
 
 			asyncSendRaw(frame, [this](ErrorCode code, std::size_t /*written*/) {
 				if (code != ErrorCode::Ok && errorCallback_) {
 					errorCallback_(code, "Failed to send Get Tx PGN Enable List F2");
 				}
 			});
+		}
+
+		void SessionImpl::getRxPgnEnableListF2Remote(
+			uint8_t targetN2kSourceAddress,
+			std::chrono::milliseconds inactivityTimeout,
+			RxPgnEnableListF2ResultCallback callback) {
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnableListF2);
+
+			std::string encodeError;
+			auto frame =
+				buildRemoteBemFrame(targetN2kSourceAddress, cmd, encodeError);
+			if (!frame) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument, encodeError);
+				}
+				return;
+			}
+
+			registerAggregatedReply<RxPgnEnableListF2Accumulator,
+									RxPgnEnableListF2Response, RxPgnEnableListF2Result,
+									RxPgnEnableListF2ResultCallback>(
+				cmd.bemId, cmd.bstId, inactivityTimeout,
+				decodeRxPgnEnableListF2Response, std::move(callback),
+				targetN2kSourceAddress);
+
+			asyncSend("bst", frame->rawData(), [this](ErrorCode code) {
+				if (code != ErrorCode::Ok && errorCallback_) {
+					errorCallback_(code,
+								   "Failed to send remote Get Rx PGN Enable List F2");
+				}
+			});
+		}
+
+		void SessionImpl::getTxPgnEnableListF2Remote(
+			uint8_t targetN2kSourceAddress,
+			std::chrono::milliseconds inactivityTimeout,
+			TxPgnEnableListF2ResultCallback callback) {
+			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnableListF2);
+
+			std::string encodeError;
+			auto frame =
+				buildRemoteBemFrame(targetN2kSourceAddress, cmd, encodeError);
+			if (!frame) {
+				if (callback) {
+					callback(std::nullopt, ErrorCode::InvalidArgument, encodeError);
+				}
+				return;
+			}
+
+			registerAggregatedReply<TxPgnEnableListF2Accumulator,
+									TxPgnEnableListF2Response, TxPgnEnableListF2Result,
+									TxPgnEnableListF2ResultCallback>(
+				cmd.bemId, cmd.bstId, inactivityTimeout,
+				decodeTxPgnEnableListF2Response, std::move(callback),
+				targetN2kSourceAddress);
+
+			asyncSend("bst", frame->rawData(), [this](ErrorCode code) {
+				if (code != ErrorCode::Ok && errorCallback_) {
+					errorCallback_(code,
+								   "Failed to send remote Get Tx PGN Enable List F2");
+				}
+			});
+		}
+
+		void SessionImpl::getSupportedPgnList_AllRemote(
+			uint8_t targetN2kSourceAddress,
+			std::chrono::milliseconds perGetTimeout,
+			SupportedPgnListResultCallback callback) {
+			auto submit = [this, targetN2kSourceAddress](const BemCommand& cmd) {
+				std::string encodeError;
+				auto frame =
+					buildRemoteBemFrame(targetN2kSourceAddress, cmd, encodeError);
+				if (!frame) {
+					if (errorCallback_) {
+						errorCallback_(ErrorCode::InvalidArgument, encodeError);
+					}
+					return;
+				}
+				asyncSend("bst", frame->rawData(), [this](ErrorCode code) {
+					if (code != ErrorCode::Ok && errorCallback_) {
+						errorCallback_(code,
+									   "Failed to send remote Get Supported PGN List");
+					}
+				});
+			};
+
+			runSupportedPgnListWalk(targetN2kSourceAddress, perGetTimeout,
+									std::move(callback), std::move(submit));
 		}
 
 		void SessionImpl::deletePgnEnableLists(uint8_t selector, std::chrono::milliseconds timeout,

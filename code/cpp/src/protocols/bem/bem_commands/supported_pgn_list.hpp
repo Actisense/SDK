@@ -32,6 +32,8 @@
 #include <string>
 #include <vector>
 
+#include "protocols/bem/bem_commands/rx_pgn_enable_list_f2.hpp"  /* PgnListAccumulatorStatus */
+
 namespace Actisense
 {
 	namespace Sdk
@@ -166,6 +168,96 @@ namespace Actisense
 				static_cast<std::size_t>(response.firstSubIdx) + response.subCount;
 			return consumedThrough < response.totalListSize;
 		}
+
+		/* Chunked-walk aggregation ---------------------------------------- */
+
+		/**************************************************************************/ /**
+		 \brief      Aggregated Supported PGN List result.
+		 \details    Populated by SupportedPgnListAccumulator once a full walk
+		             (all sub-list GETs) has completed. `entries` is sized
+		             totalListSize on Done with the merged (pgnIndex → pgn)
+		             rows in device order.
+		 *******************************************************************************/
+		struct SupportedPgnListResult
+		{
+			uint8_t  transferId = 0;        ///< Device-set xid latched from reply #1
+			uint16_t nmea2000DbVersion = 0;
+			uint8_t  totalListSize = 0;
+			std::vector<SupportedPgnEntry> entries;
+		};
+
+		/**************************************************************************/ /**
+		 \brief      Accumulator that merges 0x40 sub-list replies from a
+		             caller-driven walk into a single SupportedPgnListResult.
+		 \details    The 0x40 protocol is N-GETs-N-replies, not one-GET-N-replies.
+		             The walking sequencer (SessionImpl::getSupportedPgnList_All)
+		             feeds each reply through this accumulator and uses the
+		             return value to decide whether to issue the next GET. Reply
+		             #1 latches transferId, nmea2000DbVersion, and totalListSize;
+		             subsequent replies must carry the same transferId or
+		             Mismatch is returned. Done is reported when the next
+		             pgnIndex would equal totalListSize (i.e.
+		             !supportedPgnListHasMore(reply)).
+		 *******************************************************************************/
+		class SupportedPgnListAccumulator
+		{
+		public:
+			[[nodiscard]] PgnListAccumulatorStatus feed(
+				const SupportedPgnListResponse& msg, std::string& outError) {
+				if (!initialised_) {
+					result_.transferId = msg.transferId;
+					result_.nmea2000DbVersion = msg.nmea2000DbVersion;
+					result_.totalListSize = msg.totalListSize;
+					result_.entries.assign(msg.totalListSize, SupportedPgnEntry{});
+					seen_.assign(msg.totalListSize, false);
+					initialised_ = true;
+				} else if (msg.transferId != result_.transferId) {
+					outError = "Supported PGN List transferId changed mid-walk: expected " +
+							   std::to_string(result_.transferId) + ", got " +
+							   std::to_string(msg.transferId);
+					return PgnListAccumulatorStatus::Mismatch;
+				} else if (msg.totalListSize != result_.totalListSize) {
+					outError = "Supported PGN List totalListSize changed mid-walk: expected " +
+							   std::to_string(result_.totalListSize) + ", got " +
+							   std::to_string(msg.totalListSize);
+					return PgnListAccumulatorStatus::Mismatch;
+				}
+
+				const std::size_t end =
+					static_cast<std::size_t>(msg.firstSubIdx) + msg.subCount;
+				if (end > result_.entries.size()) {
+					outError = "Supported PGN List sub-list overruns total: firstSubIdx=" +
+							   std::to_string(msg.firstSubIdx) + " subCount=" +
+							   std::to_string(msg.subCount) + " total=" +
+							   std::to_string(result_.totalListSize);
+					return PgnListAccumulatorStatus::Mismatch;
+				}
+
+				for (std::size_t i = 0; i < msg.subCount; ++i) {
+					const std::size_t slot = msg.firstSubIdx + i;
+					result_.entries[slot] = msg.entries[i];
+					if (!seen_[slot]) {
+						seen_[slot] = true;
+						++received_;
+					}
+				}
+
+				return supportedPgnListHasMore(msg) ? PgnListAccumulatorStatus::Continue
+													: PgnListAccumulatorStatus::Done;
+			}
+
+			[[nodiscard]] const SupportedPgnListResult& result() const noexcept {
+				return result_;
+			}
+
+			[[nodiscard]] bool initialised() const noexcept { return initialised_; }
+
+		private:
+			SupportedPgnListResult result_;
+			std::vector<bool> seen_;
+			bool initialised_ = false;
+			std::size_t received_ = 0;
+		};
 
 		/**************************************************************************/ /**
 		 \brief      Format helper.
