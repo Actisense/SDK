@@ -13,6 +13,9 @@ add_sdk_test(test_bem_remote_device test_bem_remote_device.cpp)
 # Two-device Tx PGN filtering sweep, single-frame standard PGNs (GIT-89).
 # Requires ACTISENSE_TEST_PORT (DUT) AND ACTISENSE_TEST_RX_PORT (receiver).
 add_sdk_test(test_tx_pgn_blocking_singleframe test_tx_pgn_blocking_singleframe.cpp)
+# Two-device Tx PGN filtering sweep, single-frame proprietary PGNs (GIT-97).
+# Same rig as the standard sweep; exercises the NGXSW-3329 DP0 bitmap mechanic.
+add_sdk_test(test_tx_pgn_blocking_singleframe_proprietary test_tx_pgn_blocking_singleframe_proprietary.cpp)
 
 # Add integration test files here as they are developed
 
