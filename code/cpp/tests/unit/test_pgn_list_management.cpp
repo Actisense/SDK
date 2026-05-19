@@ -514,7 +514,7 @@ namespace
 	{
 		TxPgnEnableListF2Response msg;
 		msg.transferId = xid;
-		msg.structureVariantId = kTxPgnEnableListF2PropSvId;
+		msg.structureVariantId = kPgnEnableListF2PropSvId;
 		msg.variant = TxPgnEnableListF2Variant::Proprietary;
 		msg.propDp0Bitmap = std::move(dp0);
 		msg.propDp1Bitmap = std::move(dp1);

@@ -84,7 +84,15 @@ namespace Actisense
 
 		/// Structure Variant IDs for 0x4F responses
 		static constexpr uint32_t kTxPgnEnableListF2StdSvId = 0x00001102;
-		static constexpr uint32_t kTxPgnEnableListF2PropSvId = 0x00001103;
+		/// Proprietary structure variant. The same SV id is emitted by both the
+		/// Rx (0x4E) and Tx (0x4F) PGN-Enable-List F2 responses — the bitmap
+		/// layout (dp0 = 0xFF00 range, dp1 = 0x1FF00 range) is direction-agnostic
+		/// and the surrounding command id selects direction. See also
+		/// kPgnEnableListF2PropSvId (canonical name).
+		static constexpr uint32_t kPgnEnableListF2PropSvId = 0x00001103;
+		/// Deprecated: kept for backwards compatibility with code that pre-dates
+		/// the rename. Prefer kPgnEnableListF2PropSvId in new code.
+		static constexpr uint32_t kTxPgnEnableListF2PropSvId = kPgnEnableListF2PropSvId;
 
 		/// Standard-variant header size (xid + SVID + total + first + sub)
 		static constexpr std::size_t kTxPgnEnableListF2StdHeaderSize = 8;
@@ -217,7 +225,7 @@ namespace Actisense
 				return true;
 			}
 
-			if (response.structureVariantId == kTxPgnEnableListF2PropSvId) {
+			if (response.structureVariantId == kPgnEnableListF2PropSvId) {
 				response.variant = TxPgnEnableListF2Variant::Proprietary;
 				std::size_t offset = kSvHeaderSize;
 				if (data.size() < offset + 1) {
