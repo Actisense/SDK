@@ -309,40 +309,9 @@ namespace Actisense
 			std::vector<uint8_t> wrappedPayload;
 			wrapBemInPgn126720(innerBst, wrappedPayload);
 
-			/* Hand-roll the BST-94 wrap to match ACCompLib::BSTWrapBSTN2K
-			   byte-for-byte. The generic BstFrame::create94 helper writes
-			   the destination into the PDUS field for PDU1 PGNs (matching
-			   J1939's logical model), but NGT firmware parses the BST-94
-			   wrap with PDUS = the raw PGN low byte (0x00 for PGN 126720).
-			   Sending PDUS = destination here causes the NGT to fail its
-			   PGN-library lookup and reply with ES6_LIBRARY_MATCH_SEARCH_FAILED
-			   (-697). The destination always goes in byte 6 regardless of
-			   PDU class. NGX understands both, but the gateway-in-the-middle
-			   determines what the host must emit; ACCompLib's runtime path
-			   (which Toolkit uses) always emits BST-94 in this format. */
-			constexpr uint8_t kPgnByte0 = static_cast<uint8_t>((kPgn126720) & 0xFF);
-			constexpr uint8_t kPgnByte1 = static_cast<uint8_t>((kPgn126720 >> 8) & 0xFF);
-			constexpr uint8_t kPgnByte2 = static_cast<uint8_t>((kPgn126720 >> 16) & 0x03);
 			constexpr uint8_t kPriority = 3;
-			constexpr uint8_t kFastPacketId = 0;
-
-			const uint8_t dataLen = static_cast<uint8_t>(wrappedPayload.size());
-			const uint8_t storeLen =
-				static_cast<uint8_t>(6 + dataLen); /* priority+pgn(3)+dest+len */
-
-			std::vector<uint8_t> raw;
-			raw.reserve(2 + storeLen);
-			raw.push_back(static_cast<uint8_t>(BstId::Nmea2000_PCToGateway));
-			raw.push_back(storeLen);
-			raw.push_back(kPriority);
-			raw.push_back(kPgnByte0);
-			raw.push_back(kPgnByte1);
-			raw.push_back(kPgnByte2 | (kFastPacketId << 5));
-			raw.push_back(targetN2kSourceAddress);
-			raw.push_back(dataLen);
-			raw.insert(raw.end(), wrappedPayload.begin(), wrappedPayload.end());
-
-			return BstFrame(std::move(raw));
+			return BstFrame::create94(kPgn126720, targetN2kSourceAddress, wrappedPayload,
+									  kPriority);
 		}
 
 		void SessionImpl::sendBemCommandRemote(uint8_t targetN2kSourceAddress,

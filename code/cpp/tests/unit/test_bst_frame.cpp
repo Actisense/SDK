@@ -741,6 +741,62 @@ TEST_F(BstFrameTest, RawDataRoundTrip)
 	EXPECT_EQ(parsed->dataLength(), original.dataLength());
 }
 
+/* BST-94 PDU1/PDU2 Wire-Format Regression Tests (GIT-95) ------------------- */
+
+/* These tests lock in the on-wire BST-94 byte layout against the firmware
+   contract: the destination address lives ONLY in byte 6 (kBst94OffDest);
+   PDUS always carries the raw PGN low byte (0 for valid PDU1 PGNs).
+   Sending the destination in PDUS causes NGT firmware to reply with
+   ES6_LIBRARY_MATCH_SEARCH_FAILED (-697). Reference: GIT-95 and
+   LibDev/ACCompLib/Codec/WrapBSTN2K.cpp::BSTWrapBSTN2K. */
+
+TEST_F(BstFrameTest, Create94Pdu1KeepsPdusZeroAndDestInByte6)
+{
+	/* PGN 126720 = 0x1EF00, PDUF=0xEF=239 (PDU1, low byte 0x00).
+	   Pick a non-broadcast destination so any leak of dest into PDUS would
+	   show up as a non-zero PDUS byte. */
+	constexpr uint32_t kPdu1Pgn = 126720;
+	constexpr uint8_t kDestination = 0xAA;
+	auto frame = BstFrame::create94(kPdu1Pgn, kDestination, testPayload3(), 3);
+	auto raw = frame.rawData();
+
+	/* raw layout: [0]=BST ID, [1]=storeLen, [2]=priority, [3]=PDUS,
+	   [4]=PDUF, [5]=DP, [6]=dest, [7]=dataLen, [8..]=data */
+	ASSERT_GE(raw.size(), 8u);
+	EXPECT_EQ(raw[0], static_cast<uint8_t>(BstId::Nmea2000_PCToGateway));
+	EXPECT_EQ(raw[2], 3u);                /* priority */
+	EXPECT_EQ(raw[3], 0x00);              /* PDUS = raw PGN low byte (not destination) */
+	EXPECT_EQ(raw[4], 0xEF);              /* PDUF */
+	EXPECT_EQ(raw[5] & 0x03, 0x01);       /* DP */
+	EXPECT_EQ(raw[6], kDestination);      /* destination in byte 6 only */
+	EXPECT_EQ(raw[7], 3u);                /* dataLen */
+}
+
+TEST_F(BstFrameTest, Create94Pdu1NonBroadcastDecodesCorrectly)
+{
+	/* PGN 60928 (ISO Address Claim) = 0xEE00, PDUF=0xEE=238 (PDU1). */
+	constexpr uint8_t kDestination = 0x10;
+	auto frame = BstFrame::create94(kTestPgn60928, kDestination, testPayload3());
+
+	EXPECT_EQ(frame.pgn(), kTestPgn60928);
+	EXPECT_EQ(frame.destination(), kDestination);
+}
+
+TEST_F(BstFrameTest, Create94Pdu2PdusIsPgnLowByte)
+{
+	/* PGN 127250 = 0x01F112, PDUF=0xF1=241 (PDU2), PDUS=0x12.
+	   Destination must NOT leak into PDUS in PDU2 either; PDUS = PGN low byte. */
+	constexpr uint8_t kDestination = 0xFF;
+	auto frame = BstFrame::create94(kTestPgn127250, kDestination, testPayload3());
+	auto raw = frame.rawData();
+
+	ASSERT_GE(raw.size(), 8u);
+	EXPECT_EQ(raw[3], 0x12);              /* PDUS = PGN low byte */
+	EXPECT_EQ(raw[4], 0xF1);              /* PDUF */
+	EXPECT_EQ(raw[6], kDestination);      /* destination in byte 6 */
+	EXPECT_EQ(frame.pgn(), kTestPgn127250);
+}
+
 /* Edge Case Tests ---------------------------------------------------------- */
 
 TEST_F(BstFrameTest, MaxPriority)
