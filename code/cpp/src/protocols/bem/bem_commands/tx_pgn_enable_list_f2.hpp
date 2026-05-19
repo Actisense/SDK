@@ -350,6 +350,16 @@ namespace Actisense
 		class TxPgnEnableListF2Accumulator
 		{
 		public:
+			/// Inform the accumulator whether the underlying firmware emits
+			/// the proprietary-variant trailing message. Older models (NGT
+			/// and earlier) do not; in that case the accumulator completes
+			/// as soon as the standard sub-list train is fully received.
+			/// See supportsProprietaryEnableListF2 in bem_types.hpp for the
+			/// per-model decision and NGXSW-3329 for the firmware change.
+			void setSupportsProprietary(bool supports) noexcept {
+				expects_proprietary_ = supports;
+			}
+
 			[[nodiscard]] PgnListAccumulatorStatus feed(const TxPgnEnableListF2Response& msg,
 														std::string& outError) {
 				if (!initialised_) {
@@ -403,6 +413,12 @@ namespace Actisense
 							++stdReceived_;
 						}
 					}
+
+					if (stdReceived_ == result_.totalListSize && !expects_proprietary_) {
+						/* Older firmware (NGT and earlier) never emits the
+						   proprietary-variant message. Complete now. */
+						return PgnListAccumulatorStatus::Done;
+					}
 				} else if (msg.variant == TxPgnEnableListF2Variant::Proprietary) {
 					result_.proprietary.dp0RawLut.fill(0);
 					result_.proprietary.dp1RawLut.fill(0);
@@ -439,6 +455,7 @@ namespace Actisense
 			std::vector<bool> seen_;
 			bool initialised_ = false;
 			bool standardSeen_ = false;
+			bool expects_proprietary_ = true;
 			std::size_t stdReceived_ = 0;
 		};
 

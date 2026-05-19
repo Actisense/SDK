@@ -646,27 +646,30 @@ TEST_F(RemoteBemLoopbackTest, GetTxPgnEnableListF2_TerminatesOnProprietaryMessag
 
 	constexpr uint8_t kXid      = 0x33;
 	constexpr uint8_t kStdTotal = 2;
+	/* Simulate an NGX-1 responder so the SDK accumulator's model gate
+	   (supportsProprietaryEnableListF2) expects the proprietary trailer. */
+	constexpr uint16_t kModelId = static_cast<uint16_t>(ArlModelId::NGX1);
 
 	/* Std-variant reply #1: index 0 with one entry. */
 	const std::array<TxPgnEnableEntry, 1> std1 = {
 		TxPgnEnableEntry{0, /*priority=*/3, /*rateMs=*/100}};
 	gateway_->injectRx(buildWrappedReply(
 		kRemoteAddr, BstId::Bem_GP_A0, BemCommandId::GetSetTxPgnEnableListF2,
-		0, 0, 0, 0, txF2StdPayload(kXid, kStdTotal, 0, std1)));
+		0, kModelId, 0, 0, txF2StdPayload(kXid, kStdTotal, 0, std1)));
 
 	/* Std-variant reply #2: index 1 with one entry. */
 	const std::array<TxPgnEnableEntry, 1> std2 = {
 		TxPgnEnableEntry{1, /*priority=*/6, /*rateMs=*/500}};
 	gateway_->injectRx(buildWrappedReply(
 		kRemoteAddr, BstId::Bem_GP_A0, BemCommandId::GetSetTxPgnEnableListF2,
-		0, 0, 0, 0, txF2StdPayload(kXid, kStdTotal, 1, std2)));
+		0, kModelId, 0, 0, txF2StdPayload(kXid, kStdTotal, 1, std2)));
 
 	/* Proprietary-variant trailer: one bit set in DP0 byte 0 (PGN 0xFF00). */
 	const std::array<uint8_t, 1> dp0{0x01};
 	const std::array<uint8_t, 0> dp1{};
 	gateway_->injectRx(buildWrappedReply(
 		kRemoteAddr, BstId::Bem_GP_A0, BemCommandId::GetSetTxPgnEnableListF2,
-		/*seq=*/2, 0, 0, 0, txF2PropPayload(kXid, dp0, dp1)));
+		/*seq=*/2, kModelId, 0, 0, txF2PropPayload(kXid, dp0, dp1)));
 
 	auto fut = promise.get_future();
 	ASSERT_EQ(fut.wait_for(std::chrono::seconds(2)), std::future_status::ready);

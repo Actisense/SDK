@@ -797,6 +797,7 @@ namespace Actisense
 				Accumulator accumulator;
 				ResultCallback userCallback;
 				bool delivered = false;
+				bool modelGateApplied = false;
 			};
 			auto state = std::make_shared<State>();
 			state->userCallback = std::move(userCallback);
@@ -808,6 +809,22 @@ namespace Actisense
 			auto isComplete = [state, decodeFn, makeOrigin](const BemResponse& response) -> bool {
 				if (state->delivered) {
 					return true;
+				}
+				/* On the first response, set the accumulator's expectation of
+				   a trailing proprietary-variant message based on the responder's
+				   model id. Older firmware (NGT and earlier) does not emit one
+				   and the accumulator must complete on the standard list alone
+				   (NGXSW-3329). For accumulators that do not carry a
+				   setSupportsProprietary method this branch is elided at
+				   compile time. */
+				if (!state->modelGateApplied) {
+					if constexpr (requires(Accumulator& a, bool b) {
+						a.setSupportsProprietary(b);
+					}) {
+						state->accumulator.setSupportsProprietary(
+							supportsProprietaryEnableListF2(response.header.modelId));
+					}
+					state->modelGateApplied = true;
 				}
 				DecodedResponse decoded;
 				std::string decodeError;

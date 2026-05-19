@@ -487,11 +487,24 @@ namespace
 	{
 		RxPgnEnableListF2Response msg;
 		msg.transferId = xid;
-		msg.structureVariantId = kRxPgnEnableListF2SvId;
+		msg.structureVariantId = kRxPgnEnableListF2StdSvId;
+		msg.variant = RxPgnEnableListF2Variant::Standard;
 		msg.totalListSize = total;
 		msg.firstSubIdx = first;
 		msg.subCount = static_cast<uint8_t>(entries.size());
 		msg.entries = std::move(entries);
+		return msg;
+	}
+
+	RxPgnEnableListF2Response makeRxProp(uint8_t xid, std::vector<uint8_t> dp0,
+										 std::vector<uint8_t> dp1)
+	{
+		RxPgnEnableListF2Response msg;
+		msg.transferId = xid;
+		msg.structureVariantId = kRxPgnEnableListF2PropSvId;
+		msg.variant = RxPgnEnableListF2Variant::Proprietary;
+		msg.propDp0Bitmap = std::move(dp0);
+		msg.propDp1Bitmap = std::move(dp1);
 		return msg;
 	}
 
@@ -526,15 +539,21 @@ namespace
 
 TEST_F(PgnListManagementTest, RxAccumulator_SingleMessageFullList)
 {
+	/* New-firmware path: standard sub-list arrives, accumulator waits for the
+	   proprietary message to signal Done (NGXSW-3329). */
 	RxPgnEnableListF2Accumulator acc;
 	const auto msg = makeRxSubList(5, 2, 0, {{0x01, 0x01}, {0x02, 0x01}});
-	EXPECT_EQ(acc.feed(msg, m_error), PgnListAccumulatorStatus::Done);
+	EXPECT_EQ(acc.feed(msg, m_error), PgnListAccumulatorStatus::Continue);
+	EXPECT_EQ(acc.feed(makeRxProp(5, std::vector<uint8_t>(32, 0), std::vector<uint8_t>(32, 0)),
+					   m_error),
+			  PgnListAccumulatorStatus::Done);
 	EXPECT_TRUE(m_error.empty());
 	EXPECT_EQ(acc.result().transferId, 5u);
 	EXPECT_EQ(acc.result().totalListSize, 2u);
 	ASSERT_EQ(acc.result().entries.size(), 2u);
 	EXPECT_EQ(acc.result().entries[0].pgnIndex, 0x01u);
 	EXPECT_EQ(acc.result().entries[1].pgnIndex, 0x02u);
+	EXPECT_TRUE(acc.result().proprietaryReceived);
 }
 
 TEST_F(PgnListManagementTest, RxAccumulator_ThreeSubListTrain)
@@ -552,6 +571,9 @@ TEST_F(PgnListManagementTest, RxAccumulator_ThreeSubListTrain)
 	EXPECT_EQ(acc.feed(makeRxSubList(7, 200, 96, e2), m_error),
 			  PgnListAccumulatorStatus::Continue);
 	EXPECT_EQ(acc.feed(makeRxSubList(7, 200, 192, e3), m_error),
+			  PgnListAccumulatorStatus::Continue);
+	EXPECT_EQ(acc.feed(makeRxProp(7, std::vector<uint8_t>(32, 0), std::vector<uint8_t>(32, 0)),
+					   m_error),
 			  PgnListAccumulatorStatus::Done);
 	EXPECT_TRUE(m_error.empty());
 	EXPECT_EQ(acc.result().entries.size(), 200u);
@@ -575,7 +597,75 @@ TEST_F(PgnListManagementTest, RxAccumulator_RepeatedSubListDoesNotDoubleCount)
 	EXPECT_EQ(acc.feed(sub, m_error), PgnListAccumulatorStatus::Continue);
 	EXPECT_EQ(acc.feed(sub, m_error), PgnListAccumulatorStatus::Continue);
 	EXPECT_EQ(acc.feed(makeRxSubList(3, 4, 2, {{0xCC, 1}, {0xDD, 1}}), m_error),
+			  PgnListAccumulatorStatus::Continue);
+	EXPECT_EQ(acc.feed(makeRxProp(3, std::vector<uint8_t>(32, 0), std::vector<uint8_t>(32, 0)),
+					   m_error),
 			  PgnListAccumulatorStatus::Done);
+}
+
+TEST_F(PgnListManagementTest, RxAccumulator_LegacyFirmware_NoProprietary_CompletesOnStandard)
+{
+	/* Model-gate path: when supportsProprietary is set false (e.g. NGT-1
+	   detected via modelId in the BEM response header), the accumulator
+	   completes as soon as the standard sub-list train is full. */
+	RxPgnEnableListF2Accumulator acc;
+	acc.setSupportsProprietary(false);
+	const auto msg = makeRxSubList(11, 2, 0, {{0x01, 0x01}, {0x02, 0x01}});
+	EXPECT_EQ(acc.feed(msg, m_error), PgnListAccumulatorStatus::Done);
+	EXPECT_TRUE(m_error.empty());
+	EXPECT_FALSE(acc.result().proprietaryReceived);
+	ASSERT_EQ(acc.result().entries.size(), 2u);
+	EXPECT_EQ(acc.result().entries[0].pgnIndex, 0x01u);
+}
+
+TEST_F(PgnListManagementTest, RxAccumulator_PropDP0BitMapping)
+{
+	/* dp0[0] bit 0 -> PGN 0xFF00, bit 2 -> PGN 0xFF02 */
+	RxPgnEnableListF2Accumulator acc;
+	(void)acc.feed(makeRxSubList(4, 0, 0, {}), m_error);
+	std::vector<uint8_t> dp0(32, 0);
+	dp0[0] = 0x05;
+	EXPECT_EQ(acc.feed(makeRxProp(4, dp0, std::vector<uint8_t>(32, 0)), m_error),
+			  PgnListAccumulatorStatus::Done);
+	const auto& pgns = acc.result().proprietary.enabledPgns;
+	ASSERT_EQ(pgns.size(), 2u);
+	EXPECT_EQ(pgns[0], 0x0000FF00u);
+	EXPECT_EQ(pgns[1], 0x0000FF02u);
+}
+
+TEST_F(PgnListManagementTest, RxAccumulator_PropDP1BitMapping)
+{
+	/* dp1[0] bit 0 -> PGN 0x1FF00, dp1[1] bit 7 -> PGN 0x1FF0F */
+	RxPgnEnableListF2Accumulator acc;
+	(void)acc.feed(makeRxSubList(6, 0, 0, {}), m_error);
+	std::vector<uint8_t> dp1(32, 0);
+	dp1[0] = 0x01;
+	dp1[1] = 0x80;
+	EXPECT_EQ(acc.feed(makeRxProp(6, std::vector<uint8_t>(32, 0), dp1), m_error),
+			  PgnListAccumulatorStatus::Done);
+	const auto& pgns = acc.result().proprietary.enabledPgns;
+	ASSERT_EQ(pgns.size(), 2u);
+	EXPECT_EQ(pgns[0], 0x0001FF00u);
+	EXPECT_EQ(pgns[1], 0x0001FF0Fu);
+}
+
+TEST_F(PgnListManagementTest, RxPgnEnableListF2_DecodeProprietaryResponse)
+{
+	/* xid=02, SVID=0x1103, dp0Size=2, dp0=[01,00], dp1Size=1, dp1=[20] */
+	const std::vector<uint8_t> data = {
+		0x02,					/* xid */
+		0x03, 0x11, 0x00, 0x00, /* SV_DIG_PropEnableList0 */
+		0x02, 0x01, 0x00,		/* dp0 size + dp0 bytes */
+		0x01, 0x20				/* dp1 size + dp1 byte */
+	};
+
+	RxPgnEnableListF2Response response;
+	EXPECT_TRUE(decodeRxPgnEnableListF2Response(data, response, m_error));
+	EXPECT_EQ(response.variant, RxPgnEnableListF2Variant::Proprietary);
+	ASSERT_EQ(response.propDp0Bitmap.size(), 2u);
+	EXPECT_EQ(response.propDp0Bitmap[0], 0x01u);
+	ASSERT_EQ(response.propDp1Bitmap.size(), 1u);
+	EXPECT_EQ(response.propDp1Bitmap[0], 0x20u);
 }
 
 /* Tx F2 accumulator -------------------------------------------------------- */

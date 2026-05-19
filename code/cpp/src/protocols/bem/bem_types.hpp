@@ -135,6 +135,26 @@ namespace Actisense
 			}
 		}
 
+		/**************************************************************************/ /**
+		 \brief      True when a model is known to emit SV_DIG_PropEnableList0
+					 after the standard list in Rx/Tx F2 PGN-Enable-List responses.
+		 \details    Per-sub-PGN proprietary enable bitmaps (PDU2 0xFF00 and
+					 0x1FF00 ranges) were added with NGX-1 firmware
+					 (NGXSW-3329). Older models (NGT-1, NGW-1, EMU-1, PRO-NDC-1,
+					 WGX) never emit the proprietary structure-variant message
+					 and the SDK accumulator must complete based on the standard
+					 list alone. Future models that ship the feature need an
+					 explicit case here.
+		 *******************************************************************************/
+		[[nodiscard]] inline bool supportsProprietaryEnableListF2(uint16_t modelId) {
+			switch (static_cast<ArlModelId>(modelId)) {
+				case ArlModelId::NGX1:
+					return true;
+				default:
+					return false;
+			}
+		}
+
 	} /* namespace Sdk */
 } /* namespace Actisense */
 
