@@ -10,6 +10,9 @@ add_sdk_test(test_remote_bem_loopback test_remote_bem_loopback.cpp)
 # Requires ACTISENSE_TEST_PORT (local gateway) and optionally
 # ACTISENSE_TEST_REMOTE_ADDR (defaults to 200).
 add_sdk_test(test_bem_remote_device test_bem_remote_device.cpp)
+# Two-device Tx PGN filtering sweep, single-frame standard PGNs (GIT-89).
+# Requires ACTISENSE_TEST_PORT (DUT) AND ACTISENSE_TEST_RX_PORT (receiver).
+add_sdk_test(test_tx_pgn_blocking_singleframe test_tx_pgn_blocking_singleframe.cpp)
 
 # Add integration test files here as they are developed
 
