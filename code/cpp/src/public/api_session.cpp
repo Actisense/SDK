@@ -87,9 +87,9 @@ namespace Actisense
 			onOpened(ErrorCode::Ok, std::move(session));
 		}
 
-		std::unique_ptr<Session>
-		Api::createSerialSession(const SerialConfig& config, EventCallback onEvent,
-								 ErrorCallback onError) {
+		std::unique_ptr<Session> Api::createSerialSession(const SerialConfig& config,
+														  EventCallback onEvent,
+														  ErrorCallback onError) {
 			auto transport = std::make_unique<SerialTransport>();
 
 			TransportConfig transportConfig;
@@ -107,8 +107,8 @@ namespace Actisense
 				return nullptr;
 			}
 
-			auto session = std::make_unique<SessionImpl>(
-				std::move(transport), std::move(onEvent), std::move(onError));
+			auto session = std::make_unique<SessionImpl>(std::move(transport), std::move(onEvent),
+														 std::move(onError));
 			session->startReceiving();
 			return session;
 		}

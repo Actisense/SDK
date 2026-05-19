@@ -35,8 +35,8 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Maximum size of a single inner BDTP frame, in bytes
 		 \details    Shared cap used by BdtpProtocol's live parser and the
-		             wire-trace BdtpFrameAssembler so the two never disagree
-		             about what counts as oversized.
+					 wire-trace BdtpFrameAssembler so the two never disagree
+					 about what counts as oversized.
 		 *******************************************************************************/
 		inline constexpr std::size_t kBdtpMaxFrameSize = 512;
 

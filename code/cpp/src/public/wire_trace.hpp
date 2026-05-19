@@ -57,11 +57,11 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Capture Rx bytes that arrive outside any BDTP frame
 			 \details    EBL mode only. Default true so customer-support
-			             captures show *every* byte that came off the wire,
-			             including boot banners, error sentinels, partial-frame
-			             debris and other out-of-frame traffic. Set false to
-			             omit those records and keep the EBL log to cleanly
-			             framed BST messages only.
+						 captures show *every* byte that came off the wire,
+						 including boot banners, error sentinels, partial-frame
+						 debris and other out-of-frame traffic. Set false to
+						 omit those records and keep the EBL log to cleanly
+						 framed BST messages only.
 			 *******************************************************************************/
 			bool includeUnframedRxBytes = true;
 		};

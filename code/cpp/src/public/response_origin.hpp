@@ -7,17 +7,17 @@
 \date       (Created) 18/05/2026
 \brief      Per-response origin metadata delivered alongside typed BEM callbacks
 \details    Every typed BEM callback delivers, in addition to the decoded
-            value, a ResponseOrigin describing where the reply came from:
-            which device on the bus (N2K source address), via which
-            session/transport, through what wrapping path (direct BEM vs
-            PGN 126720), and at what time it landed.
+			value, a ResponseOrigin describing where the reply came from:
+			which device on the bus (N2K source address), via which
+			session/transport, through what wrapping path (direct BEM vs
+			PGN 126720), and at what time it landed.
 
-            Origin is non-load-bearing for simple single-device callers —
-            an application that opens one Session and one RemoteDevice
-            handle already knows the answers. It exists to disambiguate
-            fan-in scenarios: one user callback aggregating replies from
-            many remote devices, or many Sessions, or a mix of local +
-            remote traffic.
+			Origin is non-load-bearing for simple single-device callers —
+			an application that opens one Session and one RemoteDevice
+			handle already knows the answers. It exists to disambiguate
+			fan-in scenarios: one user callback aggregating replies from
+			many remote devices, or many Sessions, or a mix of local +
+			remote traffic.
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 ==============================================================================*/
@@ -46,12 +46,12 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Metadata describing the source of a BEM response.
 		 \details    Delivered as the trailing argument to every typed BEM
-		             callback (e.g. OperatingModeCallback, PortBaudrateCallback).
-		             The struct is constructed by the SDK at response-delivery
-		             time and is owned by the callback frame — it is safe to
-		             copy / store fields out, but the struct itself is
-		             intended to be inspected synchronously inside the
-		             callback.
+					 callback (e.g. OperatingModeCallback, PortBaudrateCallback).
+					 The struct is constructed by the SDK at response-delivery
+					 time and is owned by the callback frame — it is safe to
+					 copy / store fields out, but the struct itself is
+					 intended to be inspected synchronously inside the
+					 callback.
 		 *******************************************************************************/
 		struct ResponseOrigin
 		{

@@ -109,8 +109,8 @@ namespace Actisense
 
 			if (totalLen < kCanInfoFieldHeaderSize ||
 				totalLen > kCanInfoFieldHeaderSize + kCanInfoFieldMaxLen) {
-				outError = "CAN Info Field response has invalid total length: " +
-						   std::to_string(totalLen);
+				outError =
+					"CAN Info Field response has invalid total length: " + std::to_string(totalLen);
 				return false;
 			}
 			if (totalLen > data.size()) {
@@ -126,8 +126,8 @@ namespace Actisense
 			}
 
 			const std::size_t textLen = totalLen - kCanInfoFieldHeaderSize;
-			response.text.assign(reinterpret_cast<const char*>(data.data() + kCanInfoFieldHeaderSize),
-								 textLen);
+			response.text.assign(
+				reinterpret_cast<const char*>(data.data() + kCanInfoFieldHeaderSize), textLen);
 			return true;
 		}
 

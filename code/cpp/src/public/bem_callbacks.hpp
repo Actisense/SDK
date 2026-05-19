@@ -7,19 +7,19 @@
 \date       (Created) 18/05/2026
 \brief      Public typed callback aliases for BEM commands.
 \details    Centralises the callback signatures shared between Session
-            (local gateway) and RemoteDevice (gateway-relayed remote
-            device). Every typed callback carries a trailing
-            ResponseOrigin describing which device sent the reply, via
-            which session/transport, through what wrapping path, and
-            when it landed.
+			(local gateway) and RemoteDevice (gateway-relayed remote
+			device). Every typed callback carries a trailing
+			ResponseOrigin describing which device sent the reply, via
+			which session/transport, through what wrapping path, and
+			when it landed.
 
-            The decoded result types referenced here live alongside
-            their wire-format helpers in
-            src/protocols/bem/bem_commands/*.hpp. Those headers are
-            pure data + decoders in the Actisense::Sdk namespace with
-            no internal-only dependencies, and form part of the public
-            API contract — applications including this header will
-            transitively pull them in.
+			The decoded result types referenced here live alongside
+			their wire-format helpers in
+			src/protocols/bem/bem_commands/ headers. Those headers are
+			pure data + decoders in the Actisense::Sdk namespace with
+			no internal-only dependencies, and form part of the public
+			API contract — applications including this header will
+			transitively pull them in.
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 ==============================================================================*/
@@ -68,54 +68,54 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Operating-mode callback (Session/RemoteDevice::getOperatingMode)
 		 *******************************************************************************/
-		using OperatingModeCallback = std::function<void(
-			ErrorCode code, std::string_view errorMsg,
-			std::optional<OperatingMode> mode, ResponseOrigin origin)>;
+		using OperatingModeCallback =
+			std::function<void(ErrorCode code, std::string_view errorMsg,
+							   std::optional<OperatingMode> mode, ResponseOrigin origin)>;
 
 		/**************************************************************************/ /**
 		 \brief      Hardware-info callback (Session/RemoteDevice::getHardwareInfo)
 		 \details    Decoded from the device's NMEA 2000 Product Information
-		             (model, software/model versions, serial number, etc.).
+					 (model, software/model versions, serial number, etc.).
 		 *******************************************************************************/
-		using HardwareInfoCallback = std::function<void(
-			ErrorCode code, std::string_view errorMsg,
-			const std::optional<HardwareInfo>& info, ResponseOrigin origin)>;
+		using HardwareInfoCallback =
+			std::function<void(ErrorCode code, std::string_view errorMsg,
+							   const std::optional<HardwareInfo>& info, ResponseOrigin origin)>;
 
 		/**************************************************************************/ /**
 		 \brief      Product-info callback (raw Product Information response,
-		             prior to HardwareInfo mapping).
+					 prior to HardwareInfo mapping).
 		 *******************************************************************************/
-		using ProductInfoCallback = std::function<void(
-			ErrorCode code, std::string_view errorMsg,
-			std::optional<ProductInfoResponse> info, ResponseOrigin origin)>;
+		using ProductInfoCallback =
+			std::function<void(ErrorCode code, std::string_view errorMsg,
+							   std::optional<ProductInfoResponse> info, ResponseOrigin origin)>;
 
 		/**************************************************************************/ /**
 		 \brief      Port-baudrate callback (Get/Set Port Baudrate replies).
 		 *******************************************************************************/
 		using PortBaudrateCallback = std::function<void(
-			ErrorCode code, std::string_view errorMsg,
-			std::optional<PortBaudrateResponse> response, ResponseOrigin origin)>;
+			ErrorCode code, std::string_view errorMsg, std::optional<PortBaudrateResponse> response,
+			ResponseOrigin origin)>;
 
 		/**************************************************************************/ /**
 		 \brief      Port P-Code callback (Get/Set Port P-Code replies).
 		 *******************************************************************************/
-		using PortPCodeCallback = std::function<void(
-			ErrorCode code, std::string_view errorMsg,
-			std::optional<PortPCodeResponse> response, ResponseOrigin origin)>;
+		using PortPCodeCallback =
+			std::function<void(ErrorCode code, std::string_view errorMsg,
+							   std::optional<PortPCodeResponse> response, ResponseOrigin origin)>;
 
 		/**************************************************************************/ /**
 		 \brief      Rx PGN Enable callback (Get/Set Rx PGN Enable single-PGN replies).
 		 *******************************************************************************/
-		using RxPgnEnableCallback = std::function<void(
-			ErrorCode code, std::string_view errorMsg,
-			std::optional<RxPgnEnableResponse> response, ResponseOrigin origin)>;
+		using RxPgnEnableCallback =
+			std::function<void(ErrorCode code, std::string_view errorMsg,
+							   std::optional<RxPgnEnableResponse> response, ResponseOrigin origin)>;
 
 		/**************************************************************************/ /**
 		 \brief      Tx PGN Enable callback (Get/Set Tx PGN Enable single-PGN replies).
 		 *******************************************************************************/
-		using TxPgnEnableCallback = std::function<void(
-			ErrorCode code, std::string_view errorMsg,
-			std::optional<TxPgnEnableResponse> response, ResponseOrigin origin)>;
+		using TxPgnEnableCallback =
+			std::function<void(ErrorCode code, std::string_view errorMsg,
+							   std::optional<TxPgnEnableResponse> response, ResponseOrigin origin)>;
 
 		/**************************************************************************/ /**
 		 \brief      Rx PGN Enable List F2 result callback — full aggregated walk.
@@ -135,36 +135,36 @@ namespace Actisense
 		 \brief      Supported-PGN List result callback — full aggregated walk.
 		 *******************************************************************************/
 		using SupportedPgnListResultCallback = std::function<void(
-			ErrorCode code, std::string_view errorMsg,
-			std::optional<SupportedPgnListResult> result, ResponseOrigin origin)>;
+			ErrorCode code, std::string_view errorMsg, std::optional<SupportedPgnListResult> result,
+			ResponseOrigin origin)>;
 
 		/**************************************************************************/ /**
 		 \brief      Total-time callback (Get/Set Total Time replies).
 		 *******************************************************************************/
-		using TotalTimeCallback = std::function<void(
-			ErrorCode code, std::string_view errorMsg,
-			std::optional<TotalTimeResponse> response, ResponseOrigin origin)>;
+		using TotalTimeCallback =
+			std::function<void(ErrorCode code, std::string_view errorMsg,
+							   std::optional<TotalTimeResponse> response, ResponseOrigin origin)>;
 
 		/**************************************************************************/ /**
 		 \brief      Echo callback (Echo reply, including the echoed payload).
 		 *******************************************************************************/
-		using EchoCallback = std::function<void(
-			ErrorCode code, std::string_view errorMsg,
-			std::optional<EchoResponse> response, ResponseOrigin origin)>;
+		using EchoCallback =
+			std::function<void(ErrorCode code, std::string_view errorMsg,
+							   std::optional<EchoResponse> response, ResponseOrigin origin)>;
 
 		/**************************************************************************/ /**
 		 \brief      CAN Config callback (Get/Set CAN Config replies — NAME + SA).
 		 *******************************************************************************/
-		using CanConfigCallback = std::function<void(
-			ErrorCode code, std::string_view errorMsg,
-			std::optional<CanConfigResponse> response, ResponseOrigin origin)>;
+		using CanConfigCallback =
+			std::function<void(ErrorCode code, std::string_view errorMsg,
+							   std::optional<CanConfigResponse> response, ResponseOrigin origin)>;
 
 		/**************************************************************************/ /**
 		 \brief      CAN Info Field callback (Get/Set CAN Info Field 1/2/3 replies).
 		 *******************************************************************************/
 		using CanInfoFieldCallback = std::function<void(
-			ErrorCode code, std::string_view errorMsg,
-			std::optional<CanInfoFieldResponse> response, ResponseOrigin origin)>;
+			ErrorCode code, std::string_view errorMsg, std::optional<CanInfoFieldResponse> response,
+			ResponseOrigin origin)>;
 
 		/**************************************************************************/ /**
 		 \brief      Params PGN Enable Lists callback (status query reply).

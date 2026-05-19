@@ -28,8 +28,8 @@ namespace Actisense
 
 		/**************************************************************************/ /**
 		 \brief      Sentinel N2K source address that marks a request bound for
-		             the locally connected gateway rather than a remote device
-		             reached via PGN 126720 wrapping (GIT-88).
+					 the locally connected gateway rather than a remote device
+					 reached via PGN 126720 wrapping (GIT-88).
 		 *******************************************************************************/
 		inline constexpr uint8_t kLocalSrcAddr = 0xFF;
 
@@ -65,11 +65,11 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Encode a BEM command as the bare inner BST bytes
-			             (BST ID + storeLength + BEM ID + data).
+						 (BST ID + storeLength + BEM ID + data).
 			 \details    No BDTP framing and no trailing BDTP checksum: those
-			             belong to the local transmission path, not to the BEM
-			             payload that gets wrapped inside PGN 126720 when
-			             addressing a remote device (GIT-88).
+						 belong to the local transmission path, not to the BEM
+						 payload that gets wrapped inside PGN 126720 when
+						 addressing a remote device (GIT-88).
 			 \param[in]  command       Command to encode
 			 \param[out] outInnerBst   Inner BST bytes ready to wrap or frame
 			 \param[out] outError      Error message if encoding fails
@@ -495,32 +495,31 @@ namespace Actisense
 			 \param[in]  timeout    Timeout for response
 			 \param[in]  callback   Callback to invoke on response or timeout
 			 \param[in]  srcAddr    N2K source address the matching response is
-			                        expected to arrive from. Defaults to
-			                        kLocalSrcAddr (response comes from the locally
-			                        connected gateway). For commands sent to a
-			                        remote device via PGN 126720 wrapping
-			                        (GIT-88), pass the target device's address so
-			                        replies from different remotes do not collide.
+									expected to arrive from. Defaults to
+									kLocalSrcAddr (response comes from the locally
+									connected gateway). For commands sent to a
+									remote device via PGN 126720 wrapping
+									(GIT-88), pass the target device's address so
+									replies from different remotes do not collide.
 			 \return     Sequence ID assigned to this request
 			 \note       One-shot: the entry is released after the first matching
-			             response. For commands whose firmware emits a train of
-			             responses for a single GET (e.g. F2 PGN-list 0x4E/0x4F)
-			             use registerMultiReplyRequest() instead.
+						 response. For commands whose firmware emits a train of
+						 responses for a single GET (e.g. F2 PGN-list 0x4E/0x4F)
+						 use registerMultiReplyRequest() instead.
 			 *******************************************************************************/
 			uint8_t registerRequest(BemCommandId commandId, BstId bstId,
-									std::chrono::milliseconds timeout,
-									BemResponseCallback callback,
+									std::chrono::milliseconds timeout, BemResponseCallback callback,
 									uint8_t srcAddr = kLocalSrcAddr);
 
 			/**************************************************************************/ /**
 			 \brief      Register a pending request that may receive several
-			             responses before completing.
+						 responses before completing.
 			 \details    The callback fires once per matching response. The
-			             isComplete predicate is consulted after each callback
-			             invocation; the pending entry is held until it returns
-			             true (or the request times out). The timeout is treated
-			             as an inactivity window: sentAt is refreshed every time
-			             a response is delivered while isComplete is false.
+						 isComplete predicate is consulted after each callback
+						 invocation; the pending entry is held until it returns
+						 true (or the request times out). The timeout is treated
+						 as an inactivity window: sentAt is refreshed every time
+						 a response is delivered while isComplete is false.
 			 \param[in]  commandId           Command being sent
 			 \param[in]  bstId               Command BST ID
 			 \param[in]  inactivityTimeout   Max gap between successive responses
@@ -538,15 +537,14 @@ namespace Actisense
 			 \brief      Try to correlate a response with a pending request
 			 \param[in]  response   Decoded BEM response
 			 \param[in]  srcAddr    N2K source address that delivered the response.
-			                        Defaults to kLocalSrcAddr for replies that
-			                        arrived directly from the locally connected
-			                        gateway. For replies unwrapped from a
-			                        PGN 126720 envelope (GIT-88), pass the N2K
-			                        source address of the remote device.
+									Defaults to kLocalSrcAddr for replies that
+									arrived directly from the locally connected
+									gateway. For replies unwrapped from a
+									PGN 126720 envelope (GIT-88), pass the N2K
+									source address of the remote device.
 			 \return     True if response was correlated and callback invoked
 			 *******************************************************************************/
-			bool correlateResponse(const BemResponse& response,
-								   uint8_t srcAddr = kLocalSrcAddr);
+			bool correlateResponse(const BemResponse& response, uint8_t srcAddr = kLocalSrcAddr);
 
 			/**************************************************************************/ /**
 			 \brief      Check for timed-out requests and invoke callbacks
@@ -612,14 +610,14 @@ namespace Actisense
 			 \param[in]  bstId    BST command/response ID
 			 \param[in]  bemId    BEM command ID
 			 \param[in]  srcAddr  N2K source address (kLocalSrcAddr for the
-			                      locally connected gateway). Lets concurrent
-			                      requests to different remote devices share the
-			                      same (bstId, bemId) without colliding.
+								  locally connected gateway). Lets concurrent
+								  requests to different remote devices share the
+								  same (bstId, bemId) without colliding.
 			 \return     64-bit key for request/response correlation
 			 *******************************************************************************/
-			[[nodiscard]] static uint64_t buildResponseKey(
-				BstId bstId, BemCommandId bemId,
-				uint8_t srcAddr = kLocalSrcAddr) noexcept;
+			[[nodiscard]] static uint64_t
+			buildResponseKey(BstId bstId, BemCommandId bemId,
+							 uint8_t srcAddr = kLocalSrcAddr) noexcept;
 
 			/**************************************************************************/ /**
 			 \brief      Get next sequence ID (thread-safe)

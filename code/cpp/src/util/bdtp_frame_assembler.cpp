@@ -14,10 +14,8 @@ namespace Actisense
 {
 	namespace Sdk
 	{
-		void BdtpFrameAssembler::feed(std::span<const uint8_t> bytes,
-		                              const FrameCallback& on_frame,
-		                              const UnframedCallback& on_unframed)
-		{
+		void BdtpFrameAssembler::feed(std::span<const uint8_t> bytes, const FrameCallback& on_frame,
+									  const UnframedCallback& on_unframed) {
 			/* Helper: push a byte into the unframed buffer with the same
 			   overflow cap the frame buffer uses. The buffer is flushed at
 			   each frame start and at the end of feed(), so under normal
@@ -33,8 +31,7 @@ namespace Actisense
 					case State::Idle:
 						if (byte == BdtpChars::DLE) {
 							state_ = State::GotDLE;
-						}
-						else {
+						} else {
 							pushUnframed(byte);
 						}
 						break;
@@ -47,14 +44,12 @@ namespace Actisense
 							emitUnframed(on_unframed);
 							state_ = State::InFrame;
 							frame_.clear();
-						}
-						else if (byte == BdtpChars::DLE) {
+						} else if (byte == BdtpChars::DLE) {
 							/* Two DLEs outside a frame: the first was
 							   garbage; the second might still start a
 							   frame, so stay in GotDLE. */
 							pushUnframed(BdtpChars::DLE);
-						}
-						else {
+						} else {
 							/* Not a frame start — both the buffered DLE
 							   and this byte are garbage. */
 							pushUnframed(BdtpChars::DLE);
@@ -66,11 +61,9 @@ namespace Actisense
 					case State::InFrame:
 						if (byte == BdtpChars::DLE) {
 							state_ = State::InFrameGotDLE;
-						}
-						else if (frame_.size() < kBdtpMaxFrameSize) {
+						} else if (frame_.size() < kBdtpMaxFrameSize) {
 							frame_.push_back(byte);
-						}
-						else {
+						} else {
 							/* Oversized frame — drop and recover. */
 							state_ = State::Idle;
 							frame_.clear();
@@ -87,20 +80,17 @@ namespace Actisense
 							}
 							state_ = State::Idle;
 							frame_.clear();
-						}
-						else if (byte == BdtpChars::DLE) {
+						} else if (byte == BdtpChars::DLE) {
 							/* DLE+DLE → literal 0x10 inside the frame. */
 							if (frame_.size() < kBdtpMaxFrameSize) {
 								frame_.push_back(BdtpChars::DLE);
 							}
 							state_ = State::InFrame;
-						}
-						else if (byte == BdtpChars::STX) {
+						} else if (byte == BdtpChars::STX) {
 							/* New frame starts mid-frame — abandon the current one. */
 							state_ = State::InFrame;
 							frame_.clear();
-						}
-						else {
+						} else {
 							/* Invalid escape — drop the current frame. */
 							state_ = State::Idle;
 							frame_.clear();
@@ -117,15 +107,13 @@ namespace Actisense
 			emitUnframed(on_unframed);
 		}
 
-		void BdtpFrameAssembler::reset() noexcept
-		{
+		void BdtpFrameAssembler::reset() noexcept {
 			state_ = State::Idle;
 			frame_.clear();
 			unframed_.clear();
 		}
 
-		void BdtpFrameAssembler::emitUnframed(const UnframedCallback& on_unframed)
-		{
+		void BdtpFrameAssembler::emitUnframed(const UnframedCallback& on_unframed) {
 			if (unframed_.empty()) {
 				return;
 			}

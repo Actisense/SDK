@@ -77,8 +77,8 @@ namespace Actisense
 						   std::to_string(data.size());
 				return false;
 			}
-			const uint16_t modeRaw = static_cast<uint16_t>(data[0]) |
-									 (static_cast<uint16_t>(data[1]) << 8);
+			const uint16_t modeRaw =
+				static_cast<uint16_t>(data[0]) | (static_cast<uint16_t>(data[1]) << 8);
 			outMode = static_cast<OperatingMode>(modeRaw);
 			return true;
 		}

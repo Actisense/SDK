@@ -77,8 +77,8 @@ namespace Actisense
 			GetSetTxPgnEnable = 0x47, ///< Get/Set Tx PGN enable state
 
 			/* PGN List Management Commands */
-			GetSupportedPgnList = 0x40,		///< Get list of supported PGNs (multi-message, transferId)
-			DeletePgnEnableLists = 0x4A,	///< Delete PGN enable lists from session
+			GetSupportedPgnList = 0x40,	 ///< Get list of supported PGNs (multi-message, transferId)
+			DeletePgnEnableLists = 0x4A, ///< Delete PGN enable lists from session
 			ActivatePgnEnableLists = 0x4B,	///< Activate session PGN enable lists
 			DefaultPgnEnableList = 0x4C,	///< Restore default PGN enable lists
 			ParamsPgnEnableLists = 0x4D,	///< Get PGN enable list parameters/status

@@ -57,8 +57,7 @@ namespace Actisense
 		 \return     8-byte PGN payload
 		 *******************************************************************************/
 		[[nodiscard]] std::vector<uint8_t>
-		encodeWaterDepth(uint8_t sid, double depth_m,
-						 std::optional<double> offset_m = std::nullopt,
+		encodeWaterDepth(uint8_t sid, double depth_m, std::optional<double> offset_m = std::nullopt,
 						 std::optional<double> range_m = std::nullopt);
 
 		/**************************************************************************/ /**

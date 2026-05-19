@@ -33,10 +33,7 @@ namespace Actisense
 			RemoteDeviceImpl(SessionImpl& session, uint8_t n2kSourceAddress) noexcept;
 			~RemoteDeviceImpl() override = default;
 
-			[[nodiscard]] uint8_t n2kSourceAddress() const noexcept override
-			{
-				return src_addr_;
-			}
+			[[nodiscard]] uint8_t n2kSourceAddress() const noexcept override { return src_addr_; }
 
 			void getOperatingMode(std::chrono::milliseconds timeout,
 								  OperatingModeCallback callback) override;
@@ -58,20 +55,18 @@ namespace Actisense
 
 			void getPortBaudrate(uint8_t portNumber, std::chrono::milliseconds timeout,
 								 PortBaudrateCallback callback) override;
-			void setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud,
-								 uint32_t storeBaud, std::chrono::milliseconds timeout,
+			void setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud, uint32_t storeBaud,
+								 std::chrono::milliseconds timeout,
 								 BemResultCallback callback) override;
 
 			void getPortPCode(std::chrono::milliseconds timeout,
 							  PortPCodeCallback callback) override;
-			void setPortPCode(std::span<const uint8_t> pCodes,
-							  std::chrono::milliseconds timeout,
+			void setPortPCode(std::span<const uint8_t> pCodes, std::chrono::milliseconds timeout,
 							  BemResultCallback callback) override;
 
 			void getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
 								RxPgnEnableCallback callback) override;
-			void setRxPgnEnable(uint32_t pgn, uint8_t enable,
-								std::chrono::milliseconds timeout,
+			void setRxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
 								BemResultCallback callback) override;
 			void setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
 										std::chrono::milliseconds timeout,
@@ -79,8 +74,7 @@ namespace Actisense
 
 			void getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
 								TxPgnEnableCallback callback) override;
-			void setTxPgnEnable(uint32_t pgn, uint8_t enable,
-								std::chrono::milliseconds timeout,
+			void setTxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
 								BemResultCallback callback) override;
 			void setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
 										std::chrono::milliseconds timeout,
@@ -116,13 +110,11 @@ namespace Actisense
 
 			void getCanInfoField1(std::chrono::milliseconds timeout,
 								  CanInfoFieldCallback callback) override;
-			void setCanInfoField1(const std::string& text,
-								  std::chrono::milliseconds timeout,
+			void setCanInfoField1(const std::string& text, std::chrono::milliseconds timeout,
 								  BemResultCallback callback) override;
 			void getCanInfoField2(std::chrono::milliseconds timeout,
 								  CanInfoFieldCallback callback) override;
-			void setCanInfoField2(const std::string& text,
-								  std::chrono::milliseconds timeout,
+			void setCanInfoField2(const std::string& text, std::chrono::milliseconds timeout,
 								  BemResultCallback callback) override;
 			void getCanInfoField3(std::chrono::milliseconds timeout,
 								  CanInfoFieldCallback callback) override;
@@ -144,8 +136,7 @@ namespace Actisense
 			void sendBemCommand(const BemCommand& command, std::chrono::milliseconds timeout,
 								BemResponseCallback callback);
 
-			void getOperatingMode(std::chrono::milliseconds timeout,
-								  BemResponseCallback callback);
+			void getOperatingMode(std::chrono::milliseconds timeout, BemResponseCallback callback);
 			void setOperatingMode(uint16_t mode, std::chrono::milliseconds timeout,
 								  BemResponseCallback callback);
 
@@ -155,20 +146,20 @@ namespace Actisense
 								 std::chrono::milliseconds timeout, BemResponseCallback callback);
 
 			void getPortPCode(std::chrono::milliseconds timeout, BemResponseCallback callback);
-			void setPortPCode(std::span<const uint8_t> pCodes,
-							  std::chrono::milliseconds timeout, BemResponseCallback callback);
+			void setPortPCode(std::span<const uint8_t> pCodes, std::chrono::milliseconds timeout,
+							  BemResponseCallback callback);
 
 			void getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
 								BemResponseCallback callback);
-			void setRxPgnEnable(uint32_t pgn, uint8_t enable,
-								std::chrono::milliseconds timeout, BemResponseCallback callback);
+			void setRxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
+								BemResponseCallback callback);
 			void setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
 										std::chrono::milliseconds timeout,
 										BemResponseCallback callback);
 			void getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
 								BemResponseCallback callback);
-			void setTxPgnEnable(uint32_t pgn, uint8_t enable,
-								std::chrono::milliseconds timeout, BemResponseCallback callback);
+			void setTxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
+								BemResponseCallback callback);
 			void setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
 										std::chrono::milliseconds timeout,
 										BemResponseCallback callback);

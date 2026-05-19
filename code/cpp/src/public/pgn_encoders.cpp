@@ -10,11 +10,11 @@
 /* Dependent includes ------------------------------------------------------- */
 #include "public/pgn_encoders.hpp"
 
-#include "util/endian.hpp"
-
 #include <cmath>
 #include <cstdint>
 #include <vector>
+
+#include "util/endian.hpp"
 
 namespace Actisense
 {
@@ -83,8 +83,7 @@ namespace Actisense
 				const int32_t offsetCounts =
 					quantiseSigned(*offset_m, 0.001, -32767, 32767, kI16NotAvailable);
 				writeLe<int16_t>(&out[5], static_cast<int16_t>(offsetCounts));
-			}
-			else {
+			} else {
 				writeLe<int16_t>(&out[5], kI16NotAvailable);
 			}
 
@@ -92,8 +91,7 @@ namespace Actisense
 			if (range_m) {
 				const uint32_t rangeCounts = quantiseUnsigned(*range_m, 10.0, 254u, 0xFFu);
 				out[7] = static_cast<uint8_t>(rangeCounts);
-			}
-			else {
+			} else {
 				out[7] = 0xFF;
 			}
 
@@ -135,8 +133,8 @@ namespace Actisense
 
 			/* Rate: int32 LE, resolution 3.125e-8 rad/s */
 			constexpr double kRateResolution = 3.125e-8;
-			const int32_t rateCounts = quantiseSigned(
-				rate_rad_per_s, kRateResolution, -2147483647, 2147483647, kI32NotAvailable);
+			const int32_t rateCounts = quantiseSigned(rate_rad_per_s, kRateResolution, -2147483647,
+													  2147483647, kI32NotAvailable);
 			writeLe<int32_t>(&out[1], rateCounts);
 
 			/* Bytes 5..7 remain 0xFF reserved */

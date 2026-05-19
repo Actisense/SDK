@@ -57,21 +57,21 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Send a message asynchronously
 			 \param[in]  protocol    Protocol ID selecting how the payload is
-			                         wrapped before it hits the transport.
-			                         Accepted values:
-			                           - "bst"  : @p payload is the raw BST
-			                                      bytes (BST_ID + length + data).
-			                                      The SDK appends the zero-sum
-			                                      BST checksum and applies
-			                                      DLE+STX/DLE+ETX framing.
-			                           - "raw"  : @p payload is sent verbatim
-			                                      with no checksum or framing
-			                                      (caller is responsible for
-			                                      whatever wire format the
-			                                      remote end expects).
-			                         Any other value is treated as "raw".
+									 wrapped before it hits the transport.
+									 Accepted values:
+									   - "bst"  : @p payload is the raw BST
+												  bytes (BST_ID + length + data).
+												  The SDK appends the zero-sum
+												  BST checksum and applies
+												  DLE+STX/DLE+ETX framing.
+									   - "raw"  : @p payload is sent verbatim
+												  with no checksum or framing
+												  (caller is responsible for
+												  whatever wire format the
+												  remote end expects).
+									 Any other value is treated as "raw".
 			 \param[in]  payload     Bytes to send. See @p protocol for the
-			                         expected layout.
+									 expected layout.
 			 \param[in]  completion  Callback invoked on completion or error
 			 *******************************************************************************/
 			virtual void asyncSend(const std::string& protocol, std::span<const uint8_t> payload,
@@ -124,10 +124,10 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Open a handle for issuing BEM commands to a remote
-			             NMEA 2000 device, wrapped in PGN 126720 (GIT-88).
+						 NMEA 2000 device, wrapped in PGN 126720 (GIT-88).
 			 \param[in]  n2kSourceAddress  N2K source address of the target
-			                               device on the bus behind the
-			                               locally connected gateway.
+										   device on the bus behind the
+										   locally connected gateway.
 			 \return     Owning handle. Must not outlive the session.
 			 *******************************************************************************/
 			[[nodiscard]] virtual std::unique_ptr<RemoteDevice>
@@ -135,12 +135,12 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Transport label reported in ResponseOrigin::transportId
-			             on every typed BEM callback this Session (and its
-			             RemoteDevice handles) deliver.
+						 on every typed BEM callback this Session (and its
+						 RemoteDevice handles) deliver.
 			 \details    Defaults to a value derived from the open transport
-			             config (e.g. the serial port name "COM5"). Useful when
-			             one user callback aggregates replies from multiple
-			             concurrent Sessions and needs to disambiguate.
+						 config (e.g. the serial port name "COM5"). Useful when
+						 one user callback aggregates replies from multiple
+						 concurrent Sessions and needs to disambiguate.
 			 *******************************************************************************/
 			[[nodiscard]] virtual std::string_view transportLabel() const noexcept = 0;
 

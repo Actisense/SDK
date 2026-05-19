@@ -64,9 +64,8 @@ namespace Actisense
 			void asyncSend(const std::string& protocol, std::span<const uint8_t> payload,
 						   SendCompletion completion) override;
 
-			void sendPgn(uint32_t pgn, std::span<const uint8_t> payload,
-						 uint8_t destination = 0xFF, uint8_t priority = 6,
-						 SendCompletion completion = {}) override;
+			void sendPgn(uint32_t pgn, std::span<const uint8_t> payload, uint8_t destination = 0xFF,
+						 uint8_t priority = 6, SendCompletion completion = {}) override;
 
 			void getOperatingMode(std::chrono::milliseconds timeout,
 								  OperatingModeCallback callback) override;
@@ -90,19 +89,18 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Build a ResponseOrigin for a reply that came back over
-			             this session via the direct (local-gateway) BEM path.
+						 this session via the direct (local-gateway) BEM path.
 			 \details    Stamps the current steady-clock time; intended to be
-			             called at the moment a typed callback is about to fire.
+						 called at the moment a typed callback is about to fire.
 			 *******************************************************************************/
 			[[nodiscard]] ResponseOrigin makeLocalOrigin() const;
 
 			/**************************************************************************/ /**
 			 \brief      Build a ResponseOrigin for a reply unwrapped from a
-			             PGN 126720 round-trip via this session's gateway.
+						 PGN 126720 round-trip via this session's gateway.
 			 \param[in]  remoteN2kSourceAddress  SA of the remote responder.
 			 *******************************************************************************/
-			[[nodiscard]] ResponseOrigin
-			makeRemoteOrigin(uint8_t remoteN2kSourceAddress) const;
+			[[nodiscard]] ResponseOrigin makeRemoteOrigin(uint8_t remoteN2kSourceAddress) const;
 
 			void close() override;
 
@@ -154,17 +152,17 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Send a BEM command wrapped in PGN 126720 to a remote
-			             NMEA 2000 device (GIT-88).
+						 NMEA 2000 device (GIT-88).
 			 \details    The inner BST bytes are extracted from the encoded
-			             command, prepended with the Actisense
-			             manufacturer/industry header, and transmitted as a
-			             BST-94 PGN 126720 frame addressed to
-			             @p targetN2kSourceAddress. The reply, when it arrives
-			             unwrapped from the same PGN, is correlated against the
-			             pending request via the BEM correlator keyed on the
-			             remote source address.
+						 command, prepended with the Actisense
+						 manufacturer/industry header, and transmitted as a
+						 BST-94 PGN 126720 frame addressed to
+						 @p targetN2kSourceAddress. The reply, when it arrives
+						 unwrapped from the same PGN, is correlated against the
+						 pending request via the BEM correlator keyed on the
+						 remote source address.
 			 \param[in]  targetN2kSourceAddress  N2K source address of the
-			                                     destination device.
+												 destination device.
 			 \param[in]  command                 BEM command to send.
 			 \param[in]  timeout                 Response timeout.
 			 \param[in]  callback                Invoked on response or timeout.
@@ -176,29 +174,29 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Multi-reply variant of sendBemCommandRemote.
 			 \details    Same PGN-126720 wrap + BST-94 send path as the
-			             single-reply helper, but registers via
-			             `BemProtocol::registerMultiReplyRequest` so the
-			             correlator holds the pending entry across N replies
-			             from the same remote device, invoking `isComplete`
-			             after each delivery to decide when the train ends.
-			             `inactivityTimeout` is the per-message gap, not a
-			             whole-request budget.
+						 single-reply helper, but registers via
+						 `BemProtocol::registerMultiReplyRequest` so the
+						 correlator holds the pending entry across N replies
+						 from the same remote device, invoking `isComplete`
+						 after each delivery to decide when the train ends.
+						 `inactivityTimeout` is the per-message gap, not a
+						 whole-request budget.
 			 \param[in]  targetN2kSourceAddress  N2K source address of the
-			                                     destination device.
+												 destination device.
 			 \param[in]  command                 BEM command to send.
 			 \param[in]  inactivityTimeout       Max gap between successive
-			                                     replies before the request
-			                                     times out.
+												 replies before the request
+												 times out.
 			 \param[in]  isComplete              Predicate fired after each
-			                                     reply; true ends the train.
+												 reply; true ends the train.
 			 \param[in]  callback                Invoked per reply and on
-			                                     terminal state (timeout / cancel).
+												 terminal state (timeout / cancel).
 			 *******************************************************************************/
-			void sendBemCommandRemoteMultiReply(
-				uint8_t targetN2kSourceAddress, const BemCommand& command,
-				std::chrono::milliseconds inactivityTimeout,
-				std::function<bool(const BemResponse&)> isComplete,
-				BemResponseCallback callback);
+			void sendBemCommandRemoteMultiReply(uint8_t targetN2kSourceAddress,
+												const BemCommand& command,
+												std::chrono::milliseconds inactivityTimeout,
+												std::function<bool(const BemResponse&)> isComplete,
+												BemResponseCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Send Get Operating Mode command
@@ -385,21 +383,21 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Walk the device's Supported PGN List (0x40), issuing
-			             follow-up GETs with the device-set transferId until
-			             every sub-list has been received, and deliver the
-			             merged result.
+						 follow-up GETs with the device-set transferId until
+						 every sub-list has been received, and deliver the
+						 merged result.
 			 \details    0x40 is a caller-driven walk (N GETs → N replies),
-			             not a single-GET fan-out like F2. This helper hides
-			             that by issuing successive GETs internally and
-			             aggregating via SupportedPgnListAccumulator. The
-			             timeout applies per-GET; a partial result is
-			             delivered on Timeout if at least one sub-list arrived.
-			             The raw single-chunk getSupportedPgnList verb above
-			             remains available for callers driving the walk
-			             themselves.
+						 not a single-GET fan-out like F2. This helper hides
+						 that by issuing successive GETs internally and
+						 aggregating via SupportedPgnListAccumulator. The
+						 timeout applies per-GET; a partial result is
+						 delivered on Timeout if at least one sub-list arrived.
+						 The raw single-chunk getSupportedPgnList verb above
+						 remains available for callers driving the walk
+						 themselves.
 			 \param[in]  perGetTimeout   Timeout per sub-list GET.
 			 \param[in]  callback        Invoked once with the merged result
-			                             (or partial + Timeout on inactivity).
+										 (or partial + Timeout on inactivity).
 			 *******************************************************************************/
 			void getSupportedPgnList_All(std::chrono::milliseconds perGetTimeout,
 										 SupportedPgnListResultCallback callback);
@@ -471,12 +469,12 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Send Get Rx PGN Enable List F2 command and aggregate
-			             the multi-message reply train.
+						 the multi-message reply train.
 			 \param[in]  inactivityTimeout  Max gap between successive sub-list
-			                                messages before the request is
-			                                considered to have timed out.
+											messages before the request is
+											considered to have timed out.
 			 \param[in]  callback           Invoked once with the merged result,
-			                                or with an error / timeout.
+											or with an error / timeout.
 			 *******************************************************************************/
 			void getRxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
 									  RxPgnEnableListF2ResultCallback callback);
@@ -486,11 +484,11 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Send Get Tx PGN Enable List F2 command and aggregate
-			             the multi-message reply train (standard sub-lists +
-			             trailing proprietary bitmap message).
+						 the multi-message reply train (standard sub-lists +
+						 trailing proprietary bitmap message).
 			 \param[in]  inactivityTimeout  Max gap between successive messages.
 			 \param[in]  callback           Invoked once with the merged result,
-			                                or with an error / timeout.
+											or with an error / timeout.
 			 *******************************************************************************/
 			void getTxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
 									  TxPgnEnableListF2ResultCallback callback);
@@ -501,8 +499,8 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Remote variant of getRxPgnEnableListF2 (GIT-90).
 			 \details    Wraps the GET in PGN 126720 to the specified N2K
-			             source address and aggregates the multi-message
-			             reply train via the same accumulator used locally.
+						 source address and aggregates the multi-message
+						 reply train via the same accumulator used locally.
 			 \param[in]  targetN2kSourceAddress  Destination N2K source address.
 			 \param[in]  inactivityTimeout       Per-message inactivity timeout.
 			 \param[in]  callback                Invoked once with merged result.
@@ -521,7 +519,7 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Remote variant of getSupportedPgnList_All (GIT-90).
 			 \details    Same chunked-walk semantics; each per-GET response
-			             round-trips through the PGN 126720 wrap/unwrap path.
+						 round-trips through the PGN 126720 wrap/unwrap path.
 			 *******************************************************************************/
 			void getSupportedPgnList_AllRemote(uint8_t targetN2kSourceAddress,
 											   std::chrono::milliseconds perGetTimeout,
@@ -591,67 +589,62 @@ namespace Actisense
 		private:
 			/**************************************************************************/ /**
 			 \brief      Register a multi-reply BEM request whose responses are
-			             merged into an aggregated result via an accumulator.
+						 merged into an aggregated result via an accumulator.
 			 \details    Builds the shared `isComplete` predicate and per-response
-			             callback that drive `BemProtocol::registerMultiReplyRequest`,
-			             folding each reply through `decodeFn` and `Accumulator::feed`.
-			             On `PgnListAccumulatorStatus::Done` the user callback fires
-			             once with the merged `Result`. On Timeout (or transport
-			             cancel), if the accumulator was initialised it delivers
-			             the partial result alongside the error code.
+						 callback that drive `BemProtocol::registerMultiReplyRequest`,
+						 folding each reply through `decodeFn` and `Accumulator::feed`.
+						 On `PgnListAccumulatorStatus::Done` the user callback fires
+						 once with the merged `Result`. On Timeout (or transport
+						 cancel), if the accumulator was initialised it delivers
+						 the partial result alongside the error code.
 
-			             Caller is responsible for encoding and sending the
-			             request frame; this helper only sets up correlator state.
-			             `srcAddr` defaults to `kLocalSrcAddr` for local-gateway
-			             replies; pass the remote N2K source address when the
-			             request was wrapped in PGN 126720 (GIT-88 / GIT-90).
+						 Caller is responsible for encoding and sending the
+						 request frame; this helper only sets up correlator state.
+						 `srcAddr` defaults to `kLocalSrcAddr` for local-gateway
+						 replies; pass the remote N2K source address when the
+						 request was wrapped in PGN 126720 (GIT-88 / GIT-90).
 			 \tparam     Accumulator       Must expose
-			                               `PgnListAccumulatorStatus feed(const DecodedResponse&, std::string&)`,
-			                               `bool initialised()`, and
-			                               `const Result& result()`.
-			 \tparam     DecodedResponse   Per-message decoded payload type.
-			 \tparam     Result            Aggregated result delivered to the
-			                               user callback.
-			 \tparam     ResultCallback    `std::function<void(std::optional<Result>, ErrorCode, std::string_view)>`
-			                               (or equivalent invocable).
+										   `PgnListAccumulatorStatus feed(const DecodedResponse&,
+			 std::string&)`, `bool initialised()`, and `const Result& result()`. \tparam
+			 DecodedResponse   Per-message decoded payload type. \tparam     Result Aggregated
+			 result delivered to the user callback. \tparam     ResultCallback
+			 `std::function<void(std::optional<Result>, ErrorCode, std::string_view)>` (or
+			 equivalent invocable).
 			 *******************************************************************************/
 			template <typename Accumulator, typename DecodedResponse, typename Result,
 					  typename ResultCallback>
 			void registerAggregatedReply(
-				BemCommandId cmdId, BstId bstId,
-				std::chrono::milliseconds inactivityTimeout,
+				BemCommandId cmdId, BstId bstId, std::chrono::milliseconds inactivityTimeout,
 				bool (*decodeFn)(std::span<const uint8_t>, DecodedResponse&, std::string&),
-				ResultCallback userCallback,
-				uint8_t srcAddr = kLocalSrcAddr);
+				ResultCallback userCallback, uint8_t srcAddr = kLocalSrcAddr);
 
 			/**************************************************************************/ /**
 			 \brief      Sequencer for the 0x40 SupportedPgnList chunked walk.
 			 \details    Issues a GET, on reply feeds the
-			             SupportedPgnListAccumulator, and either delivers the
-			             merged result (Done), issues a follow-up GET
-			             (Continue), or delivers a partial result on
-			             error/timeout. `submitFn` encapsulates the
-			             encode-and-send step so local (asyncSendRaw) and
-			             remote (wrap in PGN 126720 + asyncSend) callers
-			             share the body. `srcAddr` is threaded through
-			             `BemProtocol::registerRequest` so remote replies
-			             keyed by the wrapping device's address correlate
-			             correctly (GIT-88).
+						 SupportedPgnListAccumulator, and either delivers the
+						 merged result (Done), issues a follow-up GET
+						 (Continue), or delivers a partial result on
+						 error/timeout. `submitFn` encapsulates the
+						 encode-and-send step so local (asyncSendRaw) and
+						 remote (wrap in PGN 126720 + asyncSend) callers
+						 share the body. `srcAddr` is threaded through
+						 `BemProtocol::registerRequest` so remote replies
+						 keyed by the wrapping device's address correlate
+						 correctly (GIT-88).
 			 *******************************************************************************/
-			void runSupportedPgnListWalk(
-				uint8_t srcAddr, std::chrono::milliseconds perGetTimeout,
-				SupportedPgnListResultCallback callback,
-				std::function<void(const BemCommand&)> submitFn);
+			void runSupportedPgnListWalk(uint8_t srcAddr, std::chrono::milliseconds perGetTimeout,
+										 SupportedPgnListResultCallback callback,
+										 std::function<void(const BemCommand&)> submitFn);
 
 			/**************************************************************************/ /**
 			 \brief      Encode + wrap a BEM command in PGN 126720, returning
-			             the BST-94 frame ready for asyncSend.
+						 the BST-94 frame ready for asyncSend.
 			 \details    Does NOT register a pending request and does NOT
-			             send. Caller composes: build frame → on encode error
-			             invoke user callback and return → register pending
-			             request → asyncSend. This ordering ensures encode
-			             failures don't leave an orphan pending entry that
-			             later times out and fires a second user callback.
+						 send. Caller composes: build frame → on encode error
+						 invoke user callback and return → register pending
+						 request → asyncSend. This ordering ensures encode
+						 failures don't leave an orphan pending entry that
+						 later times out and fires a second user callback.
 			 \param[in]  targetN2kSourceAddress  Destination N2K source address.
 			 \param[in]  command                 BEM command to wrap.
 			 \param[out] outEncodeError          Populated when nullopt returned.
@@ -706,8 +699,7 @@ namespace Actisense
 			 \param[in]  frame       Bytes to send (already DLE+STX framed if BDTP)
 			 \param[in]  completion  Transport-level completion callback
 			 *******************************************************************************/
-			void asyncSendRaw(std::span<const uint8_t> frame,
-							  SendCompletionHandler completion);
+			void asyncSendRaw(std::span<const uint8_t> frame, SendCompletionHandler completion);
 
 			TransportPtr transport_;
 			EventCallback eventCallback_;

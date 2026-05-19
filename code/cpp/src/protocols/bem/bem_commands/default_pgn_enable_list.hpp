@@ -21,12 +21,12 @@
  *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
-#include "protocols/bem/bem_commands/delete_pgn_enable_lists.hpp"
-
 #include <cstdint>
 #include <span>
 #include <string>
 #include <vector>
+
+#include "protocols/bem/bem_commands/delete_pgn_enable_lists.hpp"
 
 namespace Actisense
 {

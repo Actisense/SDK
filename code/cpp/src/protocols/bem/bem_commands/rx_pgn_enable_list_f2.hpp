@@ -84,7 +84,7 @@ namespace Actisense
 		struct RxPgnEnableEntry
 		{
 			uint8_t pgnIndex = 0; ///< Device-local PGN index (see SupportedPgnList)
-			uint8_t rxMask = 0;   ///< 0 = disabled, non-zero = enabled
+			uint8_t rxMask = 0;	  ///< 0 = disabled, non-zero = enabled
 		};
 
 		/**************************************************************************/ /**
@@ -92,11 +92,11 @@ namespace Actisense
 		 *******************************************************************************/
 		struct RxPgnEnableListF2Response
 		{
-			uint8_t  transferId = 0;
+			uint8_t transferId = 0;
 			uint32_t structureVariantId = 0;
-			uint8_t  totalListSize = 0;
-			uint8_t  firstSubIdx = 0;
-			uint8_t  subCount = 0;
+			uint8_t totalListSize = 0;
+			uint8_t firstSubIdx = 0;
+			uint8_t subCount = 0;
 			std::vector<RxPgnEnableEntry> entries;
 		};
 
@@ -111,8 +111,8 @@ namespace Actisense
 										std::string& outError) {
 			if (data.size() < kRxPgnEnableListF2ResponseHeaderSize) {
 				outError = "Rx PGN Enable List F2 response too short for header: expected " +
-						   std::to_string(kRxPgnEnableListF2ResponseHeaderSize) +
-						   " bytes, got " + std::to_string(data.size());
+						   std::to_string(kRxPgnEnableListF2ResponseHeaderSize) + " bytes, got " +
+						   std::to_string(data.size());
 				return false;
 			}
 
@@ -131,9 +131,9 @@ namespace Actisense
 			response.firstSubIdx = data[6];
 			response.subCount = data[7];
 
-			const std::size_t expectedSize = kRxPgnEnableListF2ResponseHeaderSize +
-											 static_cast<std::size_t>(response.subCount) *
-												 kRxPgnEnableListF2EntrySize;
+			const std::size_t expectedSize =
+				kRxPgnEnableListF2ResponseHeaderSize +
+				static_cast<std::size_t>(response.subCount) * kRxPgnEnableListF2EntrySize;
 			if (data.size() < expectedSize) {
 				outError = "Rx PGN Enable List F2 response truncated: subCount=" +
 						   std::to_string(response.subCount) + " expects " +
@@ -175,42 +175,42 @@ namespace Actisense
 
 		/**************************************************************************/ /**
 		 \brief      Outcome of feeding one sub-list message into an
-		             accumulator.
+					 accumulator.
 		 *******************************************************************************/
 		enum class PgnListAccumulatorStatus : uint8_t
 		{
-			Continue,  ///< Sub-list absorbed; more expected.
-			Done,      ///< Last sub-list absorbed; result() is ready.
-			Mismatch   ///< Transfer-id changed mid-stream or msg malformed.
+			Continue, ///< Sub-list absorbed; more expected.
+			Done,	  ///< Last sub-list absorbed; result() is ready.
+			Mismatch  ///< Transfer-id changed mid-stream or msg malformed.
 		};
 
 		/**************************************************************************/ /**
 		 \brief      Aggregated Rx PGN Enable List F2 result.
 		 \details    Populated by RxPgnEnableListF2Accumulator once all
-		             sub-list messages for one transfer have been received.
+					 sub-list messages for one transfer have been received.
 		 *******************************************************************************/
 		struct RxPgnEnableListF2Result
 		{
-			uint8_t  transferId = 0;
-			uint8_t  totalListSize = 0;
+			uint8_t transferId = 0;
+			uint8_t totalListSize = 0;
 			std::vector<RxPgnEnableEntry> entries; ///< sized totalListSize on Done
 		};
 
 		/**************************************************************************/ /**
 		 \brief      Accumulator that merges the multi-message Rx F2 response
-		             train into a single RxPgnEnableListF2Result.
+					 train into a single RxPgnEnableListF2Result.
 		 \details    First message latches transferId and totalListSize; later
-		             messages must carry the same transferId or Mismatch is
-		             returned. Sub-lists are written at firstSubIdx; repeats
-		             of an already-received sub-list overwrite in place without
-		             double-counting. Done is reported when the unique sub-list
-		             count equals totalListSize.
+					 messages must carry the same transferId or Mismatch is
+					 returned. Sub-lists are written at firstSubIdx; repeats
+					 of an already-received sub-list overwrite in place without
+					 double-counting. Done is reported when the unique sub-list
+					 count equals totalListSize.
 		 *******************************************************************************/
 		class RxPgnEnableListF2Accumulator
 		{
 		public:
-			[[nodiscard]] PgnListAccumulatorStatus feed(
-				const RxPgnEnableListF2Response& msg, std::string& outError) {
+			[[nodiscard]] PgnListAccumulatorStatus feed(const RxPgnEnableListF2Response& msg,
+														std::string& outError) {
 				if (!initialised_) {
 					result_.transferId = msg.transferId;
 					result_.totalListSize = msg.totalListSize;
@@ -229,13 +229,12 @@ namespace Actisense
 					return PgnListAccumulatorStatus::Mismatch;
 				}
 
-				const std::size_t end =
-					static_cast<std::size_t>(msg.firstSubIdx) + msg.subCount;
+				const std::size_t end = static_cast<std::size_t>(msg.firstSubIdx) + msg.subCount;
 				if (end > result_.entries.size()) {
 					outError = "Rx F2 sub-list overruns totalListSize: firstSubIdx=" +
-							   std::to_string(msg.firstSubIdx) + " subCount=" +
-							   std::to_string(msg.subCount) + " total=" +
-							   std::to_string(result_.totalListSize);
+							   std::to_string(msg.firstSubIdx) +
+							   " subCount=" + std::to_string(msg.subCount) +
+							   " total=" + std::to_string(result_.totalListSize);
 					return PgnListAccumulatorStatus::Mismatch;
 				}
 
@@ -248,14 +247,11 @@ namespace Actisense
 					}
 				}
 
-				return (received_ == result_.totalListSize)
-						   ? PgnListAccumulatorStatus::Done
-						   : PgnListAccumulatorStatus::Continue;
+				return (received_ == result_.totalListSize) ? PgnListAccumulatorStatus::Done
+															: PgnListAccumulatorStatus::Continue;
 			}
 
-			[[nodiscard]] const RxPgnEnableListF2Result& result() const noexcept {
-				return result_;
-			}
+			[[nodiscard]] const RxPgnEnableListF2Result& result() const noexcept { return result_; }
 
 			[[nodiscard]] bool initialised() const noexcept { return initialised_; }
 
@@ -274,11 +270,10 @@ namespace Actisense
 			out.reserve(64 + r.entries.size() * 16);
 			out += "Rx PGN Enable List F2 (xid=" + std::to_string(r.transferId) +
 				   ", total=" + std::to_string(r.totalListSize) + ", subList[" +
-				   std::to_string(r.firstSubIdx) + "..+" + std::to_string(r.subCount) +
-				   "]):\n";
+				   std::to_string(r.firstSubIdx) + "..+" + std::to_string(r.subCount) + "]):\n";
 			for (const auto& e : r.entries) {
-				out += "  [" + std::to_string(e.pgnIndex) +
-					   "] mask=" + std::to_string(e.rxMask) + "\n";
+				out += "  [" + std::to_string(e.pgnIndex) + "] mask=" + std::to_string(e.rxMask) +
+					   "\n";
 			}
 			return out;
 		}

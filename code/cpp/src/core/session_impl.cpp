@@ -8,8 +8,6 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include "core/session_impl.hpp"
-#include "core/remote_device_impl.hpp"
-#include "protocols/bem/bem_wrap_126720.hpp"
 
 #include <condition_variable>
 #include <cstring>
@@ -17,9 +15,11 @@
 #include <mutex>
 #include <sstream>
 
+#include "core/remote_device_impl.hpp"
 #include "protocols/bem/bem_commands/echo.hpp"
 #include "protocols/bem/bem_commands/operating_mode.hpp"
 #include "protocols/bem/bem_commands/product_info.hpp"
+#include "protocols/bem/bem_wrap_126720.hpp"
 #include "protocols/bst/bst_frame.hpp"
 #include "transport/serial/serial_transport.hpp"
 #include "util/debug_log.hpp"
@@ -221,8 +221,7 @@ namespace Actisense
 						state->eblWriter->writeTimeUtc(now);
 						state->eblWriter->writeDirectionMarker(dir);
 						state->eblWriter->writeRawStream(data);
-					}
-					else {
+					} else {
 						/* Rx (DESKTOP-332): transport reads can split a single
 						   BDTP frame across multiple callback chunks. Feed the
 						   bytes through a stateful reassembler and emit one
@@ -257,8 +256,7 @@ namespace Actisense
 								}
 								state->eblWriter->writeTimeUtc(now);
 								state->eblWriter->writeDirectionMarker(dir);
-								state->eblWriter->writeBstRawFrame(
-									frame.first(frame.size() - 1));
+								state->eblWriter->writeBstRawFrame(frame.first(frame.size() - 1));
 							};
 
 							/* Unframed callback (#16): bytes that arrived
@@ -300,10 +298,9 @@ namespace Actisense
 			return std::make_unique<RemoteDeviceImpl>(*this, n2kSourceAddress);
 		}
 
-		std::optional<BstFrame>
-		SessionImpl::buildRemoteBemFrame(uint8_t targetN2kSourceAddress,
-										 const BemCommand& command,
-										 std::string& outEncodeError) {
+		std::optional<BstFrame> SessionImpl::buildRemoteBemFrame(uint8_t targetN2kSourceAddress,
+																 const BemCommand& command,
+																 std::string& outEncodeError) {
 			std::vector<uint8_t> innerBst;
 			if (!bem_.encodeCommandInnerBst(command, innerBst, outEncodeError)) {
 				return std::nullopt;
@@ -330,7 +327,8 @@ namespace Actisense
 			constexpr uint8_t kFastPacketId = 0;
 
 			const uint8_t dataLen = static_cast<uint8_t>(wrappedPayload.size());
-			const uint8_t storeLen = static_cast<uint8_t>(6 + dataLen); /* priority+pgn(3)+dest+len */
+			const uint8_t storeLen =
+				static_cast<uint8_t>(6 + dataLen); /* priority+pgn(3)+dest+len */
 
 			std::vector<uint8_t> raw;
 			raw.reserve(2 + storeLen);
@@ -373,8 +371,7 @@ namespace Actisense
 		void SessionImpl::sendBemCommandRemoteMultiReply(
 			uint8_t targetN2kSourceAddress, const BemCommand& command,
 			std::chrono::milliseconds inactivityTimeout,
-			std::function<bool(const BemResponse&)> isComplete,
-			BemResponseCallback callback) {
+			std::function<bool(const BemResponse&)> isComplete, BemResponseCallback callback) {
 			std::string encodeError;
 			auto frame = buildRemoteBemFrame(targetN2kSourceAddress, command, encodeError);
 			if (!frame) {
@@ -440,41 +437,42 @@ namespace Actisense
 
 		void SessionImpl::getOperatingMode(std::chrono::milliseconds timeout,
 										   OperatingModeCallback callback) {
-			getOperatingMode(timeout,
-				[this, cb = std::move(callback)](const std::optional<BemResponse>& response,
-												  ErrorCode code, std::string_view errorMsg) {
-					if (!cb) {
-						return;
-					}
-					ResponseOrigin origin = makeLocalOrigin();
-					if (response) {
-						origin.modelId = response->header.modelId;
-						origin.serialNumber = response->header.serialNumber;
-					}
-					if (code != ErrorCode::Ok || !response) {
-						cb(code, errorMsg, std::nullopt, std::move(origin));
-						return;
-					}
-					if (response->header.errorCode != 0) {
-						cb(ErrorCode::MalformedFrame,
-						   "Device returned BEM error code", std::nullopt, std::move(origin));
-						return;
-					}
-					OperatingMode decoded{};
-					std::string decodeError;
-					if (!decodeOperatingModeResponse(response->data, decoded, decodeError)) {
-						cb(ErrorCode::MalformedFrame, decodeError, std::nullopt, std::move(origin));
-						return;
-					}
-					cb(ErrorCode::Ok, {}, std::make_optional(decoded), std::move(origin));
-				});
+			getOperatingMode(timeout, [this, cb = std::move(callback)](
+										  const std::optional<BemResponse>& response,
+										  ErrorCode code, std::string_view errorMsg) {
+				if (!cb) {
+					return;
+				}
+				ResponseOrigin origin = makeLocalOrigin();
+				if (response) {
+					origin.modelId = response->header.modelId;
+					origin.serialNumber = response->header.serialNumber;
+				}
+				if (code != ErrorCode::Ok || !response) {
+					cb(code, errorMsg, std::nullopt, std::move(origin));
+					return;
+				}
+				if (response->header.errorCode != 0) {
+					cb(ErrorCode::MalformedFrame, "Device returned BEM error code", std::nullopt,
+					   std::move(origin));
+					return;
+				}
+				OperatingMode decoded{};
+				std::string decodeError;
+				if (!decodeOperatingModeResponse(response->data, decoded, decodeError)) {
+					cb(ErrorCode::MalformedFrame, decodeError, std::nullopt, std::move(origin));
+					return;
+				}
+				cb(ErrorCode::Ok, {}, std::make_optional(decoded), std::move(origin));
+			});
 		}
 
 		void SessionImpl::setOperatingMode(OperatingMode mode, std::chrono::milliseconds timeout,
 										   BemResultCallback callback) {
-			setOperatingMode(static_cast<uint16_t>(mode), timeout,
+			setOperatingMode(
+				static_cast<uint16_t>(mode), timeout,
 				[this, cb = std::move(callback)](const std::optional<BemResponse>& response,
-												  ErrorCode code, std::string_view errorMsg) {
+												 ErrorCode code, std::string_view errorMsg) {
 					if (!cb) {
 						return;
 					}
@@ -498,43 +496,43 @@ namespace Actisense
 
 		void SessionImpl::getHardwareInfo(std::chrono::milliseconds timeout,
 										  HardwareInfoCallback callback) {
-			getProductInfo(timeout,
-				[this, cb = std::move(callback)](const std::optional<BemResponse>& response,
-												  ErrorCode code, std::string_view errorMsg) {
-					if (!cb) {
-						return;
-					}
-					ResponseOrigin origin = makeLocalOrigin();
-					if (response) {
-						origin.modelId = response->header.modelId;
-						origin.serialNumber = response->header.serialNumber;
-					}
-					if (code != ErrorCode::Ok || !response) {
-						cb(code, errorMsg, std::nullopt, std::move(origin));
-						return;
-					}
-					if (response->header.errorCode != 0) {
-						cb(ErrorCode::MalformedFrame,
-						   "Device returned BEM error code", std::nullopt, std::move(origin));
-						return;
-					}
-					ProductInfoResponse decoded;
-					std::string decodeError;
-					if (!decodeProductInfoResponse(response->data, decoded, decodeError)) {
-						cb(ErrorCode::MalformedFrame, decodeError, std::nullopt, std::move(origin));
-						return;
-					}
-					HardwareInfo info;
-					info.nmea2000Version = decoded.nmea2000Version;
-					info.productCode = decoded.productCode;
-					info.modelId = decoded.modelId;
-					info.softwareVersion = decoded.softwareVersion;
-					info.modelVersion = decoded.modelVersion;
-					info.modelSerialCode = decoded.modelSerialCode;
-					info.certificationLevel = decoded.certificationLevel;
-					info.loadEquivalency = decoded.loadEquivalency;
-					cb(ErrorCode::Ok, {}, std::make_optional(std::move(info)), std::move(origin));
-				});
+			getProductInfo(timeout, [this, cb = std::move(callback)](
+										const std::optional<BemResponse>& response, ErrorCode code,
+										std::string_view errorMsg) {
+				if (!cb) {
+					return;
+				}
+				ResponseOrigin origin = makeLocalOrigin();
+				if (response) {
+					origin.modelId = response->header.modelId;
+					origin.serialNumber = response->header.serialNumber;
+				}
+				if (code != ErrorCode::Ok || !response) {
+					cb(code, errorMsg, std::nullopt, std::move(origin));
+					return;
+				}
+				if (response->header.errorCode != 0) {
+					cb(ErrorCode::MalformedFrame, "Device returned BEM error code", std::nullopt,
+					   std::move(origin));
+					return;
+				}
+				ProductInfoResponse decoded;
+				std::string decodeError;
+				if (!decodeProductInfoResponse(response->data, decoded, decodeError)) {
+					cb(ErrorCode::MalformedFrame, decodeError, std::nullopt, std::move(origin));
+					return;
+				}
+				HardwareInfo info;
+				info.nmea2000Version = decoded.nmea2000Version;
+				info.productCode = decoded.productCode;
+				info.modelId = decoded.modelId;
+				info.softwareVersion = decoded.softwareVersion;
+				info.modelVersion = decoded.modelVersion;
+				info.modelSerialCode = decoded.modelSerialCode;
+				info.certificationLevel = decoded.certificationLevel;
+				info.loadEquivalency = decoded.loadEquivalency;
+				cb(ErrorCode::Ok, {}, std::make_optional(std::move(info)), std::move(origin));
+			});
 		}
 
 		/* Internal uint16_t / BemResponseCallback overload --------------------- */
@@ -569,8 +567,7 @@ namespace Actisense
 
 		void SessionImpl::getPortPCode(std::chrono::milliseconds timeout,
 									   BemResponseCallback callback) {
-			sendBemCommand(makeBemA1(BemCommandId::GetSetPortPCode), timeout,
-						   std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetSetPortPCode), timeout, std::move(callback));
 		}
 
 		void SessionImpl::setPortPCode(std::span<const uint8_t> pCodes,
@@ -657,26 +654,22 @@ namespace Actisense
 		void SessionImpl::reInitMainApp(std::chrono::milliseconds timeout,
 										BemResponseCallback callback) {
 			/* No data payload — device reboots on receipt. */
-			sendBemCommand(makeBemA1(BemCommandId::ReInitMainApp), timeout,
-						   std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::ReInitMainApp), timeout, std::move(callback));
 		}
 
 		void SessionImpl::commitToEeprom(std::chrono::milliseconds timeout,
 										 BemResponseCallback callback) {
-			sendBemCommand(makeBemA1(BemCommandId::CommitToEeprom), timeout,
-						   std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::CommitToEeprom), timeout, std::move(callback));
 		}
 
 		void SessionImpl::commitToFlash(std::chrono::milliseconds timeout,
 										BemResponseCallback callback) {
-			sendBemCommand(makeBemA1(BemCommandId::CommitToFlash), timeout,
-						   std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::CommitToFlash), timeout, std::move(callback));
 		}
 
 		void SessionImpl::getTotalTime(std::chrono::milliseconds timeout,
 									   BemResponseCallback callback) {
-			sendBemCommand(makeBemA1(BemCommandId::GetSetTotalTime), timeout,
-						   std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetSetTotalTime), timeout, std::move(callback));
 		}
 
 		void SessionImpl::setTotalTime(uint32_t totalTime, uint32_t passkey,
@@ -719,14 +712,12 @@ namespace Actisense
 
 		void SessionImpl::getProductInfo(std::chrono::milliseconds timeout,
 										 BemResponseCallback callback) {
-			sendBemCommand(makeBemA1(BemCommandId::GetProductInfo), timeout,
-						   std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetProductInfo), timeout, std::move(callback));
 		}
 
 		void SessionImpl::getCanConfig(std::chrono::milliseconds timeout,
 									   BemResponseCallback callback) {
-			sendBemCommand(makeBemA1(BemCommandId::GetSetCanConfig), timeout,
-						   std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetSetCanConfig), timeout, std::move(callback));
 		}
 
 		void SessionImpl::setCanConfig(uint64_t name, uint8_t sourceAddress,
@@ -759,8 +750,8 @@ namespace Actisense
 				return;
 			}
 
-			sendBemCommand(buildCanInfoFieldSet(text, BemCommandId::GetSetCanInfoField1),
-						   timeout, std::move(callback));
+			sendBemCommand(buildCanInfoFieldSet(text, BemCommandId::GetSetCanInfoField1), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::getCanInfoField2(std::chrono::milliseconds timeout,
@@ -782,26 +773,25 @@ namespace Actisense
 				return;
 			}
 
-			sendBemCommand(buildCanInfoFieldSet(text, BemCommandId::GetSetCanInfoField2),
-						   timeout, std::move(callback));
+			sendBemCommand(buildCanInfoFieldSet(text, BemCommandId::GetSetCanInfoField2), timeout,
+						   std::move(callback));
 		}
 
 		void SessionImpl::getCanInfoField3(std::chrono::milliseconds timeout,
 										   BemResponseCallback callback) {
 			/* Read-only: no SET variant */
-			sendBemCommand(makeBemA1(BemCommandId::GetCanInfoField3), timeout,
-						   std::move(callback));
+			sendBemCommand(makeBemA1(BemCommandId::GetCanInfoField3), timeout, std::move(callback));
 		}
 
 		/* PGN List Management Commands ----------------------------------------- */
 
 		template <typename Accumulator, typename DecodedResponse, typename Result,
 				  typename ResultCallback>
-		void SessionImpl::registerAggregatedReply(
-			BemCommandId cmdId, BstId bstId,
-			std::chrono::milliseconds inactivityTimeout,
-			bool (*decodeFn)(std::span<const uint8_t>, DecodedResponse&, std::string&),
-			ResultCallback userCallback, uint8_t srcAddr) {
+		void SessionImpl::registerAggregatedReply(BemCommandId cmdId, BstId bstId,
+												  std::chrono::milliseconds inactivityTimeout,
+												  bool (*decodeFn)(std::span<const uint8_t>,
+																   DecodedResponse&, std::string&),
+												  ResultCallback userCallback, uint8_t srcAddr) {
 			struct State
 			{
 				Accumulator accumulator;
@@ -812,8 +802,7 @@ namespace Actisense
 			state->userCallback = std::move(userCallback);
 
 			auto makeOrigin = [this, srcAddr]() {
-				return srcAddr == kLocalSrcAddr ? makeLocalOrigin()
-												: makeRemoteOrigin(srcAddr);
+				return srcAddr == kLocalSrcAddr ? makeLocalOrigin() : makeRemoteOrigin(srcAddr);
 			};
 
 			auto isComplete = [state, decodeFn, makeOrigin](const BemResponse& response) -> bool {
@@ -822,12 +811,11 @@ namespace Actisense
 				}
 				DecodedResponse decoded;
 				std::string decodeError;
-				if (!decodeFn(std::span<const uint8_t>(response.data.data(),
-													   response.data.size()),
+				if (!decodeFn(std::span<const uint8_t>(response.data.data(), response.data.size()),
 							  decoded, decodeError)) {
 					if (state->userCallback) {
-						state->userCallback(ErrorCode::InvalidArgument, decodeError,
-											std::nullopt, makeOrigin());
+						state->userCallback(ErrorCode::InvalidArgument, decodeError, std::nullopt,
+											makeOrigin());
 					}
 					state->delivered = true;
 					return true;
@@ -836,8 +824,8 @@ namespace Actisense
 				const auto status = state->accumulator.feed(decoded, feedError);
 				if (status == PgnListAccumulatorStatus::Mismatch) {
 					if (state->userCallback) {
-						state->userCallback(ErrorCode::InvalidArgument, feedError,
-											std::nullopt, makeOrigin());
+						state->userCallback(ErrorCode::InvalidArgument, feedError, std::nullopt,
+											makeOrigin());
 					}
 					state->delivered = true;
 					return true;
@@ -853,8 +841,9 @@ namespace Actisense
 				return false;
 			};
 
-			auto perResponseCallback = [state, makeOrigin](const std::optional<BemResponse>& response,
-														   ErrorCode ec, std::string_view errMsg) {
+			auto perResponseCallback = [state,
+										makeOrigin](const std::optional<BemResponse>& response,
+													ErrorCode ec, std::string_view errMsg) {
 				if (state->delivered) {
 					return;
 				}
@@ -872,15 +861,14 @@ namespace Actisense
 				/* Successful per-response delivery is handled in isComplete. */
 			};
 
-			bem_.registerMultiReplyRequest(cmdId, bstId, inactivityTimeout,
-										   std::move(isComplete),
+			bem_.registerMultiReplyRequest(cmdId, bstId, inactivityTimeout, std::move(isComplete),
 										   std::move(perResponseCallback), srcAddr);
 		}
 
-		void SessionImpl::runSupportedPgnListWalk(
-			uint8_t srcAddr, std::chrono::milliseconds perGetTimeout,
-			SupportedPgnListResultCallback callback,
-			std::function<void(const BemCommand&)> submitFn) {
+		void SessionImpl::runSupportedPgnListWalk(uint8_t srcAddr,
+												  std::chrono::milliseconds perGetTimeout,
+												  SupportedPgnListResultCallback callback,
+												  std::function<void(const BemCommand&)> submitFn) {
 			struct State
 			{
 				SupportedPgnListAccumulator accumulator;
@@ -903,13 +891,12 @@ namespace Actisense
 			auto sendOne = std::make_shared<std::function<void(uint8_t, uint8_t)>>();
 
 			auto makeOrigin = [this, srcAddr]() {
-				return srcAddr == kLocalSrcAddr ? makeLocalOrigin()
-												: makeRemoteOrigin(srcAddr);
+				return srcAddr == kLocalSrcAddr ? makeLocalOrigin() : makeRemoteOrigin(srcAddr);
 			};
 
-			auto deliver = [state, sendOne, makeOrigin](
-				std::optional<SupportedPgnListResult> result, ErrorCode ec,
-				std::string_view errMsg) {
+			auto deliver = [state, sendOne,
+							makeOrigin](std::optional<SupportedPgnListResult> result, ErrorCode ec,
+										std::string_view errMsg) {
 				if (state->delivered) {
 					return;
 				}
@@ -920,9 +907,9 @@ namespace Actisense
 				*sendOne = nullptr; /* break sendOne <-> callback cycle */
 			};
 
-			auto perResponseCallback = [state, sendOne, deliver](
-				const std::optional<BemResponse>& response, ErrorCode ec,
-				std::string_view errMsg) {
+			auto perResponseCallback = [state, sendOne,
+										deliver](const std::optional<BemResponse>& response,
+												 ErrorCode ec, std::string_view errMsg) {
 				if (state->delivered) {
 					return;
 				}
@@ -938,8 +925,7 @@ namespace Actisense
 				SupportedPgnListResponse decoded;
 				std::string decodeError;
 				if (!decodeSupportedPgnListResponse(
-						std::span<const uint8_t>(response->data.data(),
-												 response->data.size()),
+						std::span<const uint8_t>(response->data.data(), response->data.size()),
 						decoded, decodeError)) {
 					deliver(std::nullopt, ErrorCode::InvalidArgument, decodeError);
 					return;
@@ -963,8 +949,7 @@ namespace Actisense
 				(*sendOne)(nextIdx, decoded.transferId);
 			};
 
-			*sendOne = [state, perResponseCallback, this](uint8_t pgnIndex,
-														   uint8_t transferId) {
+			*sendOne = [state, perResponseCallback, this](uint8_t pgnIndex, uint8_t transferId) {
 				BemCommand cmd = makeBemA1(BemCommandId::GetSupportedPgnList);
 				encodeSupportedPgnListGetRequest(pgnIndex, transferId, cmd.data);
 
@@ -1014,11 +999,10 @@ namespace Actisense
 				return;
 			}
 
-			registerAggregatedReply<RxPgnEnableListF2Accumulator,
-									RxPgnEnableListF2Response, RxPgnEnableListF2Result,
-									RxPgnEnableListF2ResultCallback>(
-				cmd.bemId, cmd.bstId, inactivityTimeout,
-				decodeRxPgnEnableListF2Response, std::move(callback));
+			registerAggregatedReply<RxPgnEnableListF2Accumulator, RxPgnEnableListF2Response,
+									RxPgnEnableListF2Result, RxPgnEnableListF2ResultCallback>(
+				cmd.bemId, cmd.bstId, inactivityTimeout, decodeRxPgnEnableListF2Response,
+				std::move(callback));
 
 			asyncSendRaw(frame, [this](ErrorCode code, std::size_t /*written*/) {
 				if (code != ErrorCode::Ok && errorCallback_) {
@@ -1041,11 +1025,10 @@ namespace Actisense
 				return;
 			}
 
-			registerAggregatedReply<TxPgnEnableListF2Accumulator,
-									TxPgnEnableListF2Response, TxPgnEnableListF2Result,
-									TxPgnEnableListF2ResultCallback>(
-				cmd.bemId, cmd.bstId, inactivityTimeout,
-				decodeTxPgnEnableListF2Response, std::move(callback));
+			registerAggregatedReply<TxPgnEnableListF2Accumulator, TxPgnEnableListF2Response,
+									TxPgnEnableListF2Result, TxPgnEnableListF2ResultCallback>(
+				cmd.bemId, cmd.bstId, inactivityTimeout, decodeTxPgnEnableListF2Response,
+				std::move(callback));
 
 			asyncSendRaw(frame, [this](ErrorCode code, std::size_t /*written*/) {
 				if (code != ErrorCode::Ok && errorCallback_) {
@@ -1054,15 +1037,13 @@ namespace Actisense
 			});
 		}
 
-		void SessionImpl::getRxPgnEnableListF2Remote(
-			uint8_t targetN2kSourceAddress,
-			std::chrono::milliseconds inactivityTimeout,
-			RxPgnEnableListF2ResultCallback callback) {
+		void SessionImpl::getRxPgnEnableListF2Remote(uint8_t targetN2kSourceAddress,
+													 std::chrono::milliseconds inactivityTimeout,
+													 RxPgnEnableListF2ResultCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnableListF2);
 
 			std::string encodeError;
-			auto frame =
-				buildRemoteBemFrame(targetN2kSourceAddress, cmd, encodeError);
+			auto frame = buildRemoteBemFrame(targetN2kSourceAddress, cmd, encodeError);
 			if (!frame) {
 				if (callback) {
 					callback(ErrorCode::InvalidArgument, encodeError, std::nullopt,
@@ -1071,30 +1052,25 @@ namespace Actisense
 				return;
 			}
 
-			registerAggregatedReply<RxPgnEnableListF2Accumulator,
-									RxPgnEnableListF2Response, RxPgnEnableListF2Result,
-									RxPgnEnableListF2ResultCallback>(
-				cmd.bemId, cmd.bstId, inactivityTimeout,
-				decodeRxPgnEnableListF2Response, std::move(callback),
-				targetN2kSourceAddress);
+			registerAggregatedReply<RxPgnEnableListF2Accumulator, RxPgnEnableListF2Response,
+									RxPgnEnableListF2Result, RxPgnEnableListF2ResultCallback>(
+				cmd.bemId, cmd.bstId, inactivityTimeout, decodeRxPgnEnableListF2Response,
+				std::move(callback), targetN2kSourceAddress);
 
 			asyncSend("bst", frame->rawData(), [this](ErrorCode code) {
 				if (code != ErrorCode::Ok && errorCallback_) {
-					errorCallback_(code,
-								   "Failed to send remote Get Rx PGN Enable List F2");
+					errorCallback_(code, "Failed to send remote Get Rx PGN Enable List F2");
 				}
 			});
 		}
 
-		void SessionImpl::getTxPgnEnableListF2Remote(
-			uint8_t targetN2kSourceAddress,
-			std::chrono::milliseconds inactivityTimeout,
-			TxPgnEnableListF2ResultCallback callback) {
+		void SessionImpl::getTxPgnEnableListF2Remote(uint8_t targetN2kSourceAddress,
+													 std::chrono::milliseconds inactivityTimeout,
+													 TxPgnEnableListF2ResultCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnableListF2);
 
 			std::string encodeError;
-			auto frame =
-				buildRemoteBemFrame(targetN2kSourceAddress, cmd, encodeError);
+			auto frame = buildRemoteBemFrame(targetN2kSourceAddress, cmd, encodeError);
 			if (!frame) {
 				if (callback) {
 					callback(ErrorCode::InvalidArgument, encodeError, std::nullopt,
@@ -1103,29 +1079,24 @@ namespace Actisense
 				return;
 			}
 
-			registerAggregatedReply<TxPgnEnableListF2Accumulator,
-									TxPgnEnableListF2Response, TxPgnEnableListF2Result,
-									TxPgnEnableListF2ResultCallback>(
-				cmd.bemId, cmd.bstId, inactivityTimeout,
-				decodeTxPgnEnableListF2Response, std::move(callback),
-				targetN2kSourceAddress);
+			registerAggregatedReply<TxPgnEnableListF2Accumulator, TxPgnEnableListF2Response,
+									TxPgnEnableListF2Result, TxPgnEnableListF2ResultCallback>(
+				cmd.bemId, cmd.bstId, inactivityTimeout, decodeTxPgnEnableListF2Response,
+				std::move(callback), targetN2kSourceAddress);
 
 			asyncSend("bst", frame->rawData(), [this](ErrorCode code) {
 				if (code != ErrorCode::Ok && errorCallback_) {
-					errorCallback_(code,
-								   "Failed to send remote Get Tx PGN Enable List F2");
+					errorCallback_(code, "Failed to send remote Get Tx PGN Enable List F2");
 				}
 			});
 		}
 
-		void SessionImpl::getSupportedPgnList_AllRemote(
-			uint8_t targetN2kSourceAddress,
-			std::chrono::milliseconds perGetTimeout,
-			SupportedPgnListResultCallback callback) {
+		void SessionImpl::getSupportedPgnList_AllRemote(uint8_t targetN2kSourceAddress,
+														std::chrono::milliseconds perGetTimeout,
+														SupportedPgnListResultCallback callback) {
 			auto submit = [this, targetN2kSourceAddress](const BemCommand& cmd) {
 				std::string encodeError;
-				auto frame =
-					buildRemoteBemFrame(targetN2kSourceAddress, cmd, encodeError);
+				auto frame = buildRemoteBemFrame(targetN2kSourceAddress, cmd, encodeError);
 				if (!frame) {
 					if (errorCallback_) {
 						errorCallback_(ErrorCode::InvalidArgument, encodeError);
@@ -1134,14 +1105,13 @@ namespace Actisense
 				}
 				asyncSend("bst", frame->rawData(), [this](ErrorCode code) {
 					if (code != ErrorCode::Ok && errorCallback_) {
-						errorCallback_(code,
-									   "Failed to send remote Get Supported PGN List");
+						errorCallback_(code, "Failed to send remote Get Supported PGN List");
 					}
 				});
 			};
 
-			runSupportedPgnListWalk(targetN2kSourceAddress, perGetTimeout,
-									std::move(callback), std::move(submit));
+			runSupportedPgnListWalk(targetN2kSourceAddress, perGetTimeout, std::move(callback),
+									std::move(submit));
 		}
 
 		void SessionImpl::deletePgnEnableLists(uint8_t selector, std::chrono::milliseconds timeout,
@@ -1266,8 +1236,7 @@ namespace Actisense
 					/* BDTP emits BST datagrams. Use the non-throwing
 					   pointer form of any_cast so a non-BST payload is a
 					   cheap null check instead of an exception. */
-					if (const auto* datagram =
-							std::any_cast<BstDatagram>(&event.payload)) {
+					if (const auto* datagram = std::any_cast<BstDatagram>(&event.payload)) {
 						handleBstDatagram(*datagram);
 					}
 				},

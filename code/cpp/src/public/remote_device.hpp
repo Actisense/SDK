@@ -7,16 +7,16 @@
 \date       (Created) 17/05/2026
 \brief      Remote NMEA 2000 device handle for BEM commands wrapped in PGN 126720
 \details    A RemoteDevice exposes the BEM verbs of a Session but targets a
-            device addressed by its N2K source address on the bus behind the
-            locally connected gateway (NGX / WGX). The SDK wraps the BEM bytes
-            in an Actisense-proprietary PGN 126720 envelope; the gateway
-            forwards the PGN to the bus, the remote device unwraps and runs
-            the command locally, and replies via the same wrapping back to us.
+			device addressed by its N2K source address on the bus behind the
+			locally connected gateway (NGX / WGX). The SDK wraps the BEM bytes
+			in an Actisense-proprietary PGN 126720 envelope; the gateway
+			forwards the PGN to the bus, the remote device unwraps and runs
+			the command locally, and replies via the same wrapping back to us.
 
-            Lifetime: a RemoteDevice references the owning Session. It must
-            not outlive the session that produced it. Closing the session
-            cancels any of this handle's outstanding requests with
-            ErrorCode::Canceled.
+			Lifetime: a RemoteDevice references the owning Session. It must
+			not outlive the session that produced it. Closing the session
+			cancels any of this handle's outstanding requests with
+			ErrorCode::Canceled.
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 ==============================================================================*/
@@ -38,11 +38,11 @@ namespace Actisense
 
 		/**************************************************************************/ /**
 		 \brief      Handle to a remote NMEA 2000 device reachable via the
-		             session's local gateway by wrapping BEM commands in PGN
-		             126720 addressed at @c n2kSourceAddress().
+					 session's local gateway by wrapping BEM commands in PGN
+					 126720 addressed at @c n2kSourceAddress().
 		 \details    Obtained from Session::openRemote(). The same Session can
-		             produce many RemoteDevice handles, one per addressable
-		             device on the bus.
+					 produce many RemoteDevice handles, one per addressable
+					 device on the bus.
 		 *******************************************************************************/
 		class RemoteDevice
 		{
@@ -84,7 +84,7 @@ namespace Actisense
 			 \param[in]  timeout   Response timeout
 			 \param[in]  callback  Invoked with the device's acknowledgement
 			 \note       Many devices reboot before sending a reply, in which
-			             case the callback fires with ErrorCode::Timeout.
+						 case the callback fires with ErrorCode::Timeout.
 			 *******************************************************************************/
 			virtual void reInitMainApp(std::chrono::milliseconds timeout,
 									   BemResultCallback callback) = 0;
@@ -109,13 +109,12 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Get a port's baudrate (session + stored values + total
-			             port count + protocol).
+						 port count + protocol).
 			 \param[in]  portNumber  Port to query (0-based)
 			 \param[in]  timeout     Response timeout
 			 \param[in]  callback    Invoked with decoded PortBaudrateResponse
 			 *******************************************************************************/
-			virtual void getPortBaudrate(uint8_t portNumber,
-										 std::chrono::milliseconds timeout,
+			virtual void getPortBaudrate(uint8_t portNumber, std::chrono::milliseconds timeout,
 										 PortBaudrateCallback callback) = 0;
 
 			/**************************************************************************/ /**
@@ -127,8 +126,7 @@ namespace Actisense
 			 \param[in]  callback     Invoked with the device's acknowledgement
 			 *******************************************************************************/
 			virtual void setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud,
-										 uint32_t storeBaud,
-										 std::chrono::milliseconds timeout,
+										 uint32_t storeBaud, std::chrono::milliseconds timeout,
 										 BemResultCallback callback) = 0;
 
 			/* Port P-Code ------------------------------------------------------- */
@@ -189,8 +187,7 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Set Tx-enable for a PGN with an explicit transmit rate (ms).
 			 *******************************************************************************/
-			virtual void setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable,
-												uint32_t txRate,
+			virtual void setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
 												std::chrono::milliseconds timeout,
 												BemResultCallback callback) = 0;
 
@@ -205,7 +202,7 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Fetch the full Tx PGN Enable List F2 (multi-message walk +
-			             trailing proprietary bitmap).
+						 trailing proprietary bitmap).
 			 *******************************************************************************/
 			virtual void getTxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
 											  TxPgnEnableListF2ResultCallback callback) = 0;
@@ -213,9 +210,9 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Fetch one sub-list of the Supported PGN List (0x40).
 			 \details    Caller drives the walk by re-issuing with the device's
-			             returned transferId and the next index. For the common
-			             "give me the whole thing" use case, prefer
-			             getSupportedPgnList_All.
+						 returned transferId and the next index. For the common
+						 "give me the whole thing" use case, prefer
+						 getSupportedPgnList_All.
 			 *******************************************************************************/
 			virtual void getSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
 											 std::chrono::milliseconds timeout,
@@ -223,7 +220,7 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Walk the device's Supported PGN List end-to-end and
-			             deliver the merged result.
+						 deliver the merged result.
 			 *******************************************************************************/
 			virtual void getSupportedPgnList_All(std::chrono::milliseconds perGetTimeout,
 												 SupportedPgnListResultCallback callback) = 0;
@@ -248,8 +245,7 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Round-trip up to 252 bytes through the remote device.
 			 *******************************************************************************/
-			virtual void echo(std::span<const uint8_t> data,
-							  std::chrono::milliseconds timeout,
+			virtual void echo(std::span<const uint8_t> data, std::chrono::milliseconds timeout,
 							  EchoCallback callback) = 0;
 
 			/* Product info ----------------------------------------------------- */
@@ -257,8 +253,8 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Get the raw Product Information record from the remote device.
 			 \details    Use getHardwareInfo() if you want the SDK's curated
-			             HardwareInfo view; this verb returns the wire-level
-			             ProductInfoResponse with its raw byte field layout.
+						 HardwareInfo view; this verb returns the wire-level
+						 ProductInfoResponse with its raw byte field layout.
 			 *******************************************************************************/
 			virtual void getProductInfo(std::chrono::milliseconds timeout,
 										ProductInfoCallback callback) = 0;
@@ -316,8 +312,7 @@ namespace Actisense
 			 \brief      Delete (clear) PGN enable list(s).
 			 \param[in]  selector  0=Rx, 1=Tx, 2=Both
 			 *******************************************************************************/
-			virtual void deletePgnEnableLists(uint8_t selector,
-											  std::chrono::milliseconds timeout,
+			virtual void deletePgnEnableLists(uint8_t selector, std::chrono::milliseconds timeout,
 											  BemResultCallback callback) = 0;
 
 			/**************************************************************************/ /**
@@ -335,7 +330,7 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Query the parameters / status of the device's PGN enable
-			             lists.
+						 lists.
 			 *******************************************************************************/
 			virtual void getParamsPgnEnableLists(std::chrono::milliseconds timeout,
 												 ParamsPgnEnableListsCallback callback) = 0;

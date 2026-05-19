@@ -119,9 +119,9 @@ namespace Actisense
 		 *******************************************************************************/
 		struct TxPgnEnableEntry
 		{
-			uint8_t  pgnIndex = 0; ///< Device-local PGN index (see SupportedPgnList)
-			uint8_t  priority = 0; ///< NMEA 2000 priority 0-7
-			uint16_t rateMs = 0;   ///< Transmit rate in ms (0xFFFF = disabled)
+			uint8_t pgnIndex = 0; ///< Device-local PGN index (see SupportedPgnList)
+			uint8_t priority = 0; ///< NMEA 2000 priority 0-7
+			uint16_t rateMs = 0;  ///< Transmit rate in ms (0xFFFF = disabled)
 		};
 
 		/**************************************************************************/ /**
@@ -130,8 +130,8 @@ namespace Actisense
 		enum class TxPgnEnableListF2Variant : uint8_t
 		{
 			Unknown,
-			Standard,    ///< SVID 0x1102 — std PGN sub-list with priority+rate
-			Proprietary  ///< SVID 0x1103 — DP0/DP1 bitmaps for proprietary PGNs
+			Standard,	///< SVID 0x1102 — std PGN sub-list with priority+rate
+			Proprietary ///< SVID 0x1103 — DP0/DP1 bitmaps for proprietary PGNs
 		};
 
 		/**************************************************************************/ /**
@@ -141,7 +141,7 @@ namespace Actisense
 		 *******************************************************************************/
 		struct TxPgnEnableListF2Response
 		{
-			uint8_t  transferId = 0;
+			uint8_t transferId = 0;
 			uint32_t structureVariantId = 0;
 			TxPgnEnableListF2Variant variant = TxPgnEnableListF2Variant::Unknown;
 
@@ -191,9 +191,9 @@ namespace Actisense
 				response.stdFirstSubIdx = data[6];
 				response.stdSubCount = data[7];
 
-				const std::size_t expected = kTxPgnEnableListF2StdHeaderSize +
-											 static_cast<std::size_t>(response.stdSubCount) *
-												 kTxPgnEnableListF2StdEntrySize;
+				const std::size_t expected =
+					kTxPgnEnableListF2StdHeaderSize +
+					static_cast<std::size_t>(response.stdSubCount) * kTxPgnEnableListF2StdEntrySize;
 				if (data.size() < expected) {
 					outError = "Tx F2 std-variant truncated: subCount=" +
 							   std::to_string(response.stdSubCount) + " expects " +
@@ -209,9 +209,8 @@ namespace Actisense
 					TxPgnEnableEntry entry;
 					entry.pgnIndex = data[offset];
 					entry.priority = data[offset + 1];
-					entry.rateMs =
-						static_cast<uint16_t>(data[offset + 2]) |
-						(static_cast<uint16_t>(data[offset + 3]) << 8);
+					entry.rateMs = static_cast<uint16_t>(data[offset + 2]) |
+								   (static_cast<uint16_t>(data[offset + 3]) << 8);
 					response.stdEntries.push_back(entry);
 					offset += kTxPgnEnableListF2StdEntrySize;
 				}
@@ -228,31 +227,27 @@ namespace Actisense
 				const uint8_t dp0Size = data[offset++];
 				if (dp0Size > kTxPgnEnableListF2PropBitmapBytes) {
 					outError = "Tx F2 prop-variant DP0 size " + std::to_string(dp0Size) +
-							   " exceeds max " +
-							   std::to_string(kTxPgnEnableListF2PropBitmapBytes);
+							   " exceeds max " + std::to_string(kTxPgnEnableListF2PropBitmapBytes);
 					return false;
 				}
 				if (data.size() < offset + dp0Size + 1) {
 					outError = "Tx F2 prop-variant truncated reading DP0 bitmap";
 					return false;
 				}
-				response.propDp0Bitmap.assign(data.data() + offset,
-											  data.data() + offset + dp0Size);
+				response.propDp0Bitmap.assign(data.data() + offset, data.data() + offset + dp0Size);
 				offset += dp0Size;
 
 				const uint8_t dp1Size = data[offset++];
 				if (dp1Size > kTxPgnEnableListF2PropBitmapBytes) {
 					outError = "Tx F2 prop-variant DP1 size " + std::to_string(dp1Size) +
-							   " exceeds max " +
-							   std::to_string(kTxPgnEnableListF2PropBitmapBytes);
+							   " exceeds max " + std::to_string(kTxPgnEnableListF2PropBitmapBytes);
 					return false;
 				}
 				if (data.size() < offset + dp1Size) {
 					outError = "Tx F2 prop-variant truncated reading DP1 bitmap";
 					return false;
 				}
-				response.propDp1Bitmap.assign(data.data() + offset,
-											  data.data() + offset + dp1Size);
+				response.propDp1Bitmap.assign(data.data() + offset, data.data() + offset + dp1Size);
 				return true;
 			}
 
@@ -280,9 +275,9 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Decoded proprietary bitmaps + expanded enabled-PGN list.
 		 \details    enabledPgns is sorted ascending (DP0 entries then DP1).
-		             The raw LUTs are retained alongside so callers that need
-		             to re-emit or compare against the wire bytes can do so
-		             without re-encoding from the expanded set.
+					 The raw LUTs are retained alongside so callers that need
+					 to re-emit or compare against the wire bytes can do so
+					 without re-encoding from the expanded set.
 		 *******************************************************************************/
 		struct TxPgnEnableListF2ProprietaryEntries
 		{
@@ -294,22 +289,22 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Aggregated Tx PGN Enable List F2 result.
 		 \details    Populated by TxPgnEnableListF2Accumulator once the
-		             standard-variant sub-list train and the trailing
-		             proprietary-variant message for one transfer have been
-		             received.
+					 standard-variant sub-list train and the trailing
+					 proprietary-variant message for one transfer have been
+					 received.
 		 *******************************************************************************/
 		struct TxPgnEnableListF2Result
 		{
-			uint8_t  transferId = 0;
-			uint8_t  totalListSize = 0;                  ///< standard PGN total
-			std::vector<TxPgnEnableEntry> entries;       ///< standard PGNs
+			uint8_t transferId = 0;
+			uint8_t totalListSize = 0;			   ///< standard PGN total
+			std::vector<TxPgnEnableEntry> entries; ///< standard PGNs
 			TxPgnEnableListF2ProprietaryEntries proprietary;
 			bool proprietaryReceived = false;
 		};
 
 		/**************************************************************************/ /**
 		 \brief      Expand DP0/DP1 bitmap bytes into a sorted ascending list
-		             of enabled proprietary PGN numbers.
+					 of enabled proprietary PGN numbers.
 		 \param[in]  dp0Lut      DP0 bitmap (≤ kTxPgnEnableListF2PropBitmapBytes)
 		 \param[in]  dp1Lut      DP1 bitmap (≤ kTxPgnEnableListF2PropBitmapBytes)
 		 \param[out] outPgns     Cleared then filled with enabled PGNs
@@ -326,8 +321,7 @@ namespace Actisense
 					}
 					for (uint8_t b = 0; b < 8; ++b) {
 						if (byte & static_cast<uint8_t>(1u << b)) {
-							outPgns.push_back(base +
-								static_cast<uint32_t>(k * 8 + b));
+							outPgns.push_back(base + static_cast<uint32_t>(k * 8 + b));
 						}
 					}
 				}
@@ -338,24 +332,23 @@ namespace Actisense
 
 		/**************************************************************************/ /**
 		 \brief      Accumulator that merges the multi-message Tx F2 response
-		             train into a single TxPgnEnableListF2Result.
+					 train into a single TxPgnEnableListF2Result.
 		 \details    Standard-variant messages populate entries by firstSubIdx
-		             (same rules as the Rx accumulator). The trailing
-		             proprietary-variant message latches the bitmaps and
-		             marks proprietaryReceived; that arrival is the Done
-		             signal. transferId must match across all messages.
+					 (same rules as the Rx accumulator). The trailing
+					 proprietary-variant message latches the bitmaps and
+					 marks proprietaryReceived; that arrival is the Done
+					 signal. transferId must match across all messages.
 		 *******************************************************************************/
 		class TxPgnEnableListF2Accumulator
 		{
 		public:
-			[[nodiscard]] PgnListAccumulatorStatus feed(
-				const TxPgnEnableListF2Response& msg, std::string& outError) {
+			[[nodiscard]] PgnListAccumulatorStatus feed(const TxPgnEnableListF2Response& msg,
+														std::string& outError) {
 				if (!initialised_) {
 					result_.transferId = msg.transferId;
 					if (msg.variant == TxPgnEnableListF2Variant::Standard) {
 						result_.totalListSize = msg.stdTotalListSize;
-						result_.entries.assign(msg.stdTotalListSize,
-											   TxPgnEnableEntry{});
+						result_.entries.assign(msg.stdTotalListSize, TxPgnEnableEntry{});
 						seen_.assign(msg.stdTotalListSize, false);
 					}
 					initialised_ = true;
@@ -372,14 +365,12 @@ namespace Actisense
 						   stay constant. */
 						if (result_.entries.empty() && !standardSeen_) {
 							result_.totalListSize = msg.stdTotalListSize;
-							result_.entries.assign(msg.stdTotalListSize,
-												   TxPgnEnableEntry{});
+							result_.entries.assign(msg.stdTotalListSize, TxPgnEnableEntry{});
 							seen_.assign(msg.stdTotalListSize, false);
 						} else {
 							outError = "Tx F2 stdTotalListSize changed mid-stream: "
 									   "expected " +
-									   std::to_string(result_.totalListSize) +
-									   ", got " +
+									   std::to_string(result_.totalListSize) + ", got " +
 									   std::to_string(msg.stdTotalListSize);
 							return PgnListAccumulatorStatus::Mismatch;
 						}
@@ -390,9 +381,9 @@ namespace Actisense
 						static_cast<std::size_t>(msg.stdFirstSubIdx) + msg.stdSubCount;
 					if (end > result_.entries.size()) {
 						outError = "Tx F2 std sub-list overruns total: firstSubIdx=" +
-								   std::to_string(msg.stdFirstSubIdx) + " subCount=" +
-								   std::to_string(msg.stdSubCount) + " total=" +
-								   std::to_string(result_.totalListSize);
+								   std::to_string(msg.stdFirstSubIdx) +
+								   " subCount=" + std::to_string(msg.stdSubCount) +
+								   " total=" + std::to_string(result_.totalListSize);
 						return PgnListAccumulatorStatus::Mismatch;
 					}
 
@@ -408,11 +399,9 @@ namespace Actisense
 					result_.proprietary.dp0RawLut.fill(0);
 					result_.proprietary.dp1RawLut.fill(0);
 					const std::size_t dp0Bytes =
-						(std::min)(msg.propDp0Bitmap.size(),
-								   result_.proprietary.dp0RawLut.size());
+						(std::min)(msg.propDp0Bitmap.size(), result_.proprietary.dp0RawLut.size());
 					const std::size_t dp1Bytes =
-						(std::min)(msg.propDp1Bitmap.size(),
-								   result_.proprietary.dp1RawLut.size());
+						(std::min)(msg.propDp1Bitmap.size(), result_.proprietary.dp1RawLut.size());
 					for (std::size_t i = 0; i < dp0Bytes; ++i) {
 						result_.proprietary.dp0RawLut[i] = msg.propDp0Bitmap[i];
 					}
@@ -420,10 +409,8 @@ namespace Actisense
 						result_.proprietary.dp1RawLut[i] = msg.propDp1Bitmap[i];
 					}
 					decodeProprietaryEnabledPgns(
-						std::span<const uint8_t>(result_.proprietary.dp0RawLut.data(),
-												  dp0Bytes),
-						std::span<const uint8_t>(result_.proprietary.dp1RawLut.data(),
-												  dp1Bytes),
+						std::span<const uint8_t>(result_.proprietary.dp0RawLut.data(), dp0Bytes),
+						std::span<const uint8_t>(result_.proprietary.dp1RawLut.data(), dp1Bytes),
 						result_.proprietary.enabledPgns);
 					result_.proprietaryReceived = true;
 					return PgnListAccumulatorStatus::Done;
@@ -435,9 +422,7 @@ namespace Actisense
 				return PgnListAccumulatorStatus::Continue;
 			}
 
-			[[nodiscard]] const TxPgnEnableListF2Result& result() const noexcept {
-				return result_;
-			}
+			[[nodiscard]] const TxPgnEnableListF2Result& result() const noexcept { return result_; }
 
 			[[nodiscard]] bool initialised() const noexcept { return initialised_; }
 
@@ -460,9 +445,9 @@ namespace Actisense
 			out.reserve(128);
 			out += "Tx PGN Enable List F2 (xid=" + std::to_string(r.transferId) + ", ";
 			if (r.variant == TxPgnEnableListF2Variant::Standard) {
-				out += "Std, total=" + std::to_string(r.stdTotalListSize) +
-					   ", subList[" + std::to_string(r.stdFirstSubIdx) + "..+" +
-					   std::to_string(r.stdSubCount) + "]):\n";
+				out += "Std, total=" + std::to_string(r.stdTotalListSize) + ", subList[" +
+					   std::to_string(r.stdFirstSubIdx) + "..+" + std::to_string(r.stdSubCount) +
+					   "]):\n";
 				for (const auto& e : r.stdEntries) {
 					out += "  [" + std::to_string(e.pgnIndex) +
 						   "] prio=" + std::to_string(e.priority) +

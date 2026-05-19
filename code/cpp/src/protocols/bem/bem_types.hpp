@@ -19,8 +19,8 @@
 
 #include "protocols/bem/bem_commands/bem_commands.hpp"
 #include "protocols/bst/bst_types.hpp"
-#include "public/operating_mode.hpp"
 #include "public/error.hpp"
+#include "public/operating_mode.hpp"
 
 namespace Actisense
 {

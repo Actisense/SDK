@@ -76,9 +76,8 @@ namespace Actisense
 
 			const std::size_t arraySize = data[0];
 			if (arraySize > data.size() - 1) {
-				outError = "Echo response truncated: header reports " +
-						   std::to_string(arraySize) + " bytes, only " +
-						   std::to_string(data.size() - 1) + " present";
+				outError = "Echo response truncated: header reports " + std::to_string(arraySize) +
+						   " bytes, only " + std::to_string(data.size() - 1) + " present";
 				return false;
 			}
 

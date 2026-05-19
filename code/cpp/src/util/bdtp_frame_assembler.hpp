@@ -5,25 +5,25 @@
  \file       bdtp_frame_assembler.hpp
  \brief      Stateful BDTP frame reassembler for the wire-trace EBL writer
  \details    Walks a raw byte stream looking for DLE+STX...DLE+ETX frames,
-             unescaping DLE+DLE inside the frame, and invokes a callback with
-             the inner BST payload (BST_ID + length + data + checksum) for
-             each complete frame.
+			 unescaping DLE+DLE inside the frame, and invokes a callback with
+			 the inner BST payload (BST_ID + length + data + checksum) for
+			 each complete frame.
 
-             This is intentionally separate from BdtpProtocol's structured
-             parser: the wire-trace path needs raw inner-frame bytes to write
-             via EblWriter::writeBstRawFrame, not the decoded BstDatagram
-             structure. State persists across calls so a frame split across
-             multiple OS read chunks is reassembled correctly. Without this,
-             chunked Rx wire data would land as several non-EBL segments in
-             the EBL output and EBL Reader's stateless stream parser would
-             classify the partial-frame leading bytes of each chunk as
-             unstructured binary (DESKTOP-332).
+			 This is intentionally separate from BdtpProtocol's structured
+			 parser: the wire-trace path needs raw inner-frame bytes to write
+			 via EblWriter::writeBstRawFrame, not the decoded BstDatagram
+			 structure. State persists across calls so a frame split across
+			 multiple OS read chunks is reassembled correctly. Without this,
+			 chunked Rx wire data would land as several non-EBL segments in
+			 the EBL output and EBL Reader's stateless stream parser would
+			 classify the partial-frame leading bytes of each chunk as
+			 unstructured binary (DESKTOP-332).
 
-             Bytes that arrive outside any DLE+STX...DLE+ETX bracket (boot
-             banners, error sentinels, framing glitches) are buffered
-             separately and surfaced via the optional unframed callback so
-             customer-support captures can show *everything* that hit the
-             wire, not just the cleanly-framed BST messages.
+			 Bytes that arrive outside any DLE+STX...DLE+ETX bracket (boot
+			 banners, error sentinels, framing glitches) are buffered
+			 separately and surfaced via the optional unframed callback so
+			 customer-support captures can show *everything* that hit the
+			 wire, not just the cleanly-framed BST messages.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -45,10 +45,10 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Stateful DLE/STX/ETX frame reassembler
 		 \details    Frames split across feed() calls are reassembled. Bytes
-		             outside any frame (idle/junk between frames) are silently
-		             discarded — the wire-trace use case does not need them.
-		             A frame larger than @ref kBdtpMaxFrameSize is dropped
-		             and the machine resets to Idle so the stream can recover.
+					 outside any frame (idle/junk between frames) are silently
+					 discarded — the wire-trace use case does not need them.
+					 A frame larger than @ref kBdtpMaxFrameSize is dropped
+					 and the machine resets to Idle so the stream can recover.
 		 *******************************************************************************/
 		class BdtpFrameAssembler
 		{
@@ -79,7 +79,7 @@ namespace Actisense
 			 *                          matching the pre-#16 behaviour.
 			 */
 			void feed(std::span<const uint8_t> bytes, const FrameCallback& on_frame,
-			          const UnframedCallback& on_unframed = {});
+					  const UnframedCallback& on_unframed = {});
 
 			/**
 			 * @brief      Drop any in-flight partial frame and return to Idle.
@@ -90,8 +90,7 @@ namespace Actisense
 			/**
 			 * @brief      True iff currently inside a frame (between DLE+STX and DLE+ETX)
 			 */
-			[[nodiscard]] bool inFrame() const noexcept
-			{
+			[[nodiscard]] bool inFrame() const noexcept {
 				return state_ == State::InFrame || state_ == State::InFrameGotDLE;
 			}
 

@@ -8,9 +8,9 @@
 /* Dependent includes ------------------------------------------------------- */
 #include "public/ebl_writer.hpp"
 
-#include "util/endian.hpp"
-
 #include <vector>
+
+#include "util/endian.hpp"
 
 namespace Actisense
 {

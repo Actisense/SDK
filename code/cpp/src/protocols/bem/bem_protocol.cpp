@@ -8,6 +8,7 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include "protocols/bem/bem_protocol.hpp"
+
 #include "protocols/bem/bem_commands/can_info_fields.hpp"
 #include "protocols/bem/bem_commands/echo.hpp"
 #include "protocols/bem/bem_commands/operating_mode.hpp"
@@ -526,24 +527,27 @@ namespace Actisense
 		{
 			BstId responseBstIdFor(BstId commandBstId) noexcept {
 				switch (commandBstId) {
-					case BstId::Bem_PG_A1: return BstId::Bem_GP_A0;
-					case BstId::Bem_PG_A4: return BstId::Bem_GP_A2;
-					case BstId::Bem_PG_A6: return BstId::Bem_GP_A3;
-					case BstId::Bem_PG_A8: return BstId::Bem_GP_A5;
-					default:               return BstId::Bem_GP_A0;
+					case BstId::Bem_PG_A1:
+						return BstId::Bem_GP_A0;
+					case BstId::Bem_PG_A4:
+						return BstId::Bem_GP_A2;
+					case BstId::Bem_PG_A6:
+						return BstId::Bem_GP_A3;
+					case BstId::Bem_PG_A8:
+						return BstId::Bem_GP_A5;
+					default:
+						return BstId::Bem_GP_A0;
 				}
 			}
-		}
+		} // namespace
 
 		uint8_t BemProtocol::registerRequest(BemCommandId commandId, BstId bstId,
 											 std::chrono::milliseconds timeout,
-											 BemResponseCallback callback,
-											 uint8_t srcAddr) {
+											 BemResponseCallback callback, uint8_t srcAddr) {
 			std::lock_guard<std::mutex> lock(mutex_);
 
 			const uint8_t seqId = nextSequenceId();
-			const uint64_t key =
-				buildResponseKey(responseBstIdFor(bstId), commandId, srcAddr);
+			const uint64_t key = buildResponseKey(responseBstIdFor(bstId), commandId, srcAddr);
 
 			PendingRequest req;
 			req.commandId = commandId;
@@ -556,16 +560,15 @@ namespace Actisense
 			return seqId;
 		}
 
-		uint8_t BemProtocol::registerMultiReplyRequest(
-			BemCommandId commandId, BstId bstId,
-			std::chrono::milliseconds inactivityTimeout,
-			std::function<bool(const BemResponse&)> isComplete,
-			BemResponseCallback callback, uint8_t srcAddr) {
+		uint8_t
+		BemProtocol::registerMultiReplyRequest(BemCommandId commandId, BstId bstId,
+											   std::chrono::milliseconds inactivityTimeout,
+											   std::function<bool(const BemResponse&)> isComplete,
+											   BemResponseCallback callback, uint8_t srcAddr) {
 			std::lock_guard<std::mutex> lock(mutex_);
 
 			const uint8_t seqId = nextSequenceId();
-			const uint64_t key =
-				buildResponseKey(responseBstIdFor(bstId), commandId, srcAddr);
+			const uint64_t key = buildResponseKey(responseBstIdFor(bstId), commandId, srcAddr);
 
 			PendingRequest req;
 			req.commandId = commandId;
@@ -589,8 +592,7 @@ namespace Actisense
 
 				const uint64_t key =
 					buildResponseKey(response.header.bstId,
-									 static_cast<BemCommandId>(response.header.bemId),
-									 srcAddr);
+									 static_cast<BemCommandId>(response.header.bemId), srcAddr);
 
 				auto it = pending_requests_.find(key);
 				if (it == pending_requests_.end()) {
@@ -620,8 +622,7 @@ namespace Actisense
 			std::string errorMsg;
 			if (response.header.errorCode != 0) {
 				ec = ErrorCode::UnsupportedOperation; /* Map ARL errors later */
-				errorMsg = "Device returned error: " +
-						   std::to_string(response.header.errorCode);
+				errorMsg = "Device returned error: " + std::to_string(response.header.errorCode);
 			}
 
 			if (callbackToFire) {
@@ -632,10 +633,9 @@ namespace Actisense
 				const bool done = isCompletePred(response);
 				if (done) {
 					std::lock_guard<std::mutex> lock(mutex_);
-					const uint64_t key = buildResponseKey(
-						response.header.bstId,
-						static_cast<BemCommandId>(response.header.bemId),
-						srcAddr);
+					const uint64_t key =
+						buildResponseKey(response.header.bstId,
+										 static_cast<BemCommandId>(response.header.bemId), srcAddr);
 					auto it = pending_requests_.find(key);
 					if (it != pending_requests_.end()) {
 						pending_requests_.erase(it);
