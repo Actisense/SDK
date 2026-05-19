@@ -292,46 +292,28 @@ protected:
 
 	/* Sweep helpers ---------------------------------------------------------- */
 
-	/* Build the candidate PGN list as: SupportedPgnList intersected
-	   with kKnownSingleFramePgns, minus kSkipPgns. Note: getTxPgnEnableListF2
-	   reports the *current* Tx enable state (NGX-1 defaults: 39 PGNs),
-	   not the device's *capability*, so it cannot be used as a Tx-capability
-	   filter - it would exclude PGNs that aren't currently enabled even
-	   though the firmware would accept setTxPgnEnable + sendPgn for them.
-	   PGNs the firmware refuses host-Tx for (e.g. 127508 Battery Status on
-	   a gateway with no battery) are listed in kSkipPgns. */
+	/* Build the candidate PGN list as: kKnownSingleFramePgns minus kSkipPgns.
+	   Earlier revisions intersected with the DUT's getSupportedPgnList_All,
+	   but that list reports the device's own *producer* PGNs (what it emits
+	   as a node on the bus) — for a pure gateway like NGT-1 that is the
+	   gateway-status/diagnostic set, not the PGNs the firmware will accept
+	   on host-Tx and forward to the bus. The Tx-enable list (gated by
+	   setTxPgnEnable + activatePgnEnableLists) is the actual forwarding
+	   filter. So we iterate the curated single-frame set directly and let
+	   per-PGN setTxPgnEnable errors handle "firmware refuses this one"
+	   (e.g. Battery Status on a gateway with no battery). PGNs known to
+	   be refused or that bypass the filter live in kSkipPgns. */
 	std::vector<uint32_t> discoverCandidatePgns()
 	{
-		auto supported = fetchSupportedPgns();
-		if (!supported.has_value()) {
-			ADD_FAILURE() << "Could not fetch Supported PGN List from DUT";
-			return {};
-		}
-
 		std::vector<uint32_t> out;
-		out.reserve(supported->pgns.size());
-		for (uint32_t pgn : supported->pgns) {
-			/* Anything below 0x10000 is the J1939 / ISO 11783 control-PGN
-			   range (Address Claim, ISO Request, ISO ACK, Transport
-			   Protocol, etc.). Those PGNs have firmware-managed lifecycle
-			   semantics that don't fit the simple "host sends, receiver
-			   sees same bytes back" contract this test exercises, and are
-			   covered by a separate ticket. Bail before any other filter
-			   so a future edit to kKnownSingleFramePgns cannot accidentally
-			   pull one of these into the sweep. */
-			if (pgn < 0x10000u) {
-				continue;
-			}
+		out.reserve(kKnownSingleFramePgns.size());
+		for (uint32_t pgn : kKnownSingleFramePgns) {
 			if (kSkipPgns.count(pgn)) {
 				continue;
-			}
-			if (kKnownSingleFramePgns.count(pgn) == 0) {
-				continue; /* fast-packet or proprietary - out of scope */
 			}
 			out.push_back(pgn);
 		}
 		std::sort(out.begin(), out.end());
-		out.erase(std::unique(out.begin(), out.end()), out.end());
 		return out;
 	}
 
