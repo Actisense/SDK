@@ -156,6 +156,32 @@ static const std::unordered_set<uint32_t> kSkipPgns = {
 	127508, /* Battery Status - NGX has no battery; firmware refuses host-Tx */
 };
 
+/* Zero-based byte index of the Data Instance field within each PGN's
+   payload, sourced from LibN2K's i_instance_ values. PGNs not in this
+   map have no instance field (i_instance_ == 255).
+
+   GIT-103: the NGT-1 firmware enforces a Data Instance match on host-
+   Tx. It pre-builds one Tx Virtual Object per PGN with data_inst_ = 0
+   and silently drops any host-Tx whose payload instance byte does not
+   match an existing tx_object (the CreateDuplicateTxObject path is
+   defeated by a stale iterator at TranslateDBController.c:519 — NGT
+   went EOL ~2 years ago so this is not fixable in firmware). The
+   sweep's pseudo-random payload is vanishingly unlikely to land 0 in
+   any given byte by chance, so we force the instance byte to 0 here.
+   This makes the sweep deterministic against the firmware's default
+   instance and removes the cross-DUT false-failure on NGT. */
+static const std::unordered_map<uint32_t, uint8_t> kInstanceByteByPgn = {
+	{127245, 0}, /* Rudder */
+	{127488, 0}, /* Engine Parameters, Rapid Update */
+	{127493, 0}, /* Transmission Parameters, Dynamic */
+	{127501, 0}, /* Switch Bank Status */
+	{127505, 0}, /* Fluid Level */
+	{130312, 1}, /* Temperature (deprecated) */
+	{130313, 1}, /* Humidity */
+	{130314, 1}, /* Actual Pressure */
+	{130316, 1}, /* Temperature, Extended Range */
+};
+
 /* Captured receive frame for cross-checking against what the DUT sent. */
 struct ReceivedFrame
 {
@@ -318,13 +344,19 @@ protected:
 	}
 
 	/* Build an 8-byte pattern payload from (pgn, runSalt_). Deterministic
-	   per (run, PGN) so a receiver match is unambiguous. */
+	   per (run, PGN) so a receiver match is unambiguous. For PGNs that
+	   carry a Data Instance field (kInstanceByteByPgn), force that byte
+	   to 0 so the NGT-1 firmware's instance-match filter accepts the
+	   send — see GIT-103. */
 	std::vector<uint8_t> makePatternPayload(uint32_t pgn) const
 	{
 		std::vector<uint8_t> payload(8);
 		for (uint8_t i = 0; i < 8; ++i) {
 			const uint32_t mix = pgn ^ (static_cast<uint32_t>(i) * 0x11u) ^ runSalt_;
 			payload[i] = static_cast<uint8_t>(mix & 0xFFu);
+		}
+		if (const auto it = kInstanceByteByPgn.find(pgn); it != kInstanceByteByPgn.end()) {
+			payload[it->second] = 0;
 		}
 		return payload;
 	}
