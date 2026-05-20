@@ -16,6 +16,7 @@
 /* Dependent includes ------------------------------------------------------- */
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -76,34 +77,38 @@ namespace Actisense
 
 		/**************************************************************************/ /**
 		 \brief      Decode System Status from BEM data block
-		 \param[in]  data       Raw BEM data block (after header)
-		 \param[in]  data_size  Size of the data block
-		 \param[out] out_error  Error message if decoding fails
-		 \return     Decoded system status or nullopt on error
+		 \param[in]  data      BEM response data (after 12-byte header)
+		 \param[out] status    Decoded status structure (populated up to the point of
+								 failure on error; do not read on a false return)
+		 \param[out] outError  Error message if decoding fails
+		 \return     True on success, false on error
+		 \details    Permissive against trailing bytes: 1-2 bytes after the unified
+					 buffer section will not be flagged as an error (the CAN tail
+					 needs 3 bytes; the op-mode tail needs 2 in the post-CAN window).
 		 *******************************************************************************/
-		[[nodiscard]] inline std::optional<SystemStatusData>
-		decodeSystemStatus(const uint8_t* data, std::size_t data_size, std::string& out_error) {
-			if (data_size < 1) {
-				out_error = "System status data too short";
-				return std::nullopt;
+		[[nodiscard]] inline bool decodeSystemStatus(std::span<const uint8_t> data,
+													  SystemStatusData& status,
+													  std::string& outError) {
+			if (data.size() < 1) {
+				outError = "System status data too short";
+				return false;
 			}
 
-			SystemStatusData status;
 			std::size_t offset = 0;
 
 			/* Parse Individual Buffer count and entries */
 			const uint8_t num_individual_buffers = data[offset++];
 			if (num_individual_buffers < 1 || num_individual_buffers > 16) {
-				out_error =
+				outError =
 					"Invalid individual buffer count: " + std::to_string(num_individual_buffers);
-				return std::nullopt;
+				return false;
 			}
 
 			const std::size_t indi_bytes_needed =
 				static_cast<std::size_t>(num_individual_buffers) * 6;
-			if (offset + indi_bytes_needed > data_size) {
-				out_error = "Data too short for individual buffers";
-				return std::nullopt;
+			if (offset + indi_bytes_needed > data.size()) {
+				outError = "Data too short for individual buffers";
+				return false;
 			}
 
 			status.individual_buffers_.reserve(num_individual_buffers);
@@ -119,22 +124,22 @@ namespace Actisense
 			}
 
 			/* Check if we have unified buffer header */
-			if (offset >= data_size) {
+			if (offset >= data.size()) {
 				/* No unified buffers or extended data */
-				return status;
+				return true;
 			}
 
 			/* Parse Unified Buffer count and entries */
 			const uint8_t num_unified_buffers = data[offset++];
 			if (num_unified_buffers > 8) {
-				out_error = "Invalid unified buffer count: " + std::to_string(num_unified_buffers);
-				return std::nullopt;
+				outError = "Invalid unified buffer count: " + std::to_string(num_unified_buffers);
+				return false;
 			}
 
 			const std::size_t uni_bytes_needed = static_cast<std::size_t>(num_unified_buffers) * 4;
-			if (offset + uni_bytes_needed > data_size) {
-				out_error = "Data too short for unified buffers";
-				return std::nullopt;
+			if (offset + uni_bytes_needed > data.size()) {
+				outError = "Data too short for unified buffers";
+				return false;
 			}
 
 			status.unified_buffers_.reserve(num_unified_buffers);
@@ -148,7 +153,7 @@ namespace Actisense
 			}
 
 			/* Check for CAN Extended Status (3 bytes) */
-			const std::size_t remaining = data_size - offset;
+			const std::size_t remaining = data.size() - offset;
 			if (remaining >= 3) {
 				CanExtendedStatus can{};
 				can.rx_error_count_ = data[offset++];
@@ -158,14 +163,14 @@ namespace Actisense
 			}
 
 			/* Check for Operating Mode (2 bytes after CAN fields) */
-			const std::size_t remaining_after_can = data_size - offset;
+			const std::size_t remaining_after_can = data.size() - offset;
 			if (remaining_after_can >= 2) {
 				const uint16_t mode = static_cast<uint16_t>(data[offset]) |
 									  (static_cast<uint16_t>(data[offset + 1]) << 8);
 				status.operating_mode_ = mode;
 			}
 
-			return status;
+			return true;
 		}
 
 		/**************************************************************************/ /**

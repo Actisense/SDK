@@ -16,6 +16,9 @@
 #include "protocols/bem/bem_commands/error_report.hpp"
 #include "protocols/bem/bem_commands/negative_ack.hpp"
 #include "protocols/bem/bem_commands/startup_status.hpp"
+#include "protocols/bem/bem_commands/system_status.hpp"
+#include "protocols/bem/bem_wrap_126720.hpp"
+#include "protocols/bst/bst_frame.hpp"
 #include "protocols/bst/bst_types.hpp"
 #include "transport/loopback/loopback_transport.hpp"
 
@@ -122,6 +125,51 @@ protected:
 
 		datagram.data       = std::move(bytes);
 		datagram.storeLength = static_cast<uint8_t>(datagram.data.size());
+
+		std::vector<uint8_t> frame;
+		BdtpProtocol::encodeBst(datagram, frame);
+
+		ASSERT_GT(transport_->injectData(frame), 0u);
+	}
+
+	/* Build an unsolicited BEM A0H datagram, wrap it in PGN 126720, and inject
+	   it as a BST-93 (N2K Gateway→PC) frame so the session sees the same shape
+	   as an uncorrelated remote-device reply (GIT-105 path). */
+	void injectWrappedRemoteUnsolicited(uint8_t                     bemId,
+										uint8_t                     sourceAddr,
+										uint32_t                    headerErrorCode,
+										const std::vector<uint8_t>& payload)
+	{
+		/* Inner BEM frame = bstId(0xA0) + storeLength + 12-byte BEM header + payload */
+		std::vector<uint8_t> inner;
+		inner.reserve(2 + 12 + payload.size());
+		inner.push_back(static_cast<uint8_t>(BstId::Bem_GP_A0));
+		inner.push_back(static_cast<uint8_t>(12 + payload.size()));
+		inner.push_back(bemId);                       /* bemId */
+		inner.push_back(0x00);                        /* seqId */
+		inner.push_back(0x12); inner.push_back(0x00); /* modelId = 0x0012 (NGX-1) */
+		inner.push_back(0x78); inner.push_back(0x56); /* serial = 0x12345678 LE */
+		inner.push_back(0x34); inner.push_back(0x12);
+		inner.push_back(static_cast<uint8_t>(headerErrorCode & 0xFF));
+		inner.push_back(static_cast<uint8_t>((headerErrorCode >> 8) & 0xFF));
+		inner.push_back(static_cast<uint8_t>((headerErrorCode >> 16) & 0xFF));
+		inner.push_back(static_cast<uint8_t>((headerErrorCode >> 24) & 0xFF));
+		inner.insert(inner.end(), payload.begin(), payload.end());
+
+		std::vector<uint8_t> wrapped;
+		wrapBemInPgn126720(inner, wrapped);
+
+		/* Build the BST-93 frame carrying the wrapped payload as PGN 126720
+		   from the remote source address. broadcastDest=0xFF, defaults priority. */
+		const BstFrame n2kFrame = BstFrame::create93(
+			static_cast<uint32_t>(kPgn126720), sourceAddr, /*destination*/ 0xFF, wrapped);
+		const auto rawBytes = n2kFrame.rawData();
+		ASSERT_GE(rawBytes.size(), 2u);
+
+		BstDatagram datagram;
+		datagram.bstId = rawBytes[0];
+		datagram.storeLength = rawBytes[1];
+		datagram.data.assign(rawBytes.begin() + 2, rawBytes.end());
 
 		std::vector<uint8_t> frame;
 		BdtpProtocol::encodeBst(datagram, frame);
@@ -251,6 +299,41 @@ TEST_F(SessionUnsolicitedTest, NegativeAck_EmitsTypedEvent)
 	EXPECT_EQ(data.uniqueId, 0xDEADBEEFu);
 }
 
+/* System Status (0xF2) ----------------------------------------------------- */
+
+TEST_F(SessionUnsolicitedTest, SystemStatus_EmitsTypedEvent)
+{
+	/* Minimal valid payload: 1 individual buffer (Nin=1), no unified, no tail.
+	   Each individual buffer is 6 bytes (rx_bw, rx_load, rx_filt, rx_drop,
+	   tx_bw, tx_load). */
+	const std::vector<uint8_t> payload = {
+		0x01,                              /* Nin = 1 */
+		0x0A, 0x14, 0x1E, 0x28, 0x32, 0x3C /* rx 10,20,30,40 | tx 50,60 */
+	};
+
+	injectUnsolicited(0xF2, /*headerErrorCode=*/0, payload);
+
+	ASSERT_TRUE(waitForEvent());
+
+	std::lock_guard<std::mutex> lk(mutex_);
+	ASSERT_EQ(events_.size(), 1u);
+	const auto& ev = events_[0];
+	EXPECT_EQ(ev.protocol, "bem");
+	EXPECT_EQ(ev.messageType, "SystemStatus");
+
+	const auto& data = std::any_cast<const SystemStatusData&>(ev.payload);
+	ASSERT_EQ(data.individual_buffers_.size(), 1u);
+	EXPECT_EQ(data.individual_buffers_[0].rx_bandwidth_, 10u);
+	EXPECT_EQ(data.individual_buffers_[0].rx_loading_, 20u);
+	EXPECT_EQ(data.individual_buffers_[0].rx_filtered_, 30u);
+	EXPECT_EQ(data.individual_buffers_[0].rx_dropped_, 40u);
+	EXPECT_EQ(data.individual_buffers_[0].tx_bandwidth_, 50u);
+	EXPECT_EQ(data.individual_buffers_[0].tx_loading_, 60u);
+	EXPECT_TRUE(data.unified_buffers_.empty());
+	EXPECT_FALSE(data.can_status_.has_value());
+	EXPECT_FALSE(data.operating_mode_.has_value());
+}
+
 /* Decode Failure Fallback -------------------------------------------------- */
 
 TEST_F(SessionUnsolicitedTest, ShortNegativeAck_FallsBackToGenericAndReportsError)
@@ -275,13 +358,15 @@ TEST_F(SessionUnsolicitedTest, ShortNegativeAck_FallsBackToGenericAndReportsErro
 	EXPECT_NE(errors_.front().second.find("NegativeAck"), std::string::npos);
 }
 
-/* Unhandled unsolicited type --------------------------------------------- */
-
-TEST_F(SessionUnsolicitedTest, UnknownUnsolicitedFallsBackToGeneric)
+TEST_F(SessionUnsolicitedTest, ShortSystemStatus_FallsBackToGenericAndReportsError)
 {
-	/* 0xF2 (SystemStatus) is not part of GIT-65 — verify it still emits the
-	   generic event so consumers are not silently starved. */
-	const std::vector<uint8_t> payload = { 0xAA, 0xBB };
+	/* Payload announces 2 individual buffers (12 bytes needed) but only
+	   supplies 6 — decoder rejects with "Data too short for individual
+	   buffers". */
+	const std::vector<uint8_t> payload = {
+		0x02,                              /* Nin = 2 */
+		0x0A, 0x14, 0x1E, 0x28, 0x32, 0x3C /* one buffer worth of data */
+	};
 
 	injectUnsolicited(0xF2, /*headerErrorCode=*/0, payload);
 
@@ -291,6 +376,62 @@ TEST_F(SessionUnsolicitedTest, UnknownUnsolicitedFallsBackToGeneric)
 	ASSERT_EQ(events_.size(), 1u);
 	EXPECT_EQ(events_[0].protocol, "bem");
 	EXPECT_NE(events_[0].messageType.find("F2"), std::string::npos);
+	EXPECT_NE(events_[0].messageType, "SystemStatus");
+
+	ASSERT_FALSE(errors_.empty());
+	EXPECT_EQ(errors_.front().first, ErrorCode::MalformedFrame);
+	EXPECT_NE(errors_.front().second.find("SystemStatus"), std::string::npos);
+}
+
+/* Remote unsolicited dispatch (GIT-105) ----------------------------------- */
+
+TEST_F(SessionUnsolicitedTest, RemoteUnwrap_StartupStatus_EmitsTypedEvent)
+{
+	/* GIT-105: an unsolicited 0xF0 from a device on the bus behind the
+	   gateway arrives wrapped in PGN 126720. With no pending request to
+	   correlate against, the session must still route the unwrapped BEM
+	   through the typed-event dispatch (handleBemResponse), surfacing it
+	   as a StartupStatus ParsedMessageEvent — not just a raw BST frame. */
+	const std::vector<uint8_t> payload = {
+		0x34, 0x12,                    /* startupMode LE */
+		0xEF, 0xBE, 0xAD, 0xDE         /* errorCode LE */
+	};
+
+	injectWrappedRemoteUnsolicited(/*bemId*/ 0xF0, /*sourceAddr*/ 200,
+								   /*headerErrorCode*/ 0, payload);
+
+	ASSERT_TRUE(waitForEvent());
+
+	std::lock_guard<std::mutex> lk(mutex_);
+	ASSERT_EQ(events_.size(), 1u);
+	const auto& ev = events_[0];
+	EXPECT_EQ(ev.protocol, "bem");
+	EXPECT_EQ(ev.messageType, "StartupStatus");
+
+	const auto& data = std::any_cast<const StartupStatusData&>(ev.payload);
+	EXPECT_EQ(data.format, StartupStatusFormat::Modern);
+	EXPECT_EQ(data.startupMode, 0x1234u);
+	EXPECT_EQ(data.errorCode, 0xDEADBEEFu);
+}
+
+/* Unhandled unsolicited type --------------------------------------------- */
+
+TEST_F(SessionUnsolicitedTest, UnknownUnsolicitedFallsBackToGeneric)
+{
+	/* Convention: 0xF3 and 0xF5-0xFF are the untyped unsolicited pool. F2
+	   moved into the typed-dispatch set in GIT-101 so this test uses F5 as
+	   the next available negative-case anchor. If a future ticket types
+	   F5, pick another from the same pool and update this comment. */
+	const std::vector<uint8_t> payload = { 0xAA, 0xBB };
+
+	injectUnsolicited(0xF5, /*headerErrorCode=*/0, payload);
+
+	ASSERT_TRUE(waitForEvent());
+
+	std::lock_guard<std::mutex> lk(mutex_);
+	ASSERT_EQ(events_.size(), 1u);
+	EXPECT_EQ(events_[0].protocol, "bem");
+	EXPECT_NE(events_[0].messageType.find("F5"), std::string::npos);
 	EXPECT_TRUE(errors_.empty());
 }
 

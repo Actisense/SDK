@@ -2,7 +2,7 @@
 \file       test_unsolicited_messages.cpp
 \brief      Unit tests for unsolicited BEM messages
 \details    Tests decode for Startup Status (0xF0), Error Report (0xF1),
-            and Negative Ack (0xF4) unsolicited messages
+            System Status (0xF2), and Negative Ack (0xF4) unsolicited messages
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 *******************************************************************************/
@@ -11,10 +11,13 @@
 #include "protocols/bem/bem_commands/startup_status.hpp"
 #include "protocols/bem/bem_commands/error_report.hpp"
 #include "protocols/bem/bem_commands/negative_ack.hpp"
+#include "protocols/bem/bem_commands/system_status.hpp"
 #include "protocols/bem/bem_commands/bem_commands.hpp"
 
 #include <gtest/gtest.h>
 #include <array>
+#include <optional>
+#include <span>
 #include <vector>
 
 namespace Actisense
@@ -295,6 +298,273 @@ TEST_F(UnsolicitedMessagesTest, NegativeAck_FormatSimple)
 TEST_F(UnsolicitedMessagesTest, NegativeAck_Constants)
 {
 	EXPECT_EQ(kNegativeAckDataSize, 4u);
+}
+
+/* System Status (0xF2) Tests ----------------------------------------------- */
+
+/* Helper: build an Individual Buffer entry (6 bytes). */
+static std::array<uint8_t, 6> makeIndi(uint8_t rxBw, uint8_t rxLoad, uint8_t rxFilt,
+									   uint8_t rxDrop, uint8_t txBw, uint8_t txLoad)
+{
+	return { rxBw, rxLoad, rxFilt, rxDrop, txBw, txLoad };
+}
+
+/* Helper: build a Unified Buffer entry (4 bytes). */
+static std::array<uint8_t, 4> makeUni(uint8_t bw, uint8_t del, uint8_t load, uint8_t ptr)
+{
+	return { bw, del, load, ptr };
+}
+
+/* Helper: assemble a SystemStatus wire payload. Individuals are required;
+   if unifiedCount is std::nullopt the Nun byte is omitted entirely (i.e.
+   the message stops after the individual section). */
+static std::vector<uint8_t> assembleSystemStatusPayload(
+	const std::vector<std::array<uint8_t, 6>>& individuals,
+	std::optional<uint8_t> unifiedCount,
+	const std::vector<std::array<uint8_t, 4>>& unifieds,
+	std::span<const uint8_t> tail = {})
+{
+	std::vector<uint8_t> payload;
+	payload.push_back(static_cast<uint8_t>(individuals.size()));
+	for (const auto& indi : individuals) {
+		payload.insert(payload.end(), indi.begin(), indi.end());
+	}
+	if (unifiedCount.has_value()) {
+		payload.push_back(*unifiedCount);
+		for (const auto& uni : unifieds) {
+			payload.insert(payload.end(), uni.begin(), uni.end());
+		}
+	}
+	payload.insert(payload.end(), tail.begin(), tail.end());
+	return payload;
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeSingleIndividualNoTail)
+{
+	const auto payload = assembleSystemStatusPayload(
+		{ makeIndi(10, 20, 30, 40, 50, 60) },
+		/*Nun*/ std::nullopt, /*unifieds*/ {});
+
+	SystemStatusData status;
+	EXPECT_TRUE(decodeSystemStatus(payload, status, m_error));
+	EXPECT_TRUE(m_error.empty());
+
+	ASSERT_EQ(status.individual_buffers_.size(), 1u);
+	EXPECT_EQ(status.individual_buffers_[0].rx_bandwidth_, 10u);
+	EXPECT_EQ(status.individual_buffers_[0].tx_loading_, 60u);
+	EXPECT_TRUE(status.unified_buffers_.empty());
+	EXPECT_FALSE(status.can_status_.has_value());
+	EXPECT_FALSE(status.operating_mode_.has_value());
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeMultiIndividualNoUnified)
+{
+	const auto payload = assembleSystemStatusPayload(
+		{ makeIndi(1, 2, 3, 4, 5, 6), makeIndi(11, 12, 13, 14, 15, 16),
+		  makeIndi(21, 22, 23, 24, 25, 26), makeIndi(31, 32, 33, 34, 35, 36) },
+		/*Nun*/ uint8_t{0}, /*unifieds*/ {});
+
+	SystemStatusData status;
+	EXPECT_TRUE(decodeSystemStatus(payload, status, m_error));
+
+	ASSERT_EQ(status.individual_buffers_.size(), 4u);
+	EXPECT_EQ(status.individual_buffers_[3].rx_bandwidth_, 31u);
+	EXPECT_EQ(status.individual_buffers_[3].tx_loading_, 36u);
+	EXPECT_TRUE(status.unified_buffers_.empty());
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeMaxIndividualNoUnified)
+{
+	std::vector<std::array<uint8_t, 6>> individuals;
+	for (uint8_t i = 0; i < 16; ++i) {
+		individuals.push_back(makeIndi(i, i, i, i, i, i));
+	}
+	const auto payload =
+		assembleSystemStatusPayload(individuals, /*Nun*/ uint8_t{0}, /*unifieds*/ {});
+
+	SystemStatusData status;
+	EXPECT_TRUE(decodeSystemStatus(payload, status, m_error));
+	EXPECT_EQ(status.individual_buffers_.size(), 16u);
+	EXPECT_TRUE(status.unified_buffers_.empty());
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeWithUnifiedBuffers)
+{
+	const auto payload = assembleSystemStatusPayload(
+		{ makeIndi(10, 20, 30, 40, 50, 60) },
+		/*Nun*/ uint8_t{4},
+		{ makeUni(70, 71, 72, 73), makeUni(80, 81, 82, 83), makeUni(90, 91, 92, 93),
+		  makeUni(100, 101, 102, 103) });
+
+	SystemStatusData status;
+	EXPECT_TRUE(decodeSystemStatus(payload, status, m_error));
+
+	ASSERT_EQ(status.unified_buffers_.size(), 4u);
+	EXPECT_EQ(status.unified_buffers_[0].bandwidth_, 70u);
+	EXPECT_EQ(status.unified_buffers_[3].pointer_loading_, 103u);
+	EXPECT_FALSE(status.can_status_.has_value());
+	EXPECT_FALSE(status.operating_mode_.has_value());
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeMaxUnifiedBuffers)
+{
+	std::vector<std::array<uint8_t, 4>> unifieds;
+	for (uint8_t i = 0; i < 8; ++i) {
+		unifieds.push_back(makeUni(i, i, i, i));
+	}
+	const auto payload = assembleSystemStatusPayload(
+		{ makeIndi(0, 0, 0, 0, 0, 0) }, /*Nun*/ uint8_t{8}, unifieds);
+
+	SystemStatusData status;
+	EXPECT_TRUE(decodeSystemStatus(payload, status, m_error));
+	EXPECT_EQ(status.unified_buffers_.size(), 8u);
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeWithCanTail)
+{
+	const std::array<uint8_t, 3> canTail{ 0x05, 0x07, 0x80 };
+	const auto payload = assembleSystemStatusPayload(
+		{ makeIndi(10, 20, 30, 40, 50, 60) },
+		/*Nun*/ uint8_t{0}, /*unifieds*/ {}, canTail);
+
+	SystemStatusData status;
+	EXPECT_TRUE(decodeSystemStatus(payload, status, m_error));
+
+	ASSERT_TRUE(status.can_status_.has_value());
+	EXPECT_EQ(status.can_status_->rx_error_count_, 0x05u);
+	EXPECT_EQ(status.can_status_->tx_error_count_, 0x07u);
+	EXPECT_EQ(status.can_status_->can_status_, 0x80u);
+	EXPECT_FALSE(status.operating_mode_.has_value());
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeWithOperatingModeTailOnly)
+{
+	/* 2 trailing bytes after the unified section: too short for CAN (3
+	   bytes), but the post-CAN window has 2 bytes available so the
+	   operating-mode field is populated. Decoder behaviour is permissive. */
+	const std::array<uint8_t, 2> modeTail{ 0x34, 0x12 };
+	const auto payload = assembleSystemStatusPayload(
+		{ makeIndi(10, 20, 30, 40, 50, 60) },
+		/*Nun*/ uint8_t{0}, /*unifieds*/ {}, modeTail);
+
+	SystemStatusData status;
+	EXPECT_TRUE(decodeSystemStatus(payload, status, m_error));
+
+	EXPECT_FALSE(status.can_status_.has_value());
+	ASSERT_TRUE(status.operating_mode_.has_value());
+	EXPECT_EQ(*status.operating_mode_, 0x1234u);
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeWithBothTails)
+{
+	const std::array<uint8_t, 5> bothTails{ 0x05, 0x07, 0x80, 0x34, 0x12 };
+	const auto payload = assembleSystemStatusPayload(
+		{ makeIndi(10, 20, 30, 40, 50, 60) },
+		/*Nun*/ uint8_t{0}, /*unifieds*/ {}, bothTails);
+
+	SystemStatusData status;
+	EXPECT_TRUE(decodeSystemStatus(payload, status, m_error));
+
+	ASSERT_TRUE(status.can_status_.has_value());
+	EXPECT_EQ(status.can_status_->rx_error_count_, 0x05u);
+	ASSERT_TRUE(status.operating_mode_.has_value());
+	EXPECT_EQ(*status.operating_mode_, 0x1234u);
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeEmptyDataRejected)
+{
+	const std::vector<uint8_t> payload;
+	SystemStatusData status;
+	EXPECT_FALSE(decodeSystemStatus(payload, status, m_error));
+	EXPECT_FALSE(m_error.empty());
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeMidIndividualTruncated)
+{
+	/* Announces Nin=2 (12 bytes of individuals needed) but only provides 6. */
+	const std::vector<uint8_t> payload{
+		0x02, 0x0A, 0x14, 0x1E, 0x28, 0x32, 0x3C
+	};
+	SystemStatusData status;
+	EXPECT_FALSE(decodeSystemStatus(payload, status, m_error));
+	EXPECT_NE(m_error.find("individual"), std::string::npos);
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeMidUnifiedTruncated)
+{
+	/* Nin=1 + Nun=2 (8 bytes of unifieds needed) but only 4 supplied. */
+	const std::vector<uint8_t> payload{
+		0x01, 0x0A, 0x14, 0x1E, 0x28, 0x32, 0x3C, /* Nin=1 + indi */
+		0x02, 0x46, 0x50, 0x5A, 0x64               /* Nun=2 + 4 bytes (need 8) */
+	};
+	SystemStatusData status;
+	EXPECT_FALSE(decodeSystemStatus(payload, status, m_error));
+	EXPECT_NE(m_error.find("unified"), std::string::npos);
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeNinZeroRejected)
+{
+	const std::vector<uint8_t> payload{ 0x00 };
+	SystemStatusData status;
+	EXPECT_FALSE(decodeSystemStatus(payload, status, m_error));
+	EXPECT_NE(m_error.find("individual buffer count"), std::string::npos);
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeNinOverCountRejected)
+{
+	std::vector<uint8_t> payload;
+	payload.push_back(17); /* Nin=17 — out of range (max 16) */
+	for (int i = 0; i < 17 * 6; ++i) {
+		payload.push_back(0xAA);
+	}
+	SystemStatusData status;
+	EXPECT_FALSE(decodeSystemStatus(payload, status, m_error));
+	EXPECT_NE(m_error.find("individual buffer count"), std::string::npos);
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeNunOverCountRejected)
+{
+	std::vector<uint8_t> payload{ 0x01, 0x0A, 0x14, 0x1E, 0x28, 0x32, 0x3C, 0x09 };
+	/* Nun=9 — out of range (max 8). The decoder must reject before
+	   demanding the 36 bytes that would otherwise follow. */
+	SystemStatusData status;
+	EXPECT_FALSE(decodeSystemStatus(payload, status, m_error));
+	EXPECT_NE(m_error.find("unified buffer count"), std::string::npos);
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodePermissiveOneTrailingByte)
+{
+	/* GIT-101: trailing bytes after the unified section that don't form a
+	   complete optional tail (CAN needs 3, op-mode needs 2 in the post-CAN
+	   window) are silently dropped — no decode error, no fields populated. */
+	const std::array<uint8_t, 1> tail{ 0xCC };
+	const auto payload = assembleSystemStatusPayload(
+		{ makeIndi(10, 20, 30, 40, 50, 60) },
+		/*Nun*/ uint8_t{0}, /*unifieds*/ {}, tail);
+
+	SystemStatusData status;
+	EXPECT_TRUE(decodeSystemStatus(payload, status, m_error));
+	EXPECT_TRUE(m_error.empty());
+	EXPECT_FALSE(status.can_status_.has_value());
+	EXPECT_FALSE(status.operating_mode_.has_value());
+}
+
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodePermissiveTwoTrailingBytes)
+{
+	/* GIT-101: 2 trailing bytes are too short for CAN (3 bytes) but exactly
+	   right for the op-mode field (2 bytes in the post-CAN window). The
+	   decoder populates op-mode and leaves CAN unset — locks in existing
+	   permissive behaviour. */
+	const std::array<uint8_t, 2> tail{ 0x78, 0x56 };
+	const auto payload = assembleSystemStatusPayload(
+		{ makeIndi(10, 20, 30, 40, 50, 60) },
+		/*Nun*/ uint8_t{0}, /*unifieds*/ {}, tail);
+
+	SystemStatusData status;
+	EXPECT_TRUE(decodeSystemStatus(payload, status, m_error));
+	EXPECT_FALSE(status.can_status_.has_value());
+	ASSERT_TRUE(status.operating_mode_.has_value());
+	EXPECT_EQ(*status.operating_mode_, 0x5678u);
 }
 
 /* BEM Command ID Tests ----------------------------------------------------- */

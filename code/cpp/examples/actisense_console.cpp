@@ -102,18 +102,14 @@ void onEvent(const EventVariant& event)
 						if (!response.data.empty())
 						{
 							std::string error;
-							auto status = decodeSystemStatus(
-								response.data.data(), 
-								response.data.size(), 
-								error);
-							
-							if (status)
+							SystemStatusData status;
+							if (decodeSystemStatus(response.data, status, error))
 							{
-								ss << "\n         Individual Buffers: " << status->individual_buffers_.size();
-								for (std::size_t i = 0; i < status->individual_buffers_.size(); ++i)
+								ss << "\n         Individual Buffers: " << status.individual_buffers_.size();
+								for (std::size_t i = 0; i < status.individual_buffers_.size(); ++i)
 								{
-									const auto& buf = status->individual_buffers_[i];
-									ss << "\n           [" << i << "] Rx: " 
+									const auto& buf = status.individual_buffers_[i];
+									ss << "\n           [" << i << "] Rx: "
 									   << static_cast<int>(buf.rx_bandwidth_) << "% BW, "
 									   << static_cast<int>(buf.rx_loading_) << "% Load, "
 									   << static_cast<int>(buf.rx_filtered_) << "% Filt, "
@@ -122,30 +118,30 @@ void onEvent(const EventVariant& event)
 									   << static_cast<int>(buf.tx_bandwidth_) << "% BW, "
 									   << static_cast<int>(buf.tx_loading_) << "% Load";
 								}
-								
-								ss << "\n         Unified Buffers: " << status->unified_buffers_.size();
-								for (std::size_t j = 0; j < status->unified_buffers_.size(); ++j)
+
+								ss << "\n         Unified Buffers: " << status.unified_buffers_.size();
+								for (std::size_t j = 0; j < status.unified_buffers_.size(); ++j)
 								{
-									const auto& buf = status->unified_buffers_[j];
+									const auto& buf = status.unified_buffers_[j];
 									ss << "\n           [" << j << "] "
 									   << static_cast<int>(buf.bandwidth_) << "% BW, "
 									   << static_cast<int>(buf.loading_) << "% Load, "
 									   << static_cast<int>(buf.deleted_) << "% Del, "
 									   << static_cast<int>(buf.pointer_loading_) << "% Ptr";
 								}
-								
-								if (status->can_status_)
+
+								if (status.can_status_)
 								{
-									ss << "\n         CAN: RxErr=" 
-									   << static_cast<int>(status->can_status_->rx_error_count_)
-									   << " TxErr=" << static_cast<int>(status->can_status_->tx_error_count_)
-									   << " Status=0x" << std::hex 
-									   << static_cast<int>(status->can_status_->can_status_) << std::dec;
+									ss << "\n         CAN: RxErr="
+									   << static_cast<int>(status.can_status_->rx_error_count_)
+									   << " TxErr=" << static_cast<int>(status.can_status_->tx_error_count_)
+									   << " Status=0x" << std::hex
+									   << static_cast<int>(status.can_status_->can_status_) << std::dec;
 								}
-								
-								if (status->operating_mode_)
+
+								if (status.operating_mode_)
 								{
-									const uint16_t mode = *status->operating_mode_;
+									const uint16_t mode = *status.operating_mode_;
 									const char* modeName = OperatingModeName(static_cast<OperatingMode>(mode));
 									ss << "\n         Operating Mode: 0x" << std::hex << mode << std::dec
 									   << " (" << modeName << ")";

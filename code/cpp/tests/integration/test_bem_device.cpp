@@ -69,9 +69,11 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <condition_variable>
 #include <cstdlib>
 #include <future>
 #include <iostream>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <thread>
@@ -2713,13 +2715,63 @@ TEST_F(BemDeviceTest, ReInitMainApp_RebootsDevice)
 {
 	/* DESTRUCTIVE: this command reboots the device. Gated on
 	   ACTISENSE_TEST_REBOOT_OK=1 so the standard integration suite never
-	   runs it accidentally. After acceptance the device will be offline for
-	   several seconds; subsequent tests in the same run are likely to fail
-	   their SetUp probe, so reserve this for a dedicated invocation. */
+	   runs it accidentally. After acceptance the device is offline for
+	   several seconds (NGT: ~3s; NGX: up to ~10s — startup status arrives
+	   on first re-enumeration), so subsequent tests in the same run are
+	   likely to fail their SetUp probe — reserve this for a dedicated
+	   invocation.
+
+	   GIT-105: this test also asserts that the device emits an unsolicited
+	   StartupStatus (BEM 0xF0) on coming back, and that the SDK surfaces it
+	   as a typed StartupStatusData ParsedMessageEvent. To capture that we
+	   tear down the fixture's session (whose event callback discards
+	   events) and rebuild a fresh one with a capturing callback before the
+	   reinit goes out. */
+
 	const char* rebootOk = std::getenv("ACTISENSE_TEST_REBOOT_OK");
 	if (!rebootOk || std::string(rebootOk) != "1") {
 		GTEST_SKIP() << "ACTISENSE_TEST_REBOOT_OK!=1 — skipping destructive reboot test";
 	}
+
+	/* Drop the fixture session so we can rebuild one whose event callback
+	   captures unsolicited messages. */
+	if (session_) {
+		session_->close();
+		session_.reset();
+	}
+
+	std::mutex mtx;
+	std::condition_variable cv;
+	std::optional<StartupStatusData> captured;
+
+	SerialConfig config;
+	config.port = portName_;
+	config.baud = baudRate_;
+
+	session_ = createSerialSession(
+		config,
+		[&mtx, &cv, &captured](const EventVariant& event) {
+			if (!std::holds_alternative<ParsedMessageEvent>(event)) {
+				return;
+			}
+			const auto& parsed = std::get<ParsedMessageEvent>(event);
+			if (parsed.messageType != "StartupStatus") {
+				return;
+			}
+			std::lock_guard<std::mutex> lk(mtx);
+			if (!captured.has_value()) {
+				captured = std::any_cast<const StartupStatusData&>(parsed.payload);
+				cv.notify_all();
+			}
+		},
+		[](ErrorCode ec, std::string_view msg) {
+			std::cerr << "Session error (reinit test): " << static_cast<int>(ec)
+			          << " - " << msg << std::endl;
+		});
+
+	ASSERT_NE(session_, nullptr) << "Failed to recreate serial session on " << portName_;
+	session_->startReceiving();
+	std::this_thread::sleep_for(kSetupDelay);
 
 	auto result = sendConvenience([this](auto timeout, auto cb) {
 		session_->reInitMainApp(timeout, std::move(cb));
@@ -2742,6 +2794,21 @@ TEST_F(BemDeviceTest, ReInitMainApp_RebootsDevice)
 		FAIL() << "ReInitMainApp returned unexpected error: "
 		       << static_cast<int>(result.errorCode) << " (" << result.errorMsg << ")";
 	}
+
+	/* Wait for the post-reboot StartupStatus. 15s covers worst-case NGX
+	   warm-up; NGT typically returns inside 3-5s. */
+	{
+		std::unique_lock<std::mutex> lk(mtx);
+		ASSERT_TRUE(cv.wait_for(lk, std::chrono::seconds(15),
+								[&captured] { return captured.has_value(); }))
+			<< "Device did not emit unsolicited StartupStatus (0xF0) within 15s of reinit";
+	}
+
+	const auto& data = *captured;
+	EXPECT_NE(data.format, StartupStatusFormat::Unknown)
+		<< "StartupStatus arrived but with unknown format";
+	std::cout << "  StartupStatus received: " << formatStartupStatus(data)
+	          << " [" << startupStatusFormatToString(data.format) << "]" << std::endl;
 }
 
 }; /* namespace Test */

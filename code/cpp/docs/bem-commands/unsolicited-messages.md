@@ -61,13 +61,31 @@ if (rsp->header.bemId == static_cast<uint8_t>(BemCommandId::ErrorReport) &&
 
 ## System Status (`0xF2`)
 
-Periodic device-status broadcast (CPU load, queue depths, link counters,
-...). Useful for telemetry or diagnostics dashboards. Wire-protocol
+Periodic device-status broadcast: per-channel buffer bandwidth / loading,
+unified-buffer counters, and optional CAN-extended status + operating-mode
+trailers. Useful for telemetry or diagnostics dashboards. Wire-protocol
 detail:
 [system-status.md](../../../../docs/DataFormats/Binary/bem-detail/system-status.md).
 
-The payload format is product-specific; consult the wire-protocol page
-for the field layout for your model.
+The SDK decodes the payload for you and delivers it as a typed
+`ParsedMessageEvent` (`messageType == "SystemStatus"`, payload castable
+to `const SystemStatusData&`):
+
+```cpp
+if (auto* msg = std::get_if<ParsedMessageEvent>(&event);
+    msg && msg->messageType == "SystemStatus") {
+    const auto& status = std::any_cast<const SystemStatusData&>(msg->payload);
+    for (const auto& buf : status.individual_buffers_) {
+        /* per-channel telemetry */
+    }
+    if (status.can_status_)     { /* CAN error counters */ }
+    if (status.operating_mode_) { /* current operating mode */ }
+}
+```
+
+The CAN-extended and operating-mode tails are optional — devices that
+don't carry CAN hardware (e.g. NGT-class) omit them, so always check
+`has_value()` before reading.
 
 ---
 
@@ -94,26 +112,26 @@ if (rsp->header.bemId == static_cast<uint8_t>(BemCommandId::NegativeAck)) {
 
 ## Putting it together
 
-A minimal unsolicited dispatcher inside the session event callback:
+The session decodes the four known unsolicited types (F0/F1/F2/F4) into
+typed `ParsedMessageEvent`s for you — correlate-or-typed-dispatch happens
+inside the SDK. A minimal customer-side dispatcher just switches on
+`messageType` and casts the payload:
 
 ```cpp
-if (auto* msg = std::get_if<ParsedMessageEvent>(&event)) {
-    if (!bem.isBemResponse(msg->datagram)) return;
-
-    std::string err;
-    auto rsp = bem.decodeResponse(msg->datagram, err);
-    if (!rsp) return;
-
-    if (bem.correlateResponse(*rsp)) return;  // matched a pending request
-
-    switch (static_cast<BemCommandId>(rsp->header.bemId)) {
-        case BemCommandId::StartupStatus:  onStartup(*rsp);   break;
-        case BemCommandId::ErrorReport:    onErrorReport(*rsp); break;
-        case BemCommandId::SystemStatus:   onSystemStatus(*rsp); break;
-        case BemCommandId::NegativeAck:    onNegativeAck(*rsp); break;
-        default:
-            /* response that arrived after its requester gave up - ignore */
-            break;
+if (auto* msg = std::get_if<ParsedMessageEvent>(&event);
+    msg && msg->protocol == "bem") {
+    if      (msg->messageType == "StartupStatus") {
+        onStartup(std::any_cast<const StartupStatusData&>(msg->payload));
+    } else if (msg->messageType == "ErrorReport") {
+        onErrorReport(std::any_cast<const ErrorReportData&>(msg->payload));
+    } else if (msg->messageType == "SystemStatus") {
+        onSystemStatus(std::any_cast<const SystemStatusData&>(msg->payload));
+    } else if (msg->messageType == "NegativeAck") {
+        onNegativeAck(std::any_cast<const NegativeAckData&>(msg->payload));
+    } else if (msg->messageType.starts_with("BEM_Response_")) {
+        /* Untyped fallback (0xF3, 0xF5-0xFF, or a decode failure on one of
+           the typed IDs — the ErrorCallback also fires in that case).
+           Payload is the raw BemResponse. */
     }
 }
 ```

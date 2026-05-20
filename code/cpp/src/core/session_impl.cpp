@@ -1286,8 +1286,11 @@ namespace Actisense
 			/* GIT-88: a remote BEM reply arrives wrapped in PGN 126720. If the
 			   payload carries the Actisense manufacturer header and decodes as
 			   a BEM response that matches a pending request registered against
-			   the same source address, consume it silently. Otherwise fall
-			   through so the user still sees the raw PGN 126720 event. */
+			   the same source address, consume it silently. Otherwise — for an
+			   unsolicited remote BEM (e.g. 0xF0 StartupStatus after a remote
+			   reinit, GIT-105) — route it through the shared uncorrelated
+			   dispatch so it surfaces as a typed ParsedMessageEvent, matching
+			   the local A0H path. */
 			if (frame.isN2k() && frame.pgn() == kPgn126720) {
 				std::span<const uint8_t> innerBst;
 				if (tryUnwrapBemFromPgn126720(frame.data(), innerBst)) {
@@ -1298,6 +1301,8 @@ namespace Actisense
 						if (bem_.correlateResponse(*response, frame.source())) {
 							return;
 						}
+						emitUncorrelatedBemResponse(*response);
+						return;
 					}
 				}
 			}
@@ -1322,11 +1327,15 @@ namespace Actisense
 				return; /* Callback was invoked by correlator */
 			}
 
+			emitUncorrelatedBemResponse(response);
+		}
+
+		void SessionImpl::emitUncorrelatedBemResponse(const BemResponse& response) {
 			if (!eventCallback_) {
 				return;
 			}
 
-			/* Unsolicited response: decode known F0/F1/F4 types into typed events.
+			/* Unsolicited response: decode known F0/F1/F2/F4 types into typed events.
 			   On decode failure, fall through to the generic emission below so
 			   consumers still see something. */
 			const auto bemId = static_cast<BemCommandId>(response.header.bemId);
@@ -1357,6 +1366,16 @@ namespace Actisense
 						}
 						break;
 					}
+					case BemCommandId::SystemStatus: {
+						SystemStatusData data;
+						if (decodeSystemStatus(response.data, data, decodeError)) {
+							typedEvent.messageType = "SystemStatus";
+							typedEvent.payload = data;
+							eventCallback_(EventVariant{typedEvent});
+							emitted = true;
+						}
+						break;
+					}
 					case BemCommandId::NegativeAck: {
 						NegativeAckData data;
 						if (decodeNegativeAck(response.data, data, decodeError)) {
@@ -1368,8 +1387,8 @@ namespace Actisense
 						break;
 					}
 					default:
-						/* Other unsolicited IDs (e.g. SystemStatus 0xF2) handled
-						   elsewhere; fall through to generic emission. */
+						/* Remaining unsolicited IDs (0xF3, 0xF5-0xFF) have no typed
+						   decoder yet; fall through to generic emission. */
 						break;
 				}
 

@@ -684,6 +684,19 @@ namespace Actisense
 			void handleBemResponse(const BemResponse& response);
 
 			/**************************************************************************/ /**
+			 \brief      Emit a typed or generic ParsedMessageEvent for an uncorrelated
+						 BEM response
+			 \details    Shared dispatch for BEM responses that did not match a pending
+						 request. Used by both the local A0H path (handleBemResponse) and
+						 the remote PGN 126720 unwrap path (handleBstFrame) so unsolicited
+						 0xF0/0xF1/0xF4 messages get the same typed-event treatment
+						 regardless of whether they came directly from the gateway or
+						 from a device on the N2K bus behind it.
+			 \param[in]  response  Decoded BEM response that did not correlate to a request
+			 *******************************************************************************/
+			void emitUncorrelatedBemResponse(const BemResponse& response);
+
+			/**************************************************************************/ /**
 			 \brief      Emit a wire-trace event for the given direction/data
 			 \details    Fast-path no-op when no sink has been registered.
 			 *******************************************************************************/
