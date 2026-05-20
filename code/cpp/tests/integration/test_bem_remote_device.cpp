@@ -11,18 +11,32 @@
             on the remote device, and replied via the inverse wrap.
 
             ----------------------------------------------------------------
-            Reference rig (GIT-92)
+            Supported rig topologies
             ----------------------------------------------------------------
-              - Local gateway: NGX on host serial port (ACTISENSE_TEST_PORT).
-                Must be in OM_NGTransferRxAllMode so PGN 126720 replies are
-                forwarded to the host. The fixture saves the gateway's
-                starting mode in SetUp, switches to Rx-All if needed, and
-                restores in TearDown.
-              - Remote device:  NGT at N2K source address 200 (default).
-                Override with ACTISENSE_TEST_REMOTE_ADDR if your rig differs.
+            The local gateway always lives on the host serial port
+            (ACTISENSE_TEST_PORT, default "COM5"). It must be in
+            OM_NGTransferRxAllMode so PGN 126720 replies are forwarded to
+            the host. The fixture saves the gateway's starting mode in
+            SetUp, switches to Rx-All if needed, and restores in TearDown.
 
-            Other rig topologies (e.g. NGX-as-remote) are out of scope for
-            this file — see GIT-94 for re-enabling the NGX-only cases.
+            The remote device is reached via its N2K source address
+            (ACTISENSE_TEST_REMOTE_ADDR, default 200) on the shared bus
+            behind the local gateway. The fixture probes the remote's
+            model in SetUp and routes per-test SKIP gates off that.
+
+              Rig A — GIT-92 baseline (NGT-as-remote)
+                local:  NGX  on host serial   (e.g. COM5 @ 115200)
+                remote: NGT  at SA 200 on N2K bus
+                NGX-only tests (NGConvertNormalMode round-trip,
+                Buffer-1 reject) SKIP with a model-specific reason.
+
+              Rig B — GIT-94 (NGX-as-remote)
+                local:  NGX  on host serial   (e.g. COM5  @ 115200)
+                remote: NGX  on host serial   (e.g. COM10 @ 115200),
+                        both NGXs sharing the same N2K bus so the
+                        remote-NGX is visible behind the local-NGX's
+                        wrap path.
+                NGX-only tests run; everything else continues as on Rig A.
 
             ----------------------------------------------------------------
             Environment variables
@@ -59,9 +73,11 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <condition_variable>
 #include <cstdlib>
 #include <future>
 #include <iostream>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <thread>
@@ -101,13 +117,24 @@ protected:
 	static constexpr uint32_t kPgn126720 = 126720;
 	std::optional<uint8_t> savedGatewayTxPgn126720_;
 
+	/* GIT-105: capture state for unsolicited StartupStatus events. The fixture
+	   event callback always routes 0xF0 events here; armStartupStatusCapture()
+	   clears the slot before the test fires its trigger, and
+	   waitForStartupStatus() blocks until one arrives or the timeout elapses.
+	   Inactive tests are unaffected — they simply never read the slot. */
+	std::mutex startupStatusMutex_;
+	std::condition_variable startupStatusCv_;
+	std::optional<StartupStatusData> capturedStartupStatus_;
+
 	void SetUp() override
 	{
+		/* Default to COM5 (the dev rig's local-gateway NGX) so the test
+		   runs against the canonical two-NGX bench without any env-var
+		   wrangling. Override with ACTISENSE_TEST_PORT for any other rig.
+		   Failure to open the port falls through to the createSerialSession
+		   ASSERT below with a clear message naming the port. */
 		const char* port = std::getenv("ACTISENSE_TEST_PORT");
-		if (!port || std::string(port).empty()) {
-			GTEST_SKIP() << "ACTISENSE_TEST_PORT not set - skipping remote BEM tests";
-		}
-		portName_ = port;
+		portName_ = (port && *port) ? port : "COM5";
 
 		const char* baud = std::getenv("ACTISENSE_TEST_BAUD");
 		if (baud) {
@@ -130,7 +157,21 @@ protected:
 
 		session_ = createSerialSession(
 			config,
-			[](const EventVariant& /*event*/) { /* ignore unsolicited events */ },
+			[this](const EventVariant& event) {
+				if (!std::holds_alternative<ParsedMessageEvent>(event)) {
+					return;
+				}
+				const auto& parsed = std::get<ParsedMessageEvent>(event);
+				if (parsed.messageType != "StartupStatus") {
+					return;
+				}
+				std::lock_guard<std::mutex> lk(startupStatusMutex_);
+				if (!capturedStartupStatus_.has_value()) {
+					capturedStartupStatus_ =
+						std::any_cast<const StartupStatusData&>(parsed.payload);
+					startupStatusCv_.notify_all();
+				}
+			},
 			[](ErrorCode ec, std::string_view msg) {
 				std::cerr << "Session error: " << static_cast<int>(ec)
 				          << " - " << msg << std::endl;
@@ -233,6 +274,26 @@ protected:
 		return m == ArlModelId::NGT1 || m == ArlModelId::NGT1_USB;
 	}
 
+	/* Number of physical hardware comm ports the remote device's Port
+	   Baudrate (0x17) reply should report. Wi-Fi / IP streams are out of
+	   scope per NGXSW-3623 and must not be counted. Mirrors the local
+	   expectedHardwarePortCount() in test_bem_device.cpp. Returns nullopt
+	   when no canonical figure exists for the model. */
+	std::optional<uint8_t> expectedRemoteHardwarePortCount() const noexcept
+	{
+		switch (static_cast<ArlModelId>(remoteModelId_)) {
+			case ArlModelId::NGT1:
+			case ArlModelId::NGT1_USB:
+				return 1; /* serial only */
+			case ArlModelId::NGW1:
+				return 1; /* serial only */
+			case ArlModelId::NGX1:
+				return 2; /* CAN + serial */
+			default:
+				return std::nullopt;
+		}
+	}
+
 	/* Sync helpers ---------------------------------------------------------- */
 
 	/* Typed get-verb result: code + msg + decoded value + origin. */
@@ -284,6 +345,28 @@ protected:
 				promise.set_value({ec, std::string(msg), std::move(origin)});
 			});
 		return future.get();
+	}
+
+	/* Clear the StartupStatus capture slot so the next 0xF0 the fixture
+	   sees populates it. Call before triggering whatever action should
+	   produce the event. */
+	void armStartupStatusCapture()
+	{
+		std::lock_guard<std::mutex> lk(startupStatusMutex_);
+		capturedStartupStatus_.reset();
+	}
+
+	/* Block until an unsolicited StartupStatus arrives or @p timeout elapses.
+	   Returns the captured data on success, std::nullopt on timeout. */
+	std::optional<StartupStatusData>
+	waitForStartupStatus(std::chrono::milliseconds timeout)
+	{
+		std::unique_lock<std::mutex> lk(startupStatusMutex_);
+		if (!startupStatusCv_.wait_for(lk, timeout,
+									   [this] { return capturedStartupStatus_.has_value(); })) {
+			return std::nullopt;
+		}
+		return capturedStartupStatus_;
 	}
 
 private:
@@ -459,6 +542,38 @@ TEST_F(BemRemoteDeviceTest, GetPortBaudrate)
 	std::cout << "  Port 0: session=" << formatBaudrate(result.value->sessionBaud)
 	          << " store=" << formatBaudrate(result.value->storeBaud)
 	          << " totalPorts=" << static_cast<int>(result.value->totalPorts) << std::endl;
+
+	/* Hardware-port-only scope (NGXSW-3623): totalPorts should equal the
+	   physical comm-port count for the connected remote model. Wi-Fi / IP
+	   streams are out of scope for this command and must not be included
+	   by the remote firmware. Mirrors the local
+	   PortBaudrate_AllPorts_Iteration check in test_bem_device.cpp.
+
+	   The strict assertion is currently downgraded to a diagnostic
+	   because NGXSW-4193 tracks an NGX firmware regression where
+	   PortBaudrate responses delivered via the PGN 126720 wrap report
+	   totalPorts=1 (CAN only) instead of 2 (CAN + serial). Direct-attached
+	   NGX queries report the correct figure, so the gap is wrap-specific.
+	   Re-tighten to EXPECT_EQ once NGXSW-4193 is fixed. */
+	if (const auto expected = expectedRemoteHardwarePortCount(); expected.has_value()) {
+		if (result.value->totalPorts != *expected) {
+			std::cout << "  [NGXSW-4193] Remote firmware reports "
+			          << static_cast<int>(result.value->totalPorts)
+			          << " ports on " << modelIdToString(remoteModelId_)
+			          << " but the model has " << static_cast<int>(*expected)
+			          << " hardware comm port(s). Wrap-path port-count mismatch"
+			          << " is tracked under NGXSW-4193 — accepted here for now."
+			          << std::endl;
+		} else {
+			std::cout << "  Confirmed " << static_cast<int>(*expected)
+			          << " hardware port(s) for remote "
+			          << modelIdToString(remoteModelId_) << std::endl;
+		}
+	} else {
+		std::cout << "  [info] No canonical hardware-port count for remote "
+		          << modelIdToString(remoteModelId_) << " — skipping check"
+		          << std::endl;
+	}
 }
 
 TEST_F(BemRemoteDeviceTest, GetPortPCode)
@@ -725,6 +840,147 @@ TEST_F(BemRemoteDeviceTest, OperatingMode_RoundTrip)
 	ASSERT_TRUE(reverted.has_value());
 	EXPECT_EQ(*reverted, baselineMode)
 		<< "Remote did not revert to baseline after SET";
+}
+
+TEST_F(BemRemoteDeviceTest, OperatingMode_NGConvertNormalMode_RoundTrip)
+{
+	/* OM_NGConvertNormalMode (4) is supported on NGW-1 and NGX-1 only — it
+	   switches the device into NGW-style NMEA 2000 → 0183 conversion. NGT-1
+	   rejects it. Gate on remoteIsNgx() so this round-trips the canonical
+	   convertible device when present, and SKIPs cleanly on the GIT-92
+	   baseline rig where the remote slot holds an NGT.
+
+	   BEM is always-on regardless of operating mode, so the wrap path
+	   continues to respond while the remote is in convert mode. The scope-
+	   guard ModeRestorer ensures the remote is left clean even if any
+	   assertion mid-test fails. Mirrors test_bem_device.cpp:2355. */
+	if (!remoteIsNgx()) {
+		GTEST_SKIP() << "OM_NGConvertNormalMode round-trip is NGX-1 only (remote model="
+		             << modelIdToString(remoteModelId_) << ")";
+	}
+
+	auto readMode = [&](const char* tag) -> std::optional<OperatingMode> {
+		auto r = syncGet<OperatingMode>([this](auto t, auto cb) {
+			remote_->getOperatingMode(t, std::move(cb));
+		});
+		if (r.errorCode != ErrorCode::Ok || !r.value.has_value()) {
+			ADD_FAILURE() << tag << ": GET OperatingMode failed: " << r.errorMsg;
+			return std::nullopt;
+		}
+		return r.value;
+	};
+
+	auto setMode = [&](OperatingMode mode, const char* tag) -> bool {
+		auto r = syncAck([this, mode](auto t, auto cb) {
+			remote_->setOperatingMode(mode, t, std::move(cb));
+		});
+		if (r.errorCode != ErrorCode::Ok) {
+			ADD_FAILURE() << tag << ": SET OperatingMode "
+			              << static_cast<uint16_t>(mode) << " failed: " << r.errorMsg;
+			return false;
+		}
+		return true;
+	};
+
+	const auto baseline = readMode("baseline");
+	ASSERT_TRUE(baseline.has_value());
+	const OperatingMode baselineMode = *baseline;
+
+	const OperatingMode targetMode = OperatingMode::OM_NGConvertNormalMode;
+
+	/* Skip if already in convert mode — OperatingMode_RoundTrip covers the
+	   alternate Normal↔Rx-All transition on this model. */
+	if (baselineMode == targetMode) {
+		GTEST_SKIP() << "Remote already in OM_NGConvertNormalMode; "
+		                "OperatingMode_RoundTrip covers the alternate transition";
+	}
+
+	struct ModeRestorer {
+		std::function<bool(OperatingMode, const char*)> set;
+		OperatingMode mode;
+		bool armed;
+		~ModeRestorer() {
+			if (armed) {
+				std::this_thread::sleep_for(kSettleDelay);
+				(void)set(mode, "teardown restore");
+			}
+		}
+	} restorer{setMode, baselineMode, true};
+
+	ASSERT_TRUE(setMode(targetMode, "to-convert"));
+	std::this_thread::sleep_for(kSettleDelay);
+
+	const auto changed = readMode("after-set-convert");
+	ASSERT_TRUE(changed.has_value());
+	ASSERT_EQ(*changed, targetMode)
+		<< "Remote did not report OM_NGConvertNormalMode after SET (got="
+		<< static_cast<uint16_t>(*changed) << ")";
+
+	ASSERT_TRUE(setMode(baselineMode, "back-to-baseline"));
+	restorer.armed = false;
+	std::this_thread::sleep_for(kSettleDelay);
+
+	const auto reverted = readMode("after-restore");
+	ASSERT_TRUE(reverted.has_value());
+	EXPECT_EQ(*reverted, baselineMode)
+		<< "Remote did not revert to baseline after SET";
+}
+
+TEST_F(BemRemoteDeviceTest, SetOperatingMode_RejectsBuffer1OnNgx)
+{
+	/* OM_BUFFER_1 (16) is a Buffer/Combiner mode supported only on multi-port
+	   PRO-NDC-class hardware — an NGX must reject it. Verifies the firmware
+	   contract documented on OperatingMode: "if a mode is requested which is
+	   not available, the device will return an error code and remain in the
+	   same mode."
+
+	   Soft-assertion variant of test_bem_device.cpp:2646: RemoteDevice's
+	   typed setOperatingMode overload doesn't expose response->header.errorCode,
+	   so we can't inspect the wrapped firmware errorCode directly. Instead
+	   we assert that the typed ErrorCode is non-Ok AND the remote's mode is
+	   unchanged after the rejected SET — the unchanged-mode invariant carries
+	   the contract. */
+	if (!remoteIsNgx()) {
+		GTEST_SKIP() << "Negative-mode test is NGX-1 only (remote model="
+		             << modelIdToString(remoteModelId_) << ")";
+	}
+
+	auto readMode = [&]() -> std::optional<OperatingMode> {
+		auto r = syncGet<OperatingMode>([this](auto t, auto cb) {
+			remote_->getOperatingMode(t, std::move(cb));
+		});
+		if (r.errorCode != ErrorCode::Ok || !r.value.has_value()) {
+			return std::nullopt;
+		}
+		return r.value;
+	};
+
+	const auto before = readMode();
+	ASSERT_TRUE(before.has_value()) << "Could not read baseline mode";
+
+	auto setResult = syncAck([this](auto t, auto cb) {
+		remote_->setOperatingMode(OperatingMode::OM_BUFFER_1, t, std::move(cb));
+	});
+
+	/* Either outcome is evidence of rejection:
+	   - typed non-Ok ErrorCode surfaced from a wrapped firmware NACK, or
+	   - Timeout (device declined to ack at all).
+	   The follow-up GET is what actually proves the SET didn't stick. */
+	EXPECT_NE(setResult.errorCode, ErrorCode::Ok)
+		<< "Remote NGX accepted OM_BUFFER_1 — firmware should reject "
+		   "buffer/combiner modes on NGX-class hardware";
+	std::cout << "  SET OM_BUFFER_1 surfaced: ec="
+	          << static_cast<int>(setResult.errorCode)
+	          << " msg=\"" << setResult.errorMsg << "\"" << std::endl;
+
+	std::this_thread::sleep_for(kSettleDelay);
+
+	const auto after = readMode();
+	ASSERT_TRUE(after.has_value()) << "Could not read mode after rejected SET";
+	EXPECT_EQ(*after, *before)
+		<< "Remote left baseline after a rejected SET (before="
+		<< static_cast<uint16_t>(*before) << ", after="
+		<< static_cast<uint16_t>(*after) << ")";
 }
 
 TEST_F(BemRemoteDeviceTest, PortBaudrate_SafeRoundTrip_SameValues)
@@ -1049,11 +1305,19 @@ TEST_F(BemRemoteDeviceTest, ReInitMainApp_RebootsDevice)
 	/* DESTRUCTIVE: reboots the remote device. Gated on ACTISENSE_TEST_REBOOT_OK=1
 	   so the standard suite never runs it accidentally. The reboot drops the
 	   remote off the bus for several seconds; running this mid-suite will
-	   break the SetUp probe on subsequent tests. */
+	   break the SetUp probe on subsequent tests.
+
+	   GIT-105: after the remote rebooted it must emit an unsolicited
+	   StartupStatus (BEM 0xF0) wrapped in PGN 126720. The SDK unwraps it
+	   and dispatches it as a typed StartupStatusData ParsedMessageEvent
+	   (session_impl.cpp:1291-1305). The fixture event callback captures
+	   it; this test waits up to 15s and asserts on the typed payload. */
 	const char* rebootOk = std::getenv("ACTISENSE_TEST_REBOOT_OK");
 	if (!rebootOk || std::string(rebootOk) != "1") {
 		GTEST_SKIP() << "ACTISENSE_TEST_REBOOT_OK!=1 — skipping destructive reboot test";
 	}
+
+	armStartupStatusCapture();
 
 	auto result = syncAck([this](auto t, auto cb) {
 		remote_->reInitMainApp(t, std::move(cb));
@@ -1070,6 +1334,19 @@ TEST_F(BemRemoteDeviceTest, ReInitMainApp_RebootsDevice)
 		FAIL() << "ReInitMainApp returned unexpected error: "
 		       << static_cast<int>(result.errorCode) << " (" << result.errorMsg << ")";
 	}
+
+	/* 15s is the same budget the local destructive test uses; NGT-class
+	   remotes typically return inside 3-5s, NGX-class up to ~10s. */
+	const auto captured = waitForStartupStatus(std::chrono::seconds(15));
+	ASSERT_TRUE(captured.has_value())
+		<< "Remote device did not emit unsolicited StartupStatus (0xF0) "
+		   "within 15s of reinit (or the PGN 126720 unwrap path did not "
+		   "surface it as a typed event — see session_impl.cpp:1291)";
+
+	EXPECT_NE(captured->format, StartupStatusFormat::Unknown)
+		<< "StartupStatus arrived but with unknown format";
+	std::cout << "  Remote StartupStatus received: " << formatStartupStatus(*captured)
+	          << " [" << startupStatusFormatToString(captured->format) << "]" << std::endl;
 }
 
 }; /* namespace Test */

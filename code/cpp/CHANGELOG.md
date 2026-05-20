@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests
+
+- **Remote BEM sweep: re-enabled NGX-only cases against an NGX-as-remote rig
+  (GIT-94).** `test_bem_remote_device.cpp` now ports the two NGX-gated
+  cases that GIT-92 deliberately deferred — `OperatingMode_NGConvertNormalMode_RoundTrip`
+  (NGW-style 2000→0183 conversion-mode round-trip) and
+  `SetOperatingMode_RejectsBuffer1OnNgx` (firmware must reject buffer/combiner
+  modes on NGX-class hardware). The fixture gains
+  `expectedRemoteHardwarePortCount()` so `GetPortBaudrate` now checks the
+  remote's reported port count against the model's canonical hardware
+  count (NGXSW-3623 contract); currently emits a diagnostic rather than
+  asserting because NGX-as-remote hits a wrap-path mismatch tracked under
+  NGXSW-4193. Both new NGX-only tests skip-gate on `remoteIsNgx()` so the
+  GIT-92 baseline rig (NGT-as-remote) is unaffected. Default `ACTISENSE_TEST_PORT` is now `COM5` (the dev bench's
+  local-NGX); override as before for other rigs. File-header rig
+  documentation rewritten to enumerate both supported topologies.
+
 ### Removed (breaking)
 
 - **`Session::asyncRequestResponse()` and `Session::cancel()` have been
