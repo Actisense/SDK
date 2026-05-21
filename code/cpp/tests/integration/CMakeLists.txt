@@ -19,6 +19,10 @@ add_sdk_test(test_tx_pgn_blocking_singleframe_proprietary test_tx_pgn_blocking_s
 # Two-device Tx PGN filtering sweep, fast-packet standard PGNs (GIT-98).
 # Same rig as the standard sweep; exercises multi-frame (fast-packet) host-Tx.
 add_sdk_test(test_tx_pgn_blocking_fastpacket test_tx_pgn_blocking_fastpacket.cpp)
+# Two-device Tx PGN filtering sweep, fast-packet proprietary PGNs (GIT-99).
+# Combines the GIT-97 proprietary header with the GIT-98 multi-frame payload;
+# exercises the NGXSW-3329 DP1 bitmap mechanic across varied fast-packet lengths.
+add_sdk_test(test_tx_pgn_blocking_fastpacket_proprietary test_tx_pgn_blocking_fastpacket_proprietary.cpp)
 # GIT-106 diagnostic: NGT vs NGX divergence on PGN 59904 (ISO Request) host-Tx.
 # Requires ACTISENSE_TEST_NGT_PORT (NGT-1) and ACTISENSE_TEST_NGX_PORT (NGX-1).
 add_sdk_test(test_iso_request_git106 test_iso_request_git106.cpp)
