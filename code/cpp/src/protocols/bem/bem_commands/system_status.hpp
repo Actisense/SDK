@@ -87,8 +87,8 @@ namespace Actisense
 					 needs 3 bytes; the op-mode tail needs 2 in the post-CAN window).
 		 *******************************************************************************/
 		[[nodiscard]] inline bool decodeSystemStatus(std::span<const uint8_t> data,
-													  SystemStatusData& status,
-													  std::string& outError) {
+													 SystemStatusData& status,
+													 std::string& outError) {
 			if (data.size() < 1) {
 				outError = "System status data too short";
 				return false;

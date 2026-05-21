@@ -212,8 +212,7 @@ namespace Actisense
 				const uint8_t dp0Size = data[offset++];
 				if (dp0Size > kRxPgnEnableListF2PropBitmapBytes) {
 					outError = "Rx F2 prop-variant DP0 size " + std::to_string(dp0Size) +
-							   " exceeds max " +
-							   std::to_string(kRxPgnEnableListF2PropBitmapBytes);
+							   " exceeds max " + std::to_string(kRxPgnEnableListF2PropBitmapBytes);
 					return false;
 				}
 				if (data.size() < offset + dp0Size + 1) {
@@ -226,8 +225,7 @@ namespace Actisense
 				const uint8_t dp1Size = data[offset++];
 				if (dp1Size > kRxPgnEnableListF2PropBitmapBytes) {
 					outError = "Rx F2 prop-variant DP1 size " + std::to_string(dp1Size) +
-							   " exceeds max " +
-							   std::to_string(kRxPgnEnableListF2PropBitmapBytes);
+							   " exceeds max " + std::to_string(kRxPgnEnableListF2PropBitmapBytes);
 					return false;
 				}
 				if (data.size() < offset + dp1Size) {
@@ -413,10 +411,10 @@ namespace Actisense
 				if (msg.variant == RxPgnEnableListF2Variant::Proprietary) {
 					result_.proprietary.dp0RawLut.fill(0);
 					result_.proprietary.dp1RawLut.fill(0);
-					const std::size_t dp0Bytes = (std::min)(msg.propDp0Bitmap.size(),
-															result_.proprietary.dp0RawLut.size());
-					const std::size_t dp1Bytes = (std::min)(msg.propDp1Bitmap.size(),
-															result_.proprietary.dp1RawLut.size());
+					const std::size_t dp0Bytes =
+						(std::min)(msg.propDp0Bitmap.size(), result_.proprietary.dp0RawLut.size());
+					const std::size_t dp1Bytes =
+						(std::min)(msg.propDp1Bitmap.size(), result_.proprietary.dp1RawLut.size());
 					for (std::size_t i = 0; i < dp0Bytes; ++i) {
 						result_.proprietary.dp0RawLut[i] = msg.propDp0Bitmap[i];
 					}

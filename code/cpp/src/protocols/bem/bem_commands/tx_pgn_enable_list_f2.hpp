@@ -356,9 +356,7 @@ namespace Actisense
 			/// as soon as the standard sub-list train is fully received.
 			/// See supportsProprietaryEnableListF2 in bem_types.hpp for the
 			/// per-model decision and NGXSW-3329 for the firmware change.
-			void setSupportsProprietary(bool supports) noexcept {
-				expects_proprietary_ = supports;
-			}
+			void setSupportsProprietary(bool supports) noexcept { expects_proprietary_ = supports; }
 
 			[[nodiscard]] PgnListAccumulatorStatus feed(const TxPgnEnableListF2Response& msg,
 														std::string& outError) {

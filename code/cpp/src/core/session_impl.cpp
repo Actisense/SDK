@@ -788,8 +788,8 @@ namespace Actisense
 				   compile time. */
 				if (!state->modelGateApplied) {
 					if constexpr (requires(Accumulator& a, bool b) {
-						a.setSupportsProprietary(b);
-					}) {
+									  a.setSupportsProprietary(b);
+								  }) {
 						state->accumulator.setSupportsProprietary(
 							supportsProprietaryEnableListF2(response.header.modelId));
 					}
