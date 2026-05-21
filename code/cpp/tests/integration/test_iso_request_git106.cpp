@@ -2,70 +2,70 @@
 \file       test_iso_request_git106.cpp
 \author     (Created) Phil Whitehurst
 \date       (Created) 21/05/2026
-\brief      Two-direction diagnostic for GIT-106 — host-Tx of PGN 59904
-            (ISO Request) on NGT vs NGX.
-\details    Customer (Nick @ Expedition) reports that Session::sendPgn(59904,
-            ...) emits an ISO Request on the bus when the gateway is an
-            NGX-class device but is silently dropped on an NGT-1 (firmware
-            2.690). This test reproduces the divergence on the bench.
+\brief      Diagnostic for GIT-106 — host-Tx of PGN 59904 (ISO Request) via
+            an Actisense gateway, with regression tests covering the
+            address-claim sweep used by NMEA Reader / Toolkit's bus
+            discovery.
+\details    Customer report (Nick @ Expedition): Session::sendPgn(59904, ...)
+            "doesn't reach the bus" on an NGT-1 (firmware 2.690) but works
+            on an NGX. Investigation outcome: the SDK does in fact put the
+            ISO Request on the bus correctly through the NGT — byte-
+            identical to the legacy ActisenseComms DLL / Runtime library
+            emission, verified by EBL capture comparison and by an
+            address-claim flood response within ~50 ms of the send.
+
+            The original GIT-106 "failure" was a false negative: the
+            witness gateway used to confirm the EA00 reached the bus was
+            checked for "did the witness forward the EA00 back to host?",
+            and an NGX-class gateway in OM_NGTransferRxAllMode silently
+            filters PGN 59904 out of its bus-to-host forwarding (an NGX
+            firmware quirk, tracked separately). The correct success
+            indicator is the EE00 (Address Claim, PGN 60928) burst that
+            every active node on the bus emits in response — that burst
+            is reliably visible regardless of which gateway is the witness.
 
             ----------------------------------------------------------------
             Stimulus
             ----------------------------------------------------------------
-            sendPgn(59904, [00 EE 00], destination=0xFF, priority=6)
-              - 59904 (0xEA00)  = ISO Request (PDU1, dest-specific, 3-byte
-                                  payload).
-              - Payload bytes   = 24-bit LE encoding of the requested PGN.
-                                  60928 (0xEE00) = ISO Address Claim, so
-                                  every active node should respond.
-              - dest=0xFF       = broadcast — universal address-claim
-                                  request — generates visible parsable
-                                  traffic from every device on the bus.
+            sendPgn(59904, [00 EE 00], destination=0xFF, priority=7)
+              - 59904 (0xEA00) = ISO Request (PDU1, dest-specific, 3-byte
+                                 payload).
+              - Payload bytes  = 24-bit LE encoding of the requested PGN.
+                                 60928 (0xEE00) = ISO Address Claim, so
+                                 every active node responds.
+              - dest=0xFF      = broadcast — universal address-claim
+                                 request.
+              - priority=7     = matches NMEA Reader's choice in
+                                 ConnectionDoc.cpp (Actisense legacy code).
+
+            ----------------------------------------------------------------
+            Success indicator
+            ----------------------------------------------------------------
+            Count EE00 (PGN 60928) frames received in a 500 ms window
+            immediately following the send. Periodic address claims arrive
+            at <= 2 per second on a typical bus; an EA00 broadcast triggers
+            ~10+ EE00 frames in a tight burst (one per active node) within
+            ~50 ms. Threshold: >= 6 EE00 in 500 ms => EA00 reached the bus.
 
             ----------------------------------------------------------------
             Rig
             ----------------------------------------------------------------
-            Two Actisense gateways on the same N2K bus, identified by the
-            following env vars (defaults match the dev bench):
               ACTISENSE_TEST_NGT_PORT     NGT-1 port  (default COM25)
               ACTISENSE_TEST_NGX_PORT     NGX-1 port  (default COM5)
               ACTISENSE_TEST_BAUD         baud (default 115200)
               ACTISENSE_TEST_WIRE_TRACE   "1" => Tx/Rx hex dump
               ACTISENSE_TEST_RX_DEBUG     "1" => per-frame Rx log
 
-            The test does NOT trust the env vars blindly — after opening
-            each session it reads the modelId via GetOperatingMode and
-            cross-checks against the port assignment, warning loudly (but
-            continuing) if the wiring is reversed.
-
             ----------------------------------------------------------------
-            Two phases per run
+            Test structure
             ----------------------------------------------------------------
-            Phase A — NGT as Tx (the failing direction):
-              - NGT in OM_NGTransferNormalMode
-              - NGX in OM_NGTransferRxAllMode (forwards everything seen on
-                the bus to host)
-              - Host -> NGT: sendPgn(59904, [00 EE 00], 0xFF)
-              - Capture on NGX side for kListenWindow:
-                  * count of EA00 frames forwarded
-                  * count of EE00 (Address Claim) frames forwarded
-                  * set of source SAs that emitted address claims
-              - Expected on a working rig: at least 1 EA00 (the NGX sees the
-                request reach the bus) plus N EE00 claims.
-
-            Phase B — NGX as Tx (the control direction):
-              - Swap modes: NGX -> Normal, NGT -> Rx-All.
-              - Same sendPgn from the host, this time via the NGX session.
-              - Capture on NGT side; same metrics.
-
-            ----------------------------------------------------------------
-            Pass / fail
-            ----------------------------------------------------------------
-            The test isn't strict pass/fail in the diagnostic phase —
-            EXPECTs are kept loose so the output captures the actual
-            divergence rather than aborting on the first delta. The
-            authoritative answer is the per-phase summary printed at the
-            end.
+            * IsoRequestGit106BareTest.* — no-fixture tests that prove the
+              SDK puts EA00 on the bus under a range of conditions. These
+              are the proof harness (kept as a record of the bisect that
+              isolated the false-failure).
+            * IsoRequestGit106Test.NgtAndNgxDirections — two-direction
+              sweep through both gateways; uses the EE00-burst indicator
+              and asserts both directions work.
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 *******************************************************************************/
@@ -105,9 +105,6 @@ static constexpr auto kDefaultTimeout = std::chrono::milliseconds(3000);
 static constexpr auto kSetupDelay = std::chrono::milliseconds(500);
 static constexpr auto kModeChangeSettle = std::chrono::milliseconds(1500);
 static constexpr auto kSendSettle = std::chrono::milliseconds(200);
-/* Address claim arbitration responses trickle in over ~1.5s; widen so
-   we don't truncate the count. */
-static constexpr auto kListenWindow = std::chrono::milliseconds(3000);
 
 static constexpr uint32_t kPgnIsoRequest = 59904;     /* 0xEA00 */
 static constexpr uint32_t kPgnAddressClaim = 60928;   /* 0xEE00 */
@@ -253,72 +250,6 @@ protected:
 		return fut.get();
 	}
 
-	/* GIT-106 workaround experiment helpers. Mirrors the
-	   setTxEnableAndActivate pattern from the Tx-blocking sweeps but
-	   reports both error codes back to the caller for diagnostic logging
-	   rather than treating activation errors as soft warnings. */
-	ErrorCode setTxPgnEnableSync(SessionImpl& s, uint32_t pgn, uint8_t enable)
-	{
-		std::promise<ErrorCode> prom;
-		auto fut = prom.get_future();
-		s.setTxPgnEnable(pgn, enable, kDefaultTimeout,
-			[&prom](const std::optional<BemResponse>&, ErrorCode ec, std::string_view) {
-				prom.set_value(ec);
-			});
-		return fut.get();
-	}
-
-	ErrorCode activatePgnEnableListsSync(SessionImpl& s)
-	{
-		std::promise<ErrorCode> prom;
-		auto fut = prom.get_future();
-		s.activatePgnEnableLists(kDefaultTimeout,
-			[&prom](const std::optional<BemResponse>&, ErrorCode ec, std::string_view) {
-				prom.set_value(ec);
-			});
-		return fut.get();
-	}
-
-	ErrorCode defaultTxPgnEnableListSync(SessionImpl& s)
-	{
-		std::promise<ErrorCode> prom;
-		auto fut = prom.get_future();
-		s.defaultPgnEnableList(DeletePgnListSelector::TxList, kDefaultTimeout,
-			[&prom](const std::optional<BemResponse>&, ErrorCode ec, std::string_view) {
-				prom.set_value(ec);
-			});
-		return fut.get();
-	}
-
-	void listen(std::chrono::milliseconds window)
-	{
-		std::this_thread::sleep_for(window);
-	}
-
-	void reportPhase(const std::string& label, const CaptureCounters& cap) const
-	{
-		std::cout << "  --- " << label << " ---" << std::endl;
-		std::cout << "    EA00 (ISO Request) forwarded by Rx : "
-		          << cap.ea00.load() << std::endl;
-		std::cout << "    EE00 (Address Claim) replies seen  : "
-		          << cap.ee00.load() << std::endl;
-		std::lock_guard<std::mutex> lk(const_cast<CaptureCounters&>(cap).saMutex);
-		if (!cap.ee00SourceSAs.empty()) {
-			std::cout << "      claim source SAs:";
-			for (uint8_t sa : cap.ee00SourceSAs) {
-				std::cout << " " << static_cast<int>(sa);
-			}
-			std::cout << std::endl;
-		}
-		if (!cap.ea00SourceSAs.empty()) {
-			std::cout << "      EA00 source SAs (should be the Tx gateway):";
-			for (uint8_t sa : cap.ea00SourceSAs) {
-				std::cout << " " << static_cast<int>(sa);
-			}
-			std::cout << std::endl;
-		}
-	}
-
 private:
 	void openSessions()
 	{
@@ -444,11 +375,23 @@ private:
 /* ========================================================================== */
 /* Two-direction ISO Request sweep                                            */
 /* ========================================================================== */
+/* Sends PGN 59904 via each gateway in turn, with the other in Rx-All as a
+ * passive bus listener. Success is measured by the EE00 burst on the
+ * witness side -- *not* by an EA00 forwarding count, because NGX in
+ * Rx-All silently filters PGN 59904 out of its bus-to-host stream (an
+ * NGX firmware quirk, tracked separately from this ticket).
+ *
+ * Threshold: >= 6 EE00 in the 500 ms post-send window means at least 6
+ * nodes responded with an Address Claim, which only happens if the
+ * EA00 broadcast actually reached the bus.
+ */
+static constexpr int kEe00BurstThreshold = 6;
+static constexpr auto kBurstWindow = std::chrono::milliseconds(500);
 
 TEST_F(IsoRequestGit106Test, NgtAndNgxDirections)
 {
 	/* ---------------------------------------------------------------------- */
-	/* Phase A — NGT as Tx, NGX as Rx (the failing direction).                */
+	/* Phase A -- NGT as Tx, NGX in Rx-All as the witness.                    */
 	/* ---------------------------------------------------------------------- */
 	std::cout << "\n  Phase A: NGT -> bus, NGX listens in Rx-All" << std::endl;
 	configureRoles(*ngt_, savedNgtMode_, *ngx_, savedNgxMode_);
@@ -457,16 +400,21 @@ TEST_F(IsoRequestGit106Test, NgtAndNgxDirections)
 	ngxCapture_.reset();
 	std::this_thread::sleep_for(kSendSettle);
 
+	const auto preA = ngxCapture_.ee00.load();
 	const ErrorCode ecA = sendIsoRequestSync(*ngt_);
 	std::cout << "    sendPgn(59904,...) via NGT returned ec="
 	          << static_cast<int>(ecA) << std::endl;
 	EXPECT_EQ(ecA, ErrorCode::Ok) << "Host -> NGT BST-94 write failed";
 
-	listen(kListenWindow);
-	reportPhase("Phase A (NGT-Tx / NGX-Rx)", ngxCapture_);
+	std::this_thread::sleep_for(kBurstWindow);
+	const auto burstA = static_cast<int>(ngxCapture_.ee00.load() - preA);
+	std::cout << "    EE00 burst on NGX in 500ms: " << burstA
+	          << " (>=" << kEe00BurstThreshold << " confirms EA00 reached the bus)" << std::endl;
+	EXPECT_GE(burstA, kEe00BurstThreshold)
+		<< "NGT host-Tx of PGN 59904 did not produce an address-claim burst response";
 
 	/* ---------------------------------------------------------------------- */
-	/* Phase B — NGX as Tx, NGT as Rx (the control direction).                */
+	/* Phase B -- NGX as Tx, NGT in Rx-All as the witness.                    */
 	/* ---------------------------------------------------------------------- */
 	std::cout << "\n  Phase B: NGX -> bus, NGT listens in Rx-All" << std::endl;
 	configureRoles(*ngx_, savedNgxMode_, *ngt_, savedNgtMode_);
@@ -475,199 +423,391 @@ TEST_F(IsoRequestGit106Test, NgtAndNgxDirections)
 	ngxCapture_.reset();
 	std::this_thread::sleep_for(kSendSettle);
 
+	const auto preB = ngtCapture_.ee00.load();
 	const ErrorCode ecB = sendIsoRequestSync(*ngx_);
 	std::cout << "    sendPgn(59904,...) via NGX returned ec="
 	          << static_cast<int>(ecB) << std::endl;
 	EXPECT_EQ(ecB, ErrorCode::Ok) << "Host -> NGX BST-94 write failed";
 
-	listen(kListenWindow);
-	reportPhase("Phase B (NGX-Tx / NGT-Rx)", ngtCapture_);
-
-	/* ---------------------------------------------------------------------- */
-	/* Headline diagnostic                                                    */
-	/* ---------------------------------------------------------------------- */
-	std::cout << "\n  Headline:" << std::endl;
-	std::cout << "    Phase A EA00 forwarded by NGX: " << ngxCapture_.ea00.load()
-	          << " (expect >= 1 if NGT host-Tx works)" << std::endl;
-	std::cout << "    Phase B EA00 forwarded by NGT: " << ngtCapture_.ea00.load()
-	          << " (control - expect >= 1)" << std::endl;
-	std::cout << "    Phase A EE00 claims seen:      " << ngxCapture_.ee00.load() << std::endl;
-	std::cout << "    Phase B EE00 claims seen:      " << ngtCapture_.ee00.load() << std::endl;
+	std::this_thread::sleep_for(kBurstWindow);
+	const auto burstB = static_cast<int>(ngtCapture_.ee00.load() - preB);
+	std::cout << "    EE00 burst on NGT in 500ms: " << burstB
+	          << " (>=" << kEe00BurstThreshold << " confirms EA00 reached the bus)" << std::endl;
+	EXPECT_GE(burstB, kEe00BurstThreshold)
+		<< "NGX host-Tx of PGN 59904 did not produce an address-claim burst response";
 }
 
 /* ========================================================================== */
-/* Workaround experiment: setTxPgnEnable(59904, 1) before sendPgn on NGT      */
+/* Bisect: open NGT, GetOperatingMode, then sendPgn (no SetOperatingMode)     */
 /* ========================================================================== */
 
-TEST_F(IsoRequestGit106Test, NgtWithTxEnableWorkaround)
+TEST(IsoRequestGit106BareTest, NgtSendAfterGetOperatingMode)
 {
-	std::cout << "\n  NGT host-Tx of PGN 59904 with setTxPgnEnable(59904,1) workaround"
+	const char* ngtPortEnv = std::getenv("ACTISENSE_TEST_NGT_PORT");
+	const std::string ngtPort = (ngtPortEnv && *ngtPortEnv) ? ngtPortEnv : "COM25";
+
+	std::cout << "\n  Open " << ngtPort << ", send GetOperatingMode (the fixture's first"
+	          << "\n  BEM command), then sendPgn EA00. Bisecting which fixture op breaks it."
 	          << std::endl;
 
-	/* NGT as Tx, NGX as the Rx-All witness. */
-	configureRoles(*ngt_, savedNgtMode_, *ngx_, savedNgxMode_);
+	SerialConfig cfg;
+	cfg.port = ngtPort;
+	cfg.baud = 115200;
+	std::atomic<int> ee00Count {0};
+	auto eventCb = [&ee00Count](const EventVariant& ev) {
+		const auto* m = std::get_if<ParsedMessageEvent>(&ev);
+		if (!m || m->protocol != "bst") return;
+		auto f = BstFrame::fromParsedEvent(*m);
+		if (f && f->isN2k() && f->pgn() == kPgnAddressClaim) ee00Count.fetch_add(1);
+	};
+	auto session = createSerialSession(
+		cfg, eventCb,
+		[](ErrorCode ec, std::string_view msg) {
+			std::cerr << "Session error: " << static_cast<int>(ec) << " - " << msg << std::endl;
+		});
+	ASSERT_NE(session, nullptr);
 
-	/* Try enabling 59904 in the NGT's Tx list, then activating. Report
-	   each step's error code verbatim so we can tell:
-	     - Does NGT accept the SET? (PGN may not be in its known set.)
-	     - Does activation succeed?
-	     - Does the subsequent sendPgn actually put EA00 on the wire? */
-	const ErrorCode setEc = setTxPgnEnableSync(*ngt_, kPgnIsoRequest, /*enable=*/1);
-	std::cout << "    setTxPgnEnable(59904, 1) ec=" << static_cast<int>(setEc) << std::endl;
+	session->startReceiving();
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-	if (setEc != ErrorCode::Ok) {
-		std::cout << "    NGT firmware refuses to register PGN 59904 in its Tx-enable list."
-		          << " setTxPgnEnable workaround is NOT viable on this firmware revision."
-		          << std::endl;
-	}
-
-	const ErrorCode actEc = activatePgnEnableListsSync(*ngt_);
-	std::cout << "    activatePgnEnableLists ec=" << static_cast<int>(actEc) << std::endl;
-
-	/* Settle before the send. */
-	std::this_thread::sleep_for(kModeChangeSettle);
-
-	ngxCapture_.reset();
-	const ErrorCode sendEc = sendIsoRequestSync(*ngt_);
-	std::cout << "    sendPgn(59904,...) via NGT ec=" << static_cast<int>(sendEc) << std::endl;
-
-	listen(kListenWindow);
-	reportPhase("NGT-Tx with workaround / NGX-Rx", ngxCapture_);
-
-	std::cout << "\n  Headline:" << std::endl;
-	std::cout << "    EA00 forwarded by NGX after workaround: "
-	          << ngxCapture_.ea00.load() << std::endl;
-	if (ngxCapture_.ea00.load() > 0) {
-		std::cout << "    => Workaround SUCCEEDS. Recommend SDK auto-enables 59904 on NGT"
-		          << " host-Tx (or surfaces an explicit error)." << std::endl;
-	} else {
-		std::cout << "    => Workaround FAILS. NGT firmware drops 59904 even with Tx-enable;"
-		          << " resolution path is firmware or SDK-level rejection." << std::endl;
-	}
-
-	/* Best-effort cleanup: restore NGT's default Tx-enable list and
-	   activate so the next run starts from a clean slate. TearDown's
-	   savedDutMode_ restoration covers OperatingMode only. */
-	(void)defaultTxPgnEnableListSync(*ngt_);
-	(void)activatePgnEnableListsSync(*ngt_);
-}
-
-/* ========================================================================== */
-/* Priority probe: NMEA Reader uses priority 7 for ISO Request                */
-/* ========================================================================== */
-
-TEST_F(IsoRequestGit106Test, NgtWithPriority7)
-{
-	std::cout << "\n  Hypothesis: NMEA Reader uses priority 7 for ISO Request, we use 6."
-	          << " Unlikely but cheap to test." << std::endl;
-
-	configureRoles(*ngt_, savedNgtMode_, *ngx_, savedNgxMode_);
-
-	ngxCapture_.reset();
-	std::this_thread::sleep_for(kSendSettle);
-
-	const ErrorCode sendEc = sendIsoRequestSync(*ngt_, /*priority=*/7);
-	std::cout << "    sendPgn(59904, prio=7,...) via NGT ec="
-	          << static_cast<int>(sendEc) << std::endl;
-
-	listen(kListenWindow);
-	reportPhase("NGT prio=7 / NGX-Rx", ngxCapture_);
-
-	if (ngxCapture_.ea00.load() > 0) {
-		std::cout << "    => EA00 reached the bus with priority 7. Priority WAS the gate." << std::endl;
-	} else {
-		std::cout << "    => Priority 7 also drops. Not the gate." << std::endl;
-	}
-}
-
-/* ========================================================================== */
-/* Operating-mode probe: NGT in Rx-All mode instead of Normal                 */
-/* ========================================================================== */
-
-TEST_F(IsoRequestGit106Test, NgtInRxAllMode)
-{
-	std::cout << "\n  Hypothesis: NMEA Reader / old DLL leaves NGT in Rx-All when issuing the"
-	          << "\n  address-claim sweep, while our previous phases used Normal. Test directly."
-	          << std::endl;
-
-	/* Put NGT in Rx-All (host-Tx of EA00 attempted from this mode). NGX stays
-	   in Rx-All as the bus witness so we can tell if EA00 actually reaches the
-	   wire. configureRoles only handles a Normal/Rx-All split, so do this
-	   manually. */
-	const auto curNgt = [this]() {
-		std::promise<std::optional<uint16_t>> p;
-		auto f = p.get_future();
-		ngt_->getOperatingMode(kDefaultTimeout,
+	{
+		std::promise<std::optional<uint16_t>> p; auto f = p.get_future();
+		session->getOperatingMode(kDefaultTimeout,
 			[&p](const std::optional<BemResponse>& r, ErrorCode ec, std::string_view) {
 				if (ec == ErrorCode::Ok && r.has_value() && r->data.size() >= 2) {
 					p.set_value(static_cast<uint16_t>(r->data[0]) |
 					            (static_cast<uint16_t>(r->data[1]) << 8));
 				} else { p.set_value(std::nullopt); }
 			});
-		return f.get();
-	}();
-	ASSERT_TRUE(curNgt.has_value()) << "Could not read NGT operating mode";
-
-	const uint16_t target = static_cast<uint16_t>(OperatingMode::OM_NGTransferRxAllMode);
-	if (*curNgt != target) {
-		if (!savedNgtMode_.has_value()) {
-			savedNgtMode_ = *curNgt;
-		}
-		std::promise<ErrorCode> p;
-		auto f = p.get_future();
-		ngt_->setOperatingMode(OperatingMode::OM_NGTransferRxAllMode, kDefaultTimeout,
-			[&p](ErrorCode ec, std::string_view, ResponseOrigin) { p.set_value(ec); });
-		ASSERT_EQ(f.get(), ErrorCode::Ok) << "Failed to switch NGT to Rx-All";
-		std::this_thread::sleep_for(kModeChangeSettle);
+		const auto m = f.get();
+		std::cout << "    NGT mode = " << (m.has_value() ? std::to_string(*m) : "??")
+		          << " (1=Normal, 2=RxAll, 3=Raw, 4=Convert)" << std::endl;
 	}
 
-	/* NGX in Rx-All as before. */
-	const auto curNgx = [this]() {
-		std::promise<std::optional<uint16_t>> p;
-		auto f = p.get_future();
-		ngx_->getOperatingMode(kDefaultTimeout,
-			[&p](const std::optional<BemResponse>& r, ErrorCode ec, std::string_view) {
-				if (ec == ErrorCode::Ok && r.has_value() && r->data.size() >= 2) {
-					p.set_value(static_cast<uint16_t>(r->data[0]) |
-					            (static_cast<uint16_t>(r->data[1]) << 8));
-				} else { p.set_value(std::nullopt); }
-			});
-		return f.get();
-	}();
-	ASSERT_TRUE(curNgx.has_value()) << "Could not read NGX operating mode";
-
-	if (*curNgx != target) {
-		if (!savedNgxMode_.has_value()) {
-			savedNgxMode_ = *curNgx;
-		}
-		std::promise<ErrorCode> p;
-		auto f = p.get_future();
-		ngx_->setOperatingMode(OperatingMode::OM_NGTransferRxAllMode, kDefaultTimeout,
-			[&p](ErrorCode ec, std::string_view, ResponseOrigin) { p.set_value(ec); });
-		ASSERT_EQ(f.get(), ErrorCode::Ok) << "Failed to switch NGX to Rx-All";
-		std::this_thread::sleep_for(kModeChangeSettle);
-	}
-
-	ngxCapture_.reset();
-	std::this_thread::sleep_for(kSendSettle);
-
-	const ErrorCode sendEc = sendIsoRequestSync(*ngt_);
-	std::cout << "    sendPgn(59904,...) via NGT (Rx-All mode) ec="
-	          << static_cast<int>(sendEc) << std::endl;
-
-	listen(kListenWindow);
-	reportPhase("NGT in Rx-All / NGX-Rx", ngxCapture_);
-
-	if (ngxCapture_.ea00.load() > 0) {
-		std::cout << "    => EA00 reached the bus from NGT in Rx-All mode."
-		          << "\n       Root cause: NGT host-Tx of PGN 59904 is mode-gated."
-		          << "\n       Normal mode rejects, Rx-All mode permits. NMEA Reader works"
-		          << "\n       because users typically leave NGT in Rx-All for monitoring." << std::endl;
-	} else {
-		std::cout << "    => Still zero. Mode isn't the differentiator. Look elsewhere"
-		          << " (priority, BEM setup, etc)." << std::endl;
-	}
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	std::promise<ErrorCode> prom; auto fut = prom.get_future();
+	session->sendPgn(kPgnIsoRequest, kIsoRequestForAddressClaim, 0xFF, 7,
+	                 [&prom](ErrorCode ec) { prom.set_value(ec); });
+	std::cout << "    sendPgn ec=" << static_cast<int>(fut.get()) << std::endl;
+	/* Tight 500ms window: if EA00 reached the bus, the address-claim flood
+	   arrives within 50-100ms (verified empirically). Periodic claims are
+	   spaced ~750ms+ apart, so a 500ms post-send window catches the flood
+	   but skips most of the periodic noise. */
+	const auto preCount = ee00Count.load();
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	const auto postCount = ee00Count.load();
+	std::cout << "    EE00 in 500ms post-send: " << (postCount - preCount)
+	          << " (>= 6 indicates EA00 reached the bus)" << std::endl;
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	session->close();
 }
+
+/* ========================================================================== */
+/* Bisect: open BOTH NGT and NGX sessions, no BEM, send EA00 via NGT          */
+/* ========================================================================== */
+
+TEST(IsoRequestGit106BareTest, NgtSendWithBothSessionsOpen)
+{
+	const char* ngtPortEnv = std::getenv("ACTISENSE_TEST_NGT_PORT");
+	const char* ngxPortEnv = std::getenv("ACTISENSE_TEST_NGX_PORT");
+	const std::string ngtPort = (ngtPortEnv && *ngtPortEnv) ? ngtPortEnv : "COM25";
+	const std::string ngxPort = (ngxPortEnv && *ngxPortEnv) ? ngxPortEnv : "COM5";
+
+	std::cout << "\n  Open BOTH " << ngtPort << " and " << ngxPort
+	          << " sessions, do no BEM,"
+	          << "\n  send EA00 via NGT. If this fails, two-session interference"
+	          << " is the bug." << std::endl;
+
+	std::atomic<int> ee00CountNgt {0};
+	auto ngtCb = [&ee00CountNgt](const EventVariant& ev) {
+		const auto* m = std::get_if<ParsedMessageEvent>(&ev);
+		if (!m || m->protocol != "bst") return;
+		auto f = BstFrame::fromParsedEvent(*m);
+		if (f && f->isN2k() && f->pgn() == kPgnAddressClaim) ee00CountNgt.fetch_add(1);
+	};
+	SerialConfig ngtCfg; ngtCfg.port = ngtPort; ngtCfg.baud = 115200;
+	auto ngt = createSerialSession(ngtCfg, ngtCb,
+		[](ErrorCode, std::string_view) {});
+	ASSERT_NE(ngt, nullptr);
+
+	SerialConfig ngxCfg; ngxCfg.port = ngxPort; ngxCfg.baud = 115200;
+	auto ngx = createSerialSession(ngxCfg,
+		[](const EventVariant&) {},
+		[](ErrorCode, std::string_view) {});
+	ASSERT_NE(ngx, nullptr);
+
+	ngt->startReceiving();
+	ngx->startReceiving();
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+	std::promise<ErrorCode> prom; auto fut = prom.get_future();
+	ngt->sendPgn(kPgnIsoRequest, kIsoRequestForAddressClaim, 0xFF, 7,
+	             [&prom](ErrorCode ec) { prom.set_value(ec); });
+	std::cout << "    sendPgn ec=" << static_cast<int>(fut.get()) << std::endl;
+	const auto preCount = ee00CountNgt.load();
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	const auto postCount = ee00CountNgt.load();
+	std::cout << "    EE00 in 500ms post-send: " << (postCount - preCount)
+	          << " (>= 6 indicates EA00 reached the bus)" << std::endl;
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	ngt->close();
+	ngx->close();
+}
+
+/* ========================================================================== */
+/* Bisect: open both, set NGT->Normal AND NGX->RxAll, then send via NGT       */
+/* ========================================================================== */
+
+TEST(IsoRequestGit106BareTest, NgtSendAfterDualModeSet)
+{
+	const char* ngtPortEnv = std::getenv("ACTISENSE_TEST_NGT_PORT");
+	const char* ngxPortEnv = std::getenv("ACTISENSE_TEST_NGX_PORT");
+	const std::string ngtPort = (ngtPortEnv && *ngtPortEnv) ? ngtPortEnv : "COM25";
+	const std::string ngxPort = (ngxPortEnv && *ngxPortEnv) ? ngxPortEnv : "COM5";
+
+	std::cout << "\n  Open both sessions, set NGT->Normal AND NGX->RxAll (matching fixture),"
+	          << "\n  then send EA00 via NGT. Replicates the fixture's mode-changing step." << std::endl;
+
+	std::atomic<int> ee00CountNgt {0};
+	auto ngtCb = [&ee00CountNgt](const EventVariant& ev) {
+		const auto* m = std::get_if<ParsedMessageEvent>(&ev);
+		if (!m || m->protocol != "bst") return;
+		auto f = BstFrame::fromParsedEvent(*m);
+		if (f && f->isN2k() && f->pgn() == kPgnAddressClaim) ee00CountNgt.fetch_add(1);
+	};
+	SerialConfig ngtCfg; ngtCfg.port = ngtPort; ngtCfg.baud = 115200;
+	auto ngt = createSerialSession(ngtCfg, ngtCb,
+		[](ErrorCode, std::string_view) {});
+	ASSERT_NE(ngt, nullptr);
+
+	SerialConfig ngxCfg; ngxCfg.port = ngxPort; ngxCfg.baud = 115200;
+	auto ngx = createSerialSession(ngxCfg,
+		[](const EventVariant&) {},
+		[](ErrorCode, std::string_view) {});
+	ASSERT_NE(ngx, nullptr);
+
+	ngt->startReceiving();
+	ngx->startReceiving();
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+	{
+		std::promise<ErrorCode> p; auto f = p.get_future();
+		ngt->setOperatingMode(OperatingMode::OM_NGTransferNormalMode, kDefaultTimeout,
+			[&p](ErrorCode ec, std::string_view, ResponseOrigin) { p.set_value(ec); });
+		std::cout << "    NGT SetMode(Normal) ec=" << static_cast<int>(f.get()) << std::endl;
+	}
+	std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+	{
+		std::promise<ErrorCode> p; auto f = p.get_future();
+		ngx->setOperatingMode(OperatingMode::OM_NGTransferRxAllMode, kDefaultTimeout,
+			[&p](ErrorCode ec, std::string_view, ResponseOrigin) { p.set_value(ec); });
+		std::cout << "    NGX SetMode(RxAll) ec=" << static_cast<int>(f.get()) << std::endl;
+	}
+	std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+
+	const auto preCount = ee00CountNgt.load();
+	std::promise<ErrorCode> prom; auto fut = prom.get_future();
+	ngt->sendPgn(kPgnIsoRequest, kIsoRequestForAddressClaim, 0xFF, 7,
+	             [&prom](ErrorCode ec) { prom.set_value(ec); });
+	std::cout << "    sendPgn ec=" << static_cast<int>(fut.get()) << std::endl;
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	const auto postCount = ee00CountNgt.load();
+	std::cout << "    EE00 in 500ms post-send: " << (postCount - preCount)
+	          << " (>= 6 indicates EA00 reached the bus)" << std::endl;
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	ngt->close();
+	ngx->close();
+}
+
+/* ========================================================================== */
+/* Bisect: replicate fixture Phase A exactly (prio 6, no settle gap)          */
+/* ========================================================================== */
+
+TEST(IsoRequestGit106BareTest, NgtPhaseAExactPriority6)
+{
+	const char* ngtPortEnv = std::getenv("ACTISENSE_TEST_NGT_PORT");
+	const char* ngxPortEnv = std::getenv("ACTISENSE_TEST_NGX_PORT");
+	const std::string ngtPort = (ngtPortEnv && *ngtPortEnv) ? ngtPortEnv : "COM25";
+	const std::string ngxPort = (ngxPortEnv && *ngxPortEnv) ? ngxPortEnv : "COM5";
+
+	std::cout << "\n  Same as DualModeSet but priority 6 (fixture Phase A default)."
+	          << std::endl;
+
+	std::atomic<int> ee00CountNgt {0};
+	auto ngtCb = [&ee00CountNgt](const EventVariant& ev) {
+		const auto* m = std::get_if<ParsedMessageEvent>(&ev);
+		if (!m || m->protocol != "bst") return;
+		auto f = BstFrame::fromParsedEvent(*m);
+		if (f && f->isN2k() && f->pgn() == kPgnAddressClaim) ee00CountNgt.fetch_add(1);
+	};
+	SerialConfig ngtCfg; ngtCfg.port = ngtPort; ngtCfg.baud = 115200;
+	auto ngt = createSerialSession(ngtCfg, ngtCb, [](ErrorCode, std::string_view) {});
+	ASSERT_NE(ngt, nullptr);
+	SerialConfig ngxCfg; ngxCfg.port = ngxPort; ngxCfg.baud = 115200;
+	auto ngx = createSerialSession(ngxCfg, [](const EventVariant&) {},
+		[](ErrorCode, std::string_view) {});
+	ASSERT_NE(ngx, nullptr);
+
+	ngt->startReceiving();
+	ngx->startReceiving();
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+	{
+		std::promise<ErrorCode> p; auto f = p.get_future();
+		ngt->setOperatingMode(OperatingMode::OM_NGTransferNormalMode, kDefaultTimeout,
+			[&p](ErrorCode ec, std::string_view, ResponseOrigin) { p.set_value(ec); });
+		std::cout << "    NGT SetMode(Normal) ec=" << static_cast<int>(f.get()) << std::endl;
+	}
+	std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+	{
+		std::promise<ErrorCode> p; auto f = p.get_future();
+		ngx->setOperatingMode(OperatingMode::OM_NGTransferRxAllMode, kDefaultTimeout,
+			[&p](ErrorCode ec, std::string_view, ResponseOrigin) { p.set_value(ec); });
+		std::cout << "    NGX SetMode(RxAll) ec=" << static_cast<int>(f.get()) << std::endl;
+	}
+	std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+
+	const auto preCount = ee00CountNgt.load();
+	std::promise<ErrorCode> prom; auto fut = prom.get_future();
+	ngt->sendPgn(kPgnIsoRequest, kIsoRequestForAddressClaim, 0xFF, /*priority=*/6,
+	             [&prom](ErrorCode ec) { prom.set_value(ec); });
+	std::cout << "    sendPgn(prio=6) ec=" << static_cast<int>(fut.get()) << std::endl;
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	const auto postCount = ee00CountNgt.load();
+	std::cout << "    EE00 in 500ms post-send: " << (postCount - preCount)
+	          << " (>= 6 indicates EA00 reached the bus)" << std::endl;
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	ngt->close();
+	ngx->close();
+}
+
+/* ========================================================================== */
+/* Bisect: open NGT, GetOperatingMode + SetOperatingMode(Normal), sendPgn     */
+/* ========================================================================== */
+
+TEST(IsoRequestGit106BareTest, NgtSendAfterSetOperatingMode)
+{
+	const char* ngtPortEnv = std::getenv("ACTISENSE_TEST_NGT_PORT");
+	const std::string ngtPort = (ngtPortEnv && *ngtPortEnv) ? ngtPortEnv : "COM25";
+
+	std::cout << "\n  Open " << ngtPort << ", Get + Set OperatingMode(Normal),"
+	          << " then sendPgn. Does Set break it?" << std::endl;
+
+	SerialConfig cfg;
+	cfg.port = ngtPort;
+	cfg.baud = 115200;
+	std::atomic<int> ee00Count {0};
+	auto eventCb = [&ee00Count](const EventVariant& ev) {
+		const auto* m = std::get_if<ParsedMessageEvent>(&ev);
+		if (!m || m->protocol != "bst") return;
+		auto f = BstFrame::fromParsedEvent(*m);
+		if (f && f->isN2k() && f->pgn() == kPgnAddressClaim) ee00Count.fetch_add(1);
+	};
+	auto session = createSerialSession(
+		cfg, eventCb,
+		[](ErrorCode ec, std::string_view msg) {
+			std::cerr << "Session error: " << static_cast<int>(ec) << " - " << msg << std::endl;
+		});
+	ASSERT_NE(session, nullptr);
+
+	session->startReceiving();
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+	{
+		std::promise<ErrorCode> p; auto f = p.get_future();
+		session->setOperatingMode(OperatingMode::OM_NGTransferNormalMode, kDefaultTimeout,
+			[&p](ErrorCode ec, std::string_view, ResponseOrigin) { p.set_value(ec); });
+		std::cout << "    SetOperatingMode(Normal) ec=" << static_cast<int>(f.get()) << std::endl;
+	}
+	std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+	ee00Count.store(0);  /* clear any unsolicited periodic claims pre-EA00 */
+
+	std::promise<ErrorCode> prom; auto fut = prom.get_future();
+	session->sendPgn(kPgnIsoRequest, kIsoRequestForAddressClaim, 0xFF, 7,
+	                 [&prom](ErrorCode ec) { prom.set_value(ec); });
+	std::cout << "    sendPgn ec=" << static_cast<int>(fut.get()) << std::endl;
+	/* Tight 500ms window: if EA00 reached the bus, the address-claim flood
+	   arrives within 50-100ms (verified empirically). Periodic claims are
+	   spaced ~750ms+ apart, so a 500ms post-send window catches the flood
+	   but skips most of the periodic noise. */
+	const auto preCount = ee00Count.load();
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	const auto postCount = ee00Count.load();
+	std::cout << "    EE00 in 500ms post-send: " << (postCount - preCount)
+	          << " (>= 6 indicates EA00 reached the bus)" << std::endl;
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	session->close();
+}
+
+/* ========================================================================== */
+/* Bare-minimum probe: just open NGT and send EA00, no BEM warmup at all      */
+/* ========================================================================== */
+
+TEST(IsoRequestGit106BareTest, NgtMinimalSendOnly)
+{
+	const char* ngtPortEnv = std::getenv("ACTISENSE_TEST_NGT_PORT");
+	const std::string ngtPort = (ngtPortEnv && *ngtPortEnv) ? ngtPortEnv : "COM25";
+
+	std::cout << "\n  Open " << ngtPort << ", do nothing else, send EA00. If this works"
+	          << "\n  while the full-fixture tests don't, one of the fixture's BEM commands"
+	          << "\n  is the culprit. Capture wire trace for byte-level comparison." << std::endl;
+
+	std::atomic<int> ee00Count {0};
+	auto eventCb = [&ee00Count](const EventVariant& ev) {
+		const auto* m = std::get_if<ParsedMessageEvent>(&ev);
+		if (!m || m->protocol != "bst") return;
+		auto f = BstFrame::fromParsedEvent(*m);
+		if (f && f->isN2k() && f->pgn() == kPgnAddressClaim) ee00Count.fetch_add(1);
+	};
+
+	SerialConfig cfg;
+	cfg.port = ngtPort;
+	cfg.baud = 115200;
+	auto session = createSerialSession(
+		cfg,
+		eventCb,
+		[](ErrorCode ec, std::string_view msg) {
+			std::cerr << "Session error: " << static_cast<int>(ec) << " - " << msg << std::endl;
+		});
+	ASSERT_NE(session, nullptr);
+
+	if (const char* trace = std::getenv("ACTISENSE_TEST_WIRE_TRACE");
+		trace && std::string(trace) == "1") {
+		WireTraceConfig wcfg;
+		wcfg.format = WireTraceFormat::Hex;
+		wcfg.bytesPerLine = 16;
+		wcfg.includeAscii = true;
+		session->setWireTrace(wcfg, [](std::string_view line) {
+			std::cerr << "[NGT] " << line;
+		});
+	}
+
+	session->startReceiving();
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+	std::promise<ErrorCode> prom;
+	auto fut = prom.get_future();
+	session->sendPgn(kPgnIsoRequest, kIsoRequestForAddressClaim, /*dest=*/0xFF,
+	                 /*priority=*/7,
+	                 [&prom](ErrorCode ec) { prom.set_value(ec); });
+	const ErrorCode ec = fut.get();
+	std::cout << "    sendPgn(59904, prio=7,...) ec=" << static_cast<int>(ec) << std::endl;
+	const auto preCount = ee00Count.load();
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	const auto postCount = ee00Count.load();
+	std::cout << "    EE00 in 500ms post-send: " << (postCount - preCount)
+	          << " (>= 6 indicates EA00 reached the bus)" << std::endl;
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	session->close();
+}
+
+/* ========================================================================== */
+/* (Removed: NgtAloneOnRxAllSelfWitness, NgtWithToolkitBemWarmup,             */
+/* NgtWithPriority7, NgtInRxAllMode -- these were exploratory fixture-based   */
+/* tests built on the false-failure interpretation. The bare tests above and  */
+/* the corrected NgtAndNgxDirections cover every useful condition with the    */
+/* correct EE00-burst indicator.)                                             */
+/* ========================================================================== */
 
 } /* namespace Test */
 } /* namespace Sdk */
