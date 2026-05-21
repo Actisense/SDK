@@ -157,8 +157,12 @@ protected:
 	{
 		const char* ngtEnv = std::getenv("ACTISENSE_TEST_NGT_PORT");
 		const char* ngxEnv = std::getenv("ACTISENSE_TEST_NGX_PORT");
-		ngtPort_ = (ngtEnv && *ngtEnv) ? ngtEnv : "COM25";
-		ngxPort_ = (ngxEnv && *ngxEnv) ? ngxEnv : "COM5";
+		if (!ngtEnv || !*ngtEnv || !ngxEnv || !*ngxEnv) {
+			GTEST_SKIP() << "ACTISENSE_TEST_NGT_PORT / ACTISENSE_TEST_NGX_PORT not set"
+			             << " - skipping ISO-Request diagnostic";
+		}
+		ngtPort_ = ngtEnv;
+		ngxPort_ = ngxEnv;
 
 		if (ngtPort_ == ngxPort_) {
 			GTEST_SKIP() << "NGT and NGX port assignments collide on "
@@ -444,7 +448,10 @@ TEST_F(IsoRequestGit106Test, NgtAndNgxDirections)
 TEST(IsoRequestGit106BareTest, NgtSendAfterGetOperatingMode)
 {
 	const char* ngtPortEnv = std::getenv("ACTISENSE_TEST_NGT_PORT");
-	const std::string ngtPort = (ngtPortEnv && *ngtPortEnv) ? ngtPortEnv : "COM25";
+	if (!ngtPortEnv || !*ngtPortEnv) {
+		GTEST_SKIP() << "ACTISENSE_TEST_NGT_PORT not set - skipping ISO-Request bare test";
+	}
+	const std::string ngtPort = ngtPortEnv;
 
 	std::cout << "\n  Open " << ngtPort << ", send GetOperatingMode (the fixture's first"
 	          << "\n  BEM command), then sendPgn EA00. Bisecting which fixture op breaks it."
@@ -510,8 +517,12 @@ TEST(IsoRequestGit106BareTest, NgtSendWithBothSessionsOpen)
 {
 	const char* ngtPortEnv = std::getenv("ACTISENSE_TEST_NGT_PORT");
 	const char* ngxPortEnv = std::getenv("ACTISENSE_TEST_NGX_PORT");
-	const std::string ngtPort = (ngtPortEnv && *ngtPortEnv) ? ngtPortEnv : "COM25";
-	const std::string ngxPort = (ngxPortEnv && *ngxPortEnv) ? ngxPortEnv : "COM5";
+	if (!ngtPortEnv || !*ngtPortEnv || !ngxPortEnv || !*ngxPortEnv) {
+		GTEST_SKIP() << "ACTISENSE_TEST_NGT_PORT / ACTISENSE_TEST_NGX_PORT not set"
+		             << " - skipping ISO-Request bare test";
+	}
+	const std::string ngtPort = ngtPortEnv;
+	const std::string ngxPort = ngxPortEnv;
 
 	std::cout << "\n  Open BOTH " << ngtPort << " and " << ngxPort
 	          << " sessions, do no BEM,"
@@ -562,8 +573,12 @@ TEST(IsoRequestGit106BareTest, NgtSendAfterDualModeSet)
 {
 	const char* ngtPortEnv = std::getenv("ACTISENSE_TEST_NGT_PORT");
 	const char* ngxPortEnv = std::getenv("ACTISENSE_TEST_NGX_PORT");
-	const std::string ngtPort = (ngtPortEnv && *ngtPortEnv) ? ngtPortEnv : "COM25";
-	const std::string ngxPort = (ngxPortEnv && *ngxPortEnv) ? ngxPortEnv : "COM5";
+	if (!ngtPortEnv || !*ngtPortEnv || !ngxPortEnv || !*ngxPortEnv) {
+		GTEST_SKIP() << "ACTISENSE_TEST_NGT_PORT / ACTISENSE_TEST_NGX_PORT not set"
+		             << " - skipping ISO-Request bare test";
+	}
+	const std::string ngtPort = ngtPortEnv;
+	const std::string ngxPort = ngxPortEnv;
 
 	std::cout << "\n  Open both sessions, set NGT->Normal AND NGX->RxAll (matching fixture),"
 	          << "\n  then send EA00 via NGT. Replicates the fixture's mode-changing step." << std::endl;
@@ -627,8 +642,12 @@ TEST(IsoRequestGit106BareTest, NgtPhaseAExactPriority6)
 {
 	const char* ngtPortEnv = std::getenv("ACTISENSE_TEST_NGT_PORT");
 	const char* ngxPortEnv = std::getenv("ACTISENSE_TEST_NGX_PORT");
-	const std::string ngtPort = (ngtPortEnv && *ngtPortEnv) ? ngtPortEnv : "COM25";
-	const std::string ngxPort = (ngxPortEnv && *ngxPortEnv) ? ngxPortEnv : "COM5";
+	if (!ngtPortEnv || !*ngtPortEnv || !ngxPortEnv || !*ngxPortEnv) {
+		GTEST_SKIP() << "ACTISENSE_TEST_NGT_PORT / ACTISENSE_TEST_NGX_PORT not set"
+		             << " - skipping ISO-Request bare test";
+	}
+	const std::string ngtPort = ngtPortEnv;
+	const std::string ngxPort = ngxPortEnv;
 
 	std::cout << "\n  Same as DualModeSet but priority 6 (fixture Phase A default)."
 	          << std::endl;
@@ -688,7 +707,10 @@ TEST(IsoRequestGit106BareTest, NgtPhaseAExactPriority6)
 TEST(IsoRequestGit106BareTest, NgtSendAfterSetOperatingMode)
 {
 	const char* ngtPortEnv = std::getenv("ACTISENSE_TEST_NGT_PORT");
-	const std::string ngtPort = (ngtPortEnv && *ngtPortEnv) ? ngtPortEnv : "COM25";
+	if (!ngtPortEnv || !*ngtPortEnv) {
+		GTEST_SKIP() << "ACTISENSE_TEST_NGT_PORT not set - skipping ISO-Request bare test";
+	}
+	const std::string ngtPort = ngtPortEnv;
 
 	std::cout << "\n  Open " << ngtPort << ", Get + Set OperatingMode(Normal),"
 	          << " then sendPgn. Does Set break it?" << std::endl;
@@ -746,7 +768,10 @@ TEST(IsoRequestGit106BareTest, NgtSendAfterSetOperatingMode)
 TEST(IsoRequestGit106BareTest, NgtMinimalSendOnly)
 {
 	const char* ngtPortEnv = std::getenv("ACTISENSE_TEST_NGT_PORT");
-	const std::string ngtPort = (ngtPortEnv && *ngtPortEnv) ? ngtPortEnv : "COM25";
+	if (!ngtPortEnv || !*ngtPortEnv) {
+		GTEST_SKIP() << "ACTISENSE_TEST_NGT_PORT not set - skipping ISO-Request bare test";
+	}
+	const std::string ngtPort = ngtPortEnv;
 
 	std::cout << "\n  Open " << ngtPort << ", do nothing else, send EA00. If this works"
 	          << "\n  while the full-fixture tests don't, one of the fixture's BEM commands"
