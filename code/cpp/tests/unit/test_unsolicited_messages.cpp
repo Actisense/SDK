@@ -549,6 +549,43 @@ TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodePermissiveOneTrailingByte)
 	EXPECT_FALSE(status.operating_mode_.has_value());
 }
 
+TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodeNGXSW3986MultiPortShape)
+{
+	/* NGXSW-3986: PRO/Keil products emit SystemStatus with one IndiBuffer
+	   per present hardware port (CAN slot 0 + each UART), and p=0 because
+	   UniBuffer / proprietary-stream reporting is deferred. This test pins
+	   the m=3 p=0 shape with distinct per-port values so a regression
+	   anywhere in the multi-port decode path would fail. */
+	const auto payload = assembleSystemStatusPayload(
+		{
+			makeIndi( 5,  10,  0,  0, 15, 20),    /* slot 0: CAN  */
+			makeIndi(40,   0,  0,  3,  0,  0),    /* slot 1: UART0 - mostly rx */
+			makeIndi(80,   0,  0, 12,  0,  0),    /* slot 2: UART1 - higher rx + drop */
+		},
+		/*Nun*/ uint8_t{0}, /*unifieds*/ {});
+
+	SystemStatusData status;
+	EXPECT_TRUE(decodeSystemStatus(payload, status, m_error));
+	EXPECT_TRUE(m_error.empty());
+
+	ASSERT_EQ(status.individual_buffers_.size(), 3u);
+
+	EXPECT_EQ(status.individual_buffers_[0].rx_bandwidth_, 5u);
+	EXPECT_EQ(status.individual_buffers_[0].rx_loading_, 10u);
+	EXPECT_EQ(status.individual_buffers_[0].tx_bandwidth_, 15u);
+	EXPECT_EQ(status.individual_buffers_[0].tx_loading_, 20u);
+
+	EXPECT_EQ(status.individual_buffers_[1].rx_bandwidth_, 40u);
+	EXPECT_EQ(status.individual_buffers_[1].rx_dropped_, 3u);
+
+	EXPECT_EQ(status.individual_buffers_[2].rx_bandwidth_, 80u);
+	EXPECT_EQ(status.individual_buffers_[2].rx_dropped_, 12u);
+
+	EXPECT_TRUE(status.unified_buffers_.empty());
+	EXPECT_FALSE(status.can_status_.has_value());
+	EXPECT_FALSE(status.operating_mode_.has_value());
+}
+
 TEST_F(UnsolicitedMessagesTest, SystemStatus_DecodePermissiveTwoTrailingBytes)
 {
 	/* GIT-101: 2 trailing bytes are too short for CAN (3 bytes) but exactly
