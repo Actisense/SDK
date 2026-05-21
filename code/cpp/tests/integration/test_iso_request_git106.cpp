@@ -243,13 +243,50 @@ protected:
 		}
 	}
 
-	ErrorCode sendIsoRequestSync(SessionImpl& tx)
+	ErrorCode sendIsoRequestSync(SessionImpl& tx, uint8_t priority = 6)
 	{
 		std::promise<ErrorCode> prom;
 		auto fut = prom.get_future();
 		tx.sendPgn(kPgnIsoRequest, kIsoRequestForAddressClaim, /*dest=*/0xFF,
-		           /*priority=*/6,
+		           priority,
 		           [&prom](ErrorCode ec) { prom.set_value(ec); });
+		return fut.get();
+	}
+
+	/* GIT-106 workaround experiment helpers. Mirrors the
+	   setTxEnableAndActivate pattern from the Tx-blocking sweeps but
+	   reports both error codes back to the caller for diagnostic logging
+	   rather than treating activation errors as soft warnings. */
+	ErrorCode setTxPgnEnableSync(SessionImpl& s, uint32_t pgn, uint8_t enable)
+	{
+		std::promise<ErrorCode> prom;
+		auto fut = prom.get_future();
+		s.setTxPgnEnable(pgn, enable, kDefaultTimeout,
+			[&prom](const std::optional<BemResponse>&, ErrorCode ec, std::string_view) {
+				prom.set_value(ec);
+			});
+		return fut.get();
+	}
+
+	ErrorCode activatePgnEnableListsSync(SessionImpl& s)
+	{
+		std::promise<ErrorCode> prom;
+		auto fut = prom.get_future();
+		s.activatePgnEnableLists(kDefaultTimeout,
+			[&prom](const std::optional<BemResponse>&, ErrorCode ec, std::string_view) {
+				prom.set_value(ec);
+			});
+		return fut.get();
+	}
+
+	ErrorCode defaultTxPgnEnableListSync(SessionImpl& s)
+	{
+		std::promise<ErrorCode> prom;
+		auto fut = prom.get_future();
+		s.defaultPgnEnableList(DeletePgnListSelector::TxList, kDefaultTimeout,
+			[&prom](const std::optional<BemResponse>&, ErrorCode ec, std::string_view) {
+				prom.set_value(ec);
+			});
 		return fut.get();
 	}
 
@@ -456,6 +493,180 @@ TEST_F(IsoRequestGit106Test, NgtAndNgxDirections)
 	          << " (control - expect >= 1)" << std::endl;
 	std::cout << "    Phase A EE00 claims seen:      " << ngxCapture_.ee00.load() << std::endl;
 	std::cout << "    Phase B EE00 claims seen:      " << ngtCapture_.ee00.load() << std::endl;
+}
+
+/* ========================================================================== */
+/* Workaround experiment: setTxPgnEnable(59904, 1) before sendPgn on NGT      */
+/* ========================================================================== */
+
+TEST_F(IsoRequestGit106Test, NgtWithTxEnableWorkaround)
+{
+	std::cout << "\n  NGT host-Tx of PGN 59904 with setTxPgnEnable(59904,1) workaround"
+	          << std::endl;
+
+	/* NGT as Tx, NGX as the Rx-All witness. */
+	configureRoles(*ngt_, savedNgtMode_, *ngx_, savedNgxMode_);
+
+	/* Try enabling 59904 in the NGT's Tx list, then activating. Report
+	   each step's error code verbatim so we can tell:
+	     - Does NGT accept the SET? (PGN may not be in its known set.)
+	     - Does activation succeed?
+	     - Does the subsequent sendPgn actually put EA00 on the wire? */
+	const ErrorCode setEc = setTxPgnEnableSync(*ngt_, kPgnIsoRequest, /*enable=*/1);
+	std::cout << "    setTxPgnEnable(59904, 1) ec=" << static_cast<int>(setEc) << std::endl;
+
+	if (setEc != ErrorCode::Ok) {
+		std::cout << "    NGT firmware refuses to register PGN 59904 in its Tx-enable list."
+		          << " setTxPgnEnable workaround is NOT viable on this firmware revision."
+		          << std::endl;
+	}
+
+	const ErrorCode actEc = activatePgnEnableListsSync(*ngt_);
+	std::cout << "    activatePgnEnableLists ec=" << static_cast<int>(actEc) << std::endl;
+
+	/* Settle before the send. */
+	std::this_thread::sleep_for(kModeChangeSettle);
+
+	ngxCapture_.reset();
+	const ErrorCode sendEc = sendIsoRequestSync(*ngt_);
+	std::cout << "    sendPgn(59904,...) via NGT ec=" << static_cast<int>(sendEc) << std::endl;
+
+	listen(kListenWindow);
+	reportPhase("NGT-Tx with workaround / NGX-Rx", ngxCapture_);
+
+	std::cout << "\n  Headline:" << std::endl;
+	std::cout << "    EA00 forwarded by NGX after workaround: "
+	          << ngxCapture_.ea00.load() << std::endl;
+	if (ngxCapture_.ea00.load() > 0) {
+		std::cout << "    => Workaround SUCCEEDS. Recommend SDK auto-enables 59904 on NGT"
+		          << " host-Tx (or surfaces an explicit error)." << std::endl;
+	} else {
+		std::cout << "    => Workaround FAILS. NGT firmware drops 59904 even with Tx-enable;"
+		          << " resolution path is firmware or SDK-level rejection." << std::endl;
+	}
+
+	/* Best-effort cleanup: restore NGT's default Tx-enable list and
+	   activate so the next run starts from a clean slate. TearDown's
+	   savedDutMode_ restoration covers OperatingMode only. */
+	(void)defaultTxPgnEnableListSync(*ngt_);
+	(void)activatePgnEnableListsSync(*ngt_);
+}
+
+/* ========================================================================== */
+/* Priority probe: NMEA Reader uses priority 7 for ISO Request                */
+/* ========================================================================== */
+
+TEST_F(IsoRequestGit106Test, NgtWithPriority7)
+{
+	std::cout << "\n  Hypothesis: NMEA Reader uses priority 7 for ISO Request, we use 6."
+	          << " Unlikely but cheap to test." << std::endl;
+
+	configureRoles(*ngt_, savedNgtMode_, *ngx_, savedNgxMode_);
+
+	ngxCapture_.reset();
+	std::this_thread::sleep_for(kSendSettle);
+
+	const ErrorCode sendEc = sendIsoRequestSync(*ngt_, /*priority=*/7);
+	std::cout << "    sendPgn(59904, prio=7,...) via NGT ec="
+	          << static_cast<int>(sendEc) << std::endl;
+
+	listen(kListenWindow);
+	reportPhase("NGT prio=7 / NGX-Rx", ngxCapture_);
+
+	if (ngxCapture_.ea00.load() > 0) {
+		std::cout << "    => EA00 reached the bus with priority 7. Priority WAS the gate." << std::endl;
+	} else {
+		std::cout << "    => Priority 7 also drops. Not the gate." << std::endl;
+	}
+}
+
+/* ========================================================================== */
+/* Operating-mode probe: NGT in Rx-All mode instead of Normal                 */
+/* ========================================================================== */
+
+TEST_F(IsoRequestGit106Test, NgtInRxAllMode)
+{
+	std::cout << "\n  Hypothesis: NMEA Reader / old DLL leaves NGT in Rx-All when issuing the"
+	          << "\n  address-claim sweep, while our previous phases used Normal. Test directly."
+	          << std::endl;
+
+	/* Put NGT in Rx-All (host-Tx of EA00 attempted from this mode). NGX stays
+	   in Rx-All as the bus witness so we can tell if EA00 actually reaches the
+	   wire. configureRoles only handles a Normal/Rx-All split, so do this
+	   manually. */
+	const auto curNgt = [this]() {
+		std::promise<std::optional<uint16_t>> p;
+		auto f = p.get_future();
+		ngt_->getOperatingMode(kDefaultTimeout,
+			[&p](const std::optional<BemResponse>& r, ErrorCode ec, std::string_view) {
+				if (ec == ErrorCode::Ok && r.has_value() && r->data.size() >= 2) {
+					p.set_value(static_cast<uint16_t>(r->data[0]) |
+					            (static_cast<uint16_t>(r->data[1]) << 8));
+				} else { p.set_value(std::nullopt); }
+			});
+		return f.get();
+	}();
+	ASSERT_TRUE(curNgt.has_value()) << "Could not read NGT operating mode";
+
+	const uint16_t target = static_cast<uint16_t>(OperatingMode::OM_NGTransferRxAllMode);
+	if (*curNgt != target) {
+		if (!savedNgtMode_.has_value()) {
+			savedNgtMode_ = *curNgt;
+		}
+		std::promise<ErrorCode> p;
+		auto f = p.get_future();
+		ngt_->setOperatingMode(OperatingMode::OM_NGTransferRxAllMode, kDefaultTimeout,
+			[&p](ErrorCode ec, std::string_view, ResponseOrigin) { p.set_value(ec); });
+		ASSERT_EQ(f.get(), ErrorCode::Ok) << "Failed to switch NGT to Rx-All";
+		std::this_thread::sleep_for(kModeChangeSettle);
+	}
+
+	/* NGX in Rx-All as before. */
+	const auto curNgx = [this]() {
+		std::promise<std::optional<uint16_t>> p;
+		auto f = p.get_future();
+		ngx_->getOperatingMode(kDefaultTimeout,
+			[&p](const std::optional<BemResponse>& r, ErrorCode ec, std::string_view) {
+				if (ec == ErrorCode::Ok && r.has_value() && r->data.size() >= 2) {
+					p.set_value(static_cast<uint16_t>(r->data[0]) |
+					            (static_cast<uint16_t>(r->data[1]) << 8));
+				} else { p.set_value(std::nullopt); }
+			});
+		return f.get();
+	}();
+	ASSERT_TRUE(curNgx.has_value()) << "Could not read NGX operating mode";
+
+	if (*curNgx != target) {
+		if (!savedNgxMode_.has_value()) {
+			savedNgxMode_ = *curNgx;
+		}
+		std::promise<ErrorCode> p;
+		auto f = p.get_future();
+		ngx_->setOperatingMode(OperatingMode::OM_NGTransferRxAllMode, kDefaultTimeout,
+			[&p](ErrorCode ec, std::string_view, ResponseOrigin) { p.set_value(ec); });
+		ASSERT_EQ(f.get(), ErrorCode::Ok) << "Failed to switch NGX to Rx-All";
+		std::this_thread::sleep_for(kModeChangeSettle);
+	}
+
+	ngxCapture_.reset();
+	std::this_thread::sleep_for(kSendSettle);
+
+	const ErrorCode sendEc = sendIsoRequestSync(*ngt_);
+	std::cout << "    sendPgn(59904,...) via NGT (Rx-All mode) ec="
+	          << static_cast<int>(sendEc) << std::endl;
+
+	listen(kListenWindow);
+	reportPhase("NGT in Rx-All / NGX-Rx", ngxCapture_);
+
+	if (ngxCapture_.ea00.load() > 0) {
+		std::cout << "    => EA00 reached the bus from NGT in Rx-All mode."
+		          << "\n       Root cause: NGT host-Tx of PGN 59904 is mode-gated."
+		          << "\n       Normal mode rejects, Rx-All mode permits. NMEA Reader works"
+		          << "\n       because users typically leave NGT in Rx-All for monitoring." << std::endl;
+	} else {
+		std::cout << "    => Still zero. Mode isn't the differentiator. Look elsewhere"
+		          << " (priority, BEM setup, etc)." << std::endl;
+	}
 }
 
 } /* namespace Test */
