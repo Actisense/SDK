@@ -128,13 +128,15 @@ protected:
 
 	void SetUp() override
 	{
-		/* Default to COM5 (the dev rig's local-gateway NGX) so the test
-		   runs against the canonical two-NGX bench without any env-var
-		   wrangling. Override with ACTISENSE_TEST_PORT for any other rig.
-		   Failure to open the port falls through to the createSerialSession
-		   ASSERT below with a clear message naming the port. */
+		/* CI runners have no serial port, so an unset ACTISENSE_TEST_PORT
+		   must skip rather than assert — same policy as the sibling
+		   integration tests (test_bem_device, test_tx_pgn_blocking_*).
+		   Local dev rigs export ACTISENSE_TEST_PORT explicitly. */
 		const char* port = std::getenv("ACTISENSE_TEST_PORT");
-		portName_ = (port && *port) ? port : "COM5";
+		if (!port || !*port) {
+			GTEST_SKIP() << "ACTISENSE_TEST_PORT not set - skipping remote BEM tests";
+		}
+		portName_ = port;
 
 		const char* baud = std::getenv("ACTISENSE_TEST_BAUD");
 		if (baud) {

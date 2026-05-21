@@ -16,6 +16,9 @@ add_sdk_test(test_tx_pgn_blocking_singleframe test_tx_pgn_blocking_singleframe.c
 # Two-device Tx PGN filtering sweep, single-frame proprietary PGNs (GIT-97).
 # Same rig as the standard sweep; exercises the NGXSW-3329 DP0 bitmap mechanic.
 add_sdk_test(test_tx_pgn_blocking_singleframe_proprietary test_tx_pgn_blocking_singleframe_proprietary.cpp)
+# Two-device Tx PGN filtering sweep, fast-packet standard PGNs (GIT-98).
+# Same rig as the standard sweep; exercises multi-frame (fast-packet) host-Tx.
+add_sdk_test(test_tx_pgn_blocking_fastpacket test_tx_pgn_blocking_fastpacket.cpp)
 
 # Add integration test files here as they are developed
 
