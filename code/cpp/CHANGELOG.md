@@ -7,7 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`OM_CanPacket` (5) and `OM_CanPacketASCII` (6) added to the public
+  `OperatingMode` enum (NGXSW-4207).** These let an SDK client request the NGX
+  raw-CAN modes the firmware implements (NGXSW-4206), in which the device
+  bridges `SystemNames::CAN` ↔ the serial host link as BST-95 (`OM_CanPacket`)
+  or CAN-ASCII (`OM_CanPacketASCII`). The values match firmware
+  `OperatingModeCodes.h`, and `OperatingModeName()` now returns
+  `"CAN Packet Mode"` / `"CAN Packet ASCII Mode"`. The change is additive —
+  existing modes are unaffected.
+- **`OM_NGTransferRawMode = 3` redocumented.** Mode 3 is no longer raw CAN
+  (firmware now treats it as a spare/legacy slot, `OM_NGTransferSpareMode`);
+  raw CAN transfer moved to `OM_CanPacket` (5) / `OM_CanPacketASCII` (6). The
+  enum value is **retained** for public-API stability, but its documentation
+  now marks it legacy — new code should target `OM_CanPacket`.
+
 ### Tests
+
+- **Black-box NGX CAN Packet routing integration test (NGXSW-4207).** New
+  `tests/integration/test_can_packet_mode.cpp` drives a real NGX into each CAN
+  Packet mode via the SDK and proves the device behaviour as a black box: GET
+  baseline → scope-guarded SET → GET-verify → CAN→serial (await a BST-95
+  `ParsedMessageEvent` via the event callback) → serial→CAN (emit a BST-95
+  frame via `asyncSend("bst", …)`) → BEM Echo (0x18) in-mode → restore the
+  baseline, for both `OM_CanPacket` and `OM_CanPacketASCII`. Opt-in via
+  `ACTISENSE_TEST_PORT` (a real NGX on a live N2K bus); skips cleanly headless
+  so CI stays green. A no-hardware run against the Product Emulator is tracked
+  as a DESKTOP-160 follow-up. Unit coverage for the two new modes (encode +
+  `OperatingModeName`) added to `tests/unit/test_operating_mode.cpp`.
 
 - **Remote BEM sweep: re-enabled NGX-only cases against an NGX-as-remote rig
   (GIT-94).** `test_bem_remote_device.cpp` now ports the two NGX-gated
