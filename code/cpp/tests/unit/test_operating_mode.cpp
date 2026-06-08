@@ -85,6 +85,24 @@ TEST_F(OperatingModeHelperTest, EncodeSet_ConvertNormalMode)
 	EXPECT_EQ(data_[1], 0x00);
 }
 
+TEST_F(OperatingModeHelperTest, EncodeSet_CanPacketMode)
+{
+	/* NGXSW-4207: OM_CanPacket = 5 — raw CAN frames via BST-95. */
+	encodeOperatingModeSetRequest(OperatingMode::OM_CanPacket, data_);
+	ASSERT_EQ(data_.size(), 2u);
+	EXPECT_EQ(data_[0], 0x05);
+	EXPECT_EQ(data_[1], 0x00);
+}
+
+TEST_F(OperatingModeHelperTest, EncodeSet_CanPacketAsciiMode)
+{
+	/* NGXSW-4207: OM_CanPacketASCII = 6 — raw CAN frames in ASCII. */
+	encodeOperatingModeSetRequest(OperatingMode::OM_CanPacketASCII, data_);
+	ASSERT_EQ(data_.size(), 2u);
+	EXPECT_EQ(data_[0], 0x06);
+	EXPECT_EQ(data_[1], 0x00);
+}
+
 TEST_F(OperatingModeHelperTest, EncodeSet_LittleEndianHighByte)
 {
 	/* OM_NORMAL = 512 = 0x0200 — exercises the high byte */
@@ -380,6 +398,14 @@ TEST(OperatingModeNameTest, NamedCases_NgGateway)
 	             "NGT Transfer Raw Mode");
 	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_NGConvertNormalMode),
 	             "NGW Convert Normal Mode");
+}
+
+TEST(OperatingModeNameTest, NamedCases_CanPacket)
+{
+	/* NGXSW-4207: raw CAN-frame transfer modes (firmware modes 5 and 6). */
+	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_CanPacket), "CAN Packet Mode");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_CanPacketASCII),
+	             "CAN Packet ASCII Mode");
 }
 
 TEST(OperatingModeNameTest, NamedCases_BufferAndCombiner)

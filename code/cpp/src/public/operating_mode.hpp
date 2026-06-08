@@ -72,13 +72,14 @@ namespace Actisense
 			OM_NGTransferRxAllMode = 2,
 
 			/**********************************************************************/ /**
-			 \brief    	Raw Rx & Tx Transfers using BST Protocol.
-			 \details  	Rx & Tx PGN Enable Lists are inactive. All CAN packets are
-						 transferred to PC in raw format. No NMEA 2000 processing is
-						 performed, therefore ambiguous to the data protocol used.
-						 Ideal for use as a low-level CAN-Analyser.
-						 NGT: Mode has not yet been implemented.
-						 NGX: Switches to NGT mode, and send raw can packets as BST95
+			 \brief    	Legacy / spare transfer mode slot (mode 3).
+			 \details  	Historically labelled "Raw Rx & Tx Transfers". NGT never
+						 implemented mode 3, and the NGX no longer uses it for raw
+						 CAN — raw CAN-frame transfer moved to OM_CanPacket (5) /
+						 OM_CanPacketASCII (6), matching firmware OperatingModeCodes.h
+						 where mode 3 is now OM_NGTransferSpareMode. The enum value is
+						 retained (not removed) to preserve the public API surface for
+						 existing clients; new code should target OM_CanPacket instead.
 			 \note		Enum value 3.
 			 ***************************************************************************/
 			OM_NGTransferRawMode = 3,
@@ -93,8 +94,33 @@ namespace Actisense
 			 ***************************************************************************/
 			OM_NGConvertNormalMode = 4,
 
+			/* NGX / Gateway raw CAN Operating Modes (5 to 6) --------------------- */
+			/**********************************************************************/ /**
+			 \brief    	CAN Packet mode — raw CAN frames via BST-95.
+			 \details  	Rx & Tx PGN Enable Lists are inactive. All CAN packets are
+						 transferred to / from the PC as raw BST-95 CAN frames, in
+						 both directions. No NMEA 2000 processing is performed, so the
+						 mode is agnostic to the higher-level protocol on the bus —
+						 ideal as a low-level CAN analyser.
+						 NGT: not implemented.
+						 NGX: switches the device to this mode over the serial host
+						 link; only BEM commands are otherwise processed, making it a
+						 serial-wired CAN-analyser mode.
+			 \note		Enum value 5. Matches firmware OperatingModeCodes.h OM_CanPacket.
+			 ***************************************************************************/
+			OM_CanPacket = 5,
 
-			/* ---  Enum values 5 to 15 are reserved for use by Gateway products  --- */
+			/**********************************************************************/ /**
+			 \brief    	CAN Packet mode — raw CAN frames in ASCII.
+			 \details  	As OM_CanPacket, but CAN frames are transferred in ASCII
+						 format rather than as binary BST-95 frames.
+			 \note		Enum value 6. Matches firmware OperatingModeCodes.h
+						 OM_CanPacketASCII.
+			 ***************************************************************************/
+			OM_CanPacketASCII = 6,
+
+
+			/* ---  Enum values 7 to 15 are reserved for use by Gateway products  --- */
 
 			/* Buffer/Combiner Operating Modes  ------------------------------------- */
 			/**********************************************************************/ /**

@@ -39,6 +39,12 @@ namespace Actisense
 				case OperatingMode::OM_NGConvertNormalMode:
 					return "NGW Convert Normal Mode";
 
+				/* NGX / Gateway raw CAN Operating Modes */
+				case OperatingMode::OM_CanPacket:
+					return "CAN Packet Mode";
+				case OperatingMode::OM_CanPacketASCII:
+					return "CAN Packet ASCII Mode";
+
 				/* Buffer/Combiner Operating Modes */
 				case OperatingMode::OM_BUFFER_1:
 					return "Buffer Mode 1";
