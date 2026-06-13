@@ -56,6 +56,7 @@ add_sdk_test(test_session_pgn_list_management test_session_pgn_list_management.c
 
 # API entry point tests
 add_sdk_test(test_api_open test_api_open.cpp)
+add_sdk_test(test_api_open_with_transport test_api_open_with_transport.cpp)
 
 # Wire-trace (hex dump) tests (GIT-63)
 add_sdk_test(test_wire_trace test_wire_trace.cpp)
