@@ -69,6 +69,42 @@ namespace Actisense
 				}
 			}
 
+			openWithTransport(options, std::move(transport), std::move(onEvent),
+							   std::move(onError), std::move(onOpened));
+		}
+
+		/**************************************************************************/ /**
+		 \brief      Open a session over a caller-supplied transport
+		 \param[in]  options    Session options (transport.kind is ignored)
+		 \param[in]  transport  Caller-implemented transport (ownership transferred)
+		 \param[in]  onEvent    Callback for parsed messages and status events
+		 \param[in]  onError    Callback for errors
+		 \param[in]  onOpened   Callback when session is opened (or failed)
+		 \details    Shares the open path used by Api::open(): the transport is
+					 opened via asyncOpen() and, on success, wrapped in a
+					 SessionImpl whose receive loop is started. A null transport or
+					 null onOpened reports ErrorCode::InvalidArgument.
+		 *******************************************************************************/
+		void Api::openWithTransport(const OpenOptions& options, TransportPtr transport,
+									EventCallback onEvent, ErrorCallback onError,
+									SessionOpenedCallback onOpened) {
+			if (!onOpened) {
+				if (onError) {
+					onError(ErrorCode::InvalidArgument,
+							"Api::openWithTransport requires a non-null onOpened");
+				}
+				return;
+			}
+
+			if (!transport) {
+				if (onError) {
+					onError(ErrorCode::InvalidArgument,
+							"Api::openWithTransport requires a non-null transport");
+				}
+				onOpened(ErrorCode::InvalidArgument, nullptr);
+				return;
+			}
+
 			ErrorCode openResult = ErrorCode::Internal;
 			transport->asyncOpen(options.transport,
 								 [&openResult](ErrorCode code) { openResult = code; });
