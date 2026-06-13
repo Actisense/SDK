@@ -21,6 +21,7 @@
 #include "public/events.hpp"
 #include "public/serial_device_info.hpp"
 #include "public/session.hpp"
+#include "public/transport.hpp"
 #include "public/version.hpp"
 
 namespace Actisense
@@ -93,6 +94,27 @@ namespace Actisense
 			[[nodiscard]] static std::unique_ptr<Session>
 			createSerialSession(const SerialConfig& config, EventCallback onEvent,
 								ErrorCallback onError);
+
+			/**************************************************************************/ /**
+			 \brief      Open a session over a caller-supplied transport
+			 \param[in]  options    Session options (timeouts, protocols). The
+									transport.kind field is ignored - the supplied
+									transport is used as-is.
+			 \param[in]  transport  Caller-implemented transport; ownership is
+									transferred to the session on success.
+			 \param[in]  onEvent    Callback for parsed messages and status events
+			 \param[in]  onError    Callback for errors
+			 \param[in]  onOpened   Callback when session is opened (or failed)
+			 \details    Bypasses the built-in TransportKind selection so callers
+						 can drive the SDK over their own ITransport implementation
+						 (e.g. a test harness bridging to an emulated device). The
+						 transport is opened via asyncOpen() using options.transport
+						 before the session is created. A null transport or null
+						 onOpened reports ErrorCode::InvalidArgument.
+			 *******************************************************************************/
+			static void openWithTransport(const OpenOptions& options, TransportPtr transport,
+										  EventCallback onEvent, ErrorCallback onError,
+										  SessionOpenedCallback onOpened);
 
 		private:
 			Api() = delete;
