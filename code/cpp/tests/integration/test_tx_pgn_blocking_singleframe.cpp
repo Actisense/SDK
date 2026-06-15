@@ -411,13 +411,17 @@ protected:
 		rxFrames_.clear();
 	}
 
-	/* Wait up to @p timeout for a frame whose (pgn, payload-from-byte-1)
-	   match what we sent. Byte 0 of many N2K PGNs is a firmware-managed
-	   Sequence ID (SID) which the NGX rewrites between sendPgn and the
-	   wire (verified empirically on PGN 126992 - we sent F4 in byte 0
-	   and got 02 back, but bytes 1..7 of our random pattern arrived
-	   intact). Bytes 1..7 are still seven bytes of unique-per-run salted
-	   random data, which keeps the fingerprint specific enough that no
+	/* Wait up to @p timeout for a frame whose (pgn, payload) match what we
+	   sent. Byte 0 of many N2K PGNs is a firmware-managed Sequence ID
+	   (SID). NGT-1 (legacy, unfixable) rewrites it between sendPgn and the
+	   wire (verified empirically on PGN 126992 - we sent F4 in byte 0 and
+	   got 02 back, but bytes 1..7 of our random pattern arrived intact), so
+	   for NGT-1 we compare from byte 1 only. NGX-1 / WGX firmware preserves
+	   the host-supplied SID after NGXSW-3897, so byte 0 must match there and
+	   the full 8-byte payload is compared (GIT-109). The byte-0 exemption is
+	   gated on the DUT model via rewritesHostTxSidByte0() so NGT-1 rigs stay
+	   green. Bytes 1..7 are seven bytes of unique-per-run salted random data
+	   either way, which keeps the fingerprint specific enough that no
 	   unrelated bus traffic will collide.
 
 	   getCanConfig only reports the stored preferred SA, not the live
@@ -427,6 +431,9 @@ protected:
 	bool waitForMatch(uint32_t pgn, std::span<const uint8_t> payload,
 	                  std::chrono::milliseconds timeout)
 	{
+		/* NGT-1 rewrites the SID at byte 0 on host-Tx; every other model
+		   (NGX/WGX post-NGXSW-3897) preserves it, so compare from byte 0. */
+		const std::size_t cmpStart = rewritesHostTxSidByte0(dutModelId_) ? 1u : 0u;
 		const auto deadline = std::chrono::steady_clock::now() + timeout;
 		std::unique_lock<std::mutex> lk(rxMutex_);
 		while (true) {
@@ -436,11 +443,11 @@ protected:
 				if (f.pgn != pgn) {
 					continue;
 				}
-				if (f.data.size() < payload.size() || payload.size() < 2) {
+				if (f.data.size() < payload.size() || payload.size() <= cmpStart) {
 					continue;
 				}
-				if (!std::equal(payload.begin() + 1, payload.end(),
-				                f.data.begin() + 1)) {
+				if (!std::equal(payload.begin() + cmpStart, payload.end(),
+				                f.data.begin() + cmpStart)) {
 					continue;
 				}
 				if (!observedDutSa_.has_value()) {

@@ -155,6 +155,32 @@ namespace Actisense
 			}
 		}
 
+		/**************************************************************************/ /**
+		 \brief      True when a model rewrites byte 0 (the N2K Sequence ID /
+					 SID) of a host-injected single-frame / fast-packet PGN on
+					 the host-Tx path, so byte 0 cannot be matched against what
+					 sendPgn supplied.
+		 \details    The NGT-1 N2K stack overwrites the SID field of host-Tx
+					 BST 94 / D0 frames with its own running sequence counter
+					 (empirically: sent F4 on PGN 126992, observed 02 on the
+					 wire). NGT-1 went EOL ~2 years ago so this is not fixable
+					 in firmware. NGX-1 / WGX firmware preserves the host-
+					 supplied SID after NGXSW-3897, so byte 0 must match there.
+					 Integration tests gate their byte-0 comparison on this so
+					 NGT-1 rigs stay green while NGX/WGX get full-payload
+					 verification (GIT-109). Future legacy models needing the
+					 same exemption add an explicit case here.
+		 *******************************************************************************/
+		[[nodiscard]] inline bool rewritesHostTxSidByte0(uint16_t modelId) {
+			switch (static_cast<ArlModelId>(modelId)) {
+				case ArlModelId::NGT1:
+				case ArlModelId::NGT1_USB:
+					return true;
+				default:
+					return false;
+			}
+		}
+
 	} /* namespace Sdk */
 } /* namespace Actisense */
 

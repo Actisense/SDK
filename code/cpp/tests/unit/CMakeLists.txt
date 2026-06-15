@@ -66,3 +66,6 @@ add_sdk_test(test_ebl_writer test_ebl_writer.cpp)
 
 # macOS enumerator composition tests (GIT-70) — pure C++, runs on all platforms
 add_sdk_test(test_enumerate_serial_devices_macos test_enumerate_serial_devices_macos.cpp)
+
+# ArlModelId helper predicates incl. GIT-109 host-Tx SID byte-0 model gate
+add_sdk_test(test_model_id_helpers test_model_id_helpers.cpp)

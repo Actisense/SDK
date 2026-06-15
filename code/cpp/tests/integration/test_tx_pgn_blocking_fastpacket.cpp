@@ -43,8 +43,11 @@
               is forced to 0 — same rationale as GIT-89 / GIT-103 (NGT-1's
               CreateDuplicateTxObject path is broken; default tx_object
               has data_inst_ == 0, mismatches are silently dropped).
-            * Match still skips byte 0 (firmware SID rewrite on host-Tx).
-              For 51-byte payloads that still leaves 50 salted bytes of
+            * Match skips byte 0 only on NGT-1 (legacy SID rewrite on
+              host-Tx, unfixable); NGX-1 / WGX preserve the host-supplied
+              SID after NGXSW-3897 so byte 0 is compared too — gated on the
+              DUT model via rewritesHostTxSidByte0() (GIT-109). For 51-byte
+              payloads even the byte-0-skip path leaves 50 salted bytes of
               fingerprint, which is more than enough to disambiguate from
               any unrelated bus traffic.
             * On the receive side the BST-D0 frame's data() span carries
@@ -410,18 +413,23 @@ protected:
 		rxFrames_.clear();
 	}
 
-	/* Wait up to @p timeout for a frame matching (pgn, payload-from-byte-1).
-	   Byte 0 of fast-packet PGNs that carry an SID is rewritten by the
+	/* Wait up to @p timeout for a frame matching (pgn, payload).
+	   Byte 0 of fast-packet PGNs that carry an SID is rewritten by NGT-1
 	   firmware between sendPgn and the wire (same path as the single-frame
-	   case — verified empirically on PGN 126992). For PGNs without an SID
-	   that rewrite never fires, but the salted bytes 1..N-1 are unique
-	   enough that the byte-0 skip costs us nothing. The receiver's data()
-	   span is the *reassembled* fast-packet payload from the BST-D0 frame,
-	   so length-mismatch (sender saw N2K-defined length, gateway delivered
-	   fewer bytes) shows up here as a continue-and-time-out. */
+	   case — verified empirically on PGN 126992). NGT-1 (legacy, unfixable)
+	   therefore has byte 0 skipped; NGX-1 / WGX preserve the host-supplied
+	   SID after NGXSW-3897 so byte 0 must match and the full payload is
+	   compared (GIT-109). The exemption is gated on the DUT model via
+	   rewritesHostTxSidByte0() so NGT-1 rigs stay green. The receiver's
+	   data() span is the *reassembled* fast-packet payload from the BST-D0
+	   frame, so length-mismatch (sender saw N2K-defined length, gateway
+	   delivered fewer bytes) shows up here as a continue-and-time-out. */
 	bool waitForMatch(uint32_t pgn, std::span<const uint8_t> payload,
 	                  std::chrono::milliseconds timeout)
 	{
+		/* NGT-1 rewrites the SID at byte 0 on host-Tx; every other model
+		   (NGX/WGX post-NGXSW-3897) preserves it, so compare from byte 0. */
+		const std::size_t cmpStart = rewritesHostTxSidByte0(dutModelId_) ? 1u : 0u;
 		const auto deadline = std::chrono::steady_clock::now() + timeout;
 		std::unique_lock<std::mutex> lk(rxMutex_);
 		while (true) {
@@ -431,11 +439,11 @@ protected:
 				if (f.pgn != pgn) {
 					continue;
 				}
-				if (f.data.size() < payload.size() || payload.size() < 2) {
+				if (f.data.size() < payload.size() || payload.size() <= cmpStart) {
 					continue;
 				}
-				if (!std::equal(payload.begin() + 1, payload.end(),
-				                f.data.begin() + 1)) {
+				if (!std::equal(payload.begin() + cmpStart, payload.end(),
+				                f.data.begin() + cmpStart)) {
 					continue;
 				}
 				if (!observedDutSa_.has_value()) {
