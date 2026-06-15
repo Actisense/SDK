@@ -40,7 +40,9 @@ set(PUBLIC_HEADERS
 set(SDK_SOURCES
     # Core
     core/error_category.cpp
+    core/session.cpp
     core/session_impl.cpp
+    core/remote_device.cpp
     core/remote_device_impl.cpp
     core/logger.cpp
     core/metrics_collector.cpp

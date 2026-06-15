@@ -27,107 +27,107 @@ namespace Actisense
 
 		/* Definitions ---------------------------------------------------------- */
 
-		class RemoteDeviceImpl final : public RemoteDevice
+		class RemoteDevice::Impl final
 		{
 		public:
-			RemoteDeviceImpl(SessionImpl& session, uint8_t n2kSourceAddress) noexcept;
-			~RemoteDeviceImpl() override = default;
+			Impl(SessionImpl& session, uint8_t n2kSourceAddress) noexcept;
+			~Impl() = default;
 
-			[[nodiscard]] uint8_t n2kSourceAddress() const noexcept override { return src_addr_; }
+			[[nodiscard]] uint8_t n2kSourceAddress() const noexcept { return src_addr_; }
 
 			void getOperatingMode(std::chrono::milliseconds timeout,
-								  OperatingModeCallback callback) override;
+								  OperatingModeCallback callback);
 
 			void setOperatingMode(OperatingMode mode, std::chrono::milliseconds timeout,
-								  BemResultCallback callback) override;
+								  BemResultCallback callback);
 
 			void getHardwareInfo(std::chrono::milliseconds timeout,
-								 HardwareInfoCallback callback) override;
+								 HardwareInfoCallback callback);
 
 			void reInitMainApp(std::chrono::milliseconds timeout,
-							   BemResultCallback callback) override;
+							   BemResultCallback callback);
 
 			void commitToEeprom(std::chrono::milliseconds timeout,
-								BemResultCallback callback) override;
+								BemResultCallback callback);
 
 			void commitToFlash(std::chrono::milliseconds timeout,
-							   BemResultCallback callback) override;
+							   BemResultCallback callback);
 
 			void getPortBaudrate(uint8_t portNumber, std::chrono::milliseconds timeout,
-								 PortBaudrateCallback callback) override;
+								 PortBaudrateCallback callback);
 			void setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud, uint32_t storeBaud,
 								 std::chrono::milliseconds timeout,
-								 BemResultCallback callback) override;
+								 BemResultCallback callback);
 
 			void getPortPCode(std::chrono::milliseconds timeout,
-							  PortPCodeCallback callback) override;
+							  PortPCodeCallback callback);
 			void setPortPCode(std::span<const uint8_t> pCodes, std::chrono::milliseconds timeout,
-							  BemResultCallback callback) override;
+							  BemResultCallback callback);
 
 			void getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
-								RxPgnEnableCallback callback) override;
+								RxPgnEnableCallback callback);
 			void setRxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
-								BemResultCallback callback) override;
+								BemResultCallback callback);
 			void setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
 										std::chrono::milliseconds timeout,
-										BemResultCallback callback) override;
+										BemResultCallback callback);
 
 			void getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
-								TxPgnEnableCallback callback) override;
+								TxPgnEnableCallback callback);
 			void setTxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
-								BemResultCallback callback) override;
+								BemResultCallback callback);
 			void setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
 										std::chrono::milliseconds timeout,
-										BemResultCallback callback) override;
+										BemResultCallback callback);
 
 			void getRxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
-									  RxPgnEnableListF2ResultCallback callback) override;
+									  RxPgnEnableListF2ResultCallback callback);
 			void getTxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
-									  TxPgnEnableListF2ResultCallback callback) override;
+									  TxPgnEnableListF2ResultCallback callback);
 			void getSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
 									 std::chrono::milliseconds timeout,
-									 BemResultCallback callback) override;
+									 BemResultCallback callback);
 			void getSupportedPgnList_All(std::chrono::milliseconds perGetTimeout,
-										 SupportedPgnListResultCallback callback) override;
+										 SupportedPgnListResultCallback callback);
 
 			void getTotalTime(std::chrono::milliseconds timeout,
-							  TotalTimeCallback callback) override;
+							  TotalTimeCallback callback);
 			void setTotalTime(uint32_t totalTime, uint32_t passkey,
 							  std::chrono::milliseconds timeout,
-							  BemResultCallback callback) override;
+							  BemResultCallback callback);
 
 			void echo(std::span<const uint8_t> data, std::chrono::milliseconds timeout,
-					  EchoCallback callback) override;
+					  EchoCallback callback);
 
 			void getProductInfo(std::chrono::milliseconds timeout,
-								ProductInfoCallback callback) override;
+								ProductInfoCallback callback);
 
 			void getCanConfig(std::chrono::milliseconds timeout,
-							  CanConfigCallback callback) override;
+							  CanConfigCallback callback);
 			void setCanConfig(uint64_t name, uint8_t sourceAddress,
 							  std::chrono::milliseconds timeout,
-							  BemResultCallback callback) override;
+							  BemResultCallback callback);
 
 			void getCanInfoField1(std::chrono::milliseconds timeout,
-								  CanInfoFieldCallback callback) override;
+								  CanInfoFieldCallback callback);
 			void setCanInfoField1(const std::string& text, std::chrono::milliseconds timeout,
-								  BemResultCallback callback) override;
+								  BemResultCallback callback);
 			void getCanInfoField2(std::chrono::milliseconds timeout,
-								  CanInfoFieldCallback callback) override;
+								  CanInfoFieldCallback callback);
 			void setCanInfoField2(const std::string& text, std::chrono::milliseconds timeout,
-								  BemResultCallback callback) override;
+								  BemResultCallback callback);
 			void getCanInfoField3(std::chrono::milliseconds timeout,
-								  CanInfoFieldCallback callback) override;
+								  CanInfoFieldCallback callback);
 
 			void deletePgnEnableLists(uint8_t selector, std::chrono::milliseconds timeout,
-									  BemResultCallback callback) override;
+									  BemResultCallback callback);
 			void activatePgnEnableLists(std::chrono::milliseconds timeout,
-										BemResultCallback callback) override;
+										BemResultCallback callback);
 			void defaultPgnEnableList(DeletePgnListSelector selector,
 									  std::chrono::milliseconds timeout,
-									  BemResultCallback callback) override;
+									  BemResultCallback callback);
 			void getParamsPgnEnableLists(std::chrono::milliseconds timeout,
-										 ParamsPgnEnableListsCallback callback) override;
+										 ParamsPgnEnableListsCallback callback);
 
 			/* Concrete-only typed BEM verbs (BemResponseCallback). These mirror
 			   the SessionImpl-equivalent helpers and let internal callers
@@ -176,7 +176,7 @@ namespace Actisense
 									 BemResponseCallback callback);
 
 			/* Aggregated PGN-list verbs (GIT-86 / GIT-90) live above as
-			   public virtual overrides — no internal-only mirror needed. */
+			   public virtuals — no internal-only mirror needed. */
 
 			void getProductInfo(std::chrono::milliseconds timeout, BemResponseCallback callback);
 
@@ -206,6 +206,38 @@ namespace Actisense
 			SessionImpl& session_;
 			uint8_t src_addr_;
 		};
+
+		/* Alias preserving the historical concrete-class name for internal
+		   callers and tests that name the implementation directly. */
+		using RemoteDeviceImpl = RemoteDevice::Impl;
+
+		namespace detail
+		{
+			/**************************************************************************/ /**
+			 \brief      Sanctioned internal bridge between the public RemoteDevice
+						 pimpl facade and its implementation (GIT-115).
+			 \details    Lets Session::openRemote wrap an already-built
+						 implementation in a RemoteDevice handle, and lets internal
+						 callers reach the implementation behind a handle they were
+						 given. Not part of the public API.
+			 *******************************************************************************/
+			struct RemoteDeviceAccess
+			{
+				[[nodiscard]] static RemoteDevice::Impl& impl(RemoteDevice& device) noexcept {
+					return *device.impl_;
+				}
+
+				[[nodiscard]] static const RemoteDevice::Impl&
+				impl(const RemoteDevice& device) noexcept {
+					return *device.impl_;
+				}
+
+				[[nodiscard]] static std::unique_ptr<RemoteDevice>
+				wrap(std::unique_ptr<RemoteDevice::Impl> impl) {
+					return std::unique_ptr<RemoteDevice>(new RemoteDevice(std::move(impl)));
+				}
+			};
+		} /* namespace detail */
 
 	} /* namespace Sdk */
 } /* namespace Actisense */

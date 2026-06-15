@@ -3,8 +3,12 @@
 
 /**************************************************************************/ /**
  \file       session.hpp
- \brief      Session interface for Actisense SDK
- \details    Abstract session class for protocol-aware device communication
+ \brief      Session handle for Actisense SDK
+ \details    Protocol-aware device communication handle. Session is a
+			 non-polymorphic, move-only, ABI-stable pimpl facade: every method
+			 forwards one-line to an opaque implementation held via
+			 std::unique_ptr. Growing the API appends member symbols rather than
+			 mutating a vtable (GIT-115).
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -33,6 +37,11 @@ namespace Actisense
 		/* Forward declarations ------------------------------------------------- */
 		class RemoteDevice;
 
+		namespace detail
+		{
+			struct SessionAccess;
+		} /* namespace detail */
+
 		/* Definitions ---------------------------------------------------------- */
 
 		/**************************************************************************/ /**
@@ -45,14 +54,27 @@ namespace Actisense
 		   public/bem_callbacks.hpp — shared between Session and RemoteDevice. */
 
 		/**************************************************************************/ /**
-		 \brief      Abstract session interface for device communication
-		 \details    Sessions are created via Sdk::open() and manage the lifetime
-					 of transport, protocols, and async operations.
+		 \brief      Session handle for device communication
+		 \details    Sessions are created via the Api facade (createSerialSession /
+					 open / openWithTransport) and manage the lifetime of transport,
+					 protocols, and async operations.
+
+					 ABI: Session is a final, non-polymorphic class whose only data
+					 member is a std::unique_ptr to an opaque implementation. It has
+					 no vtable, so sizeof(Session) == sizeof(a pointer) and adding a
+					 new verb only appends a member symbol — the binary layout of
+					 shipped consumers is unaffected (GIT-115).
 		 *******************************************************************************/
-		class Session
+		class Session final
 		{
 		public:
-			virtual ~Session() = default;
+			/**************************************************************************/ /**
+			 \brief      Opaque implementation type.
+			 \details    Defined internally (see core/session_impl.hpp). Forward
+						 declared here only so the pimpl unique_ptr has a type;
+						 it is incomplete to consumers and cannot be used directly.
+			 *******************************************************************************/
+			class Impl;
 
 			/**************************************************************************/ /**
 			 \brief      Selects how an asyncSend() payload is wrapped before it
@@ -70,13 +92,12 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Send a message asynchronously
 			 \param[in]  protocol    Wrapping to apply to @p payload (Bst or Raw).
-									 Replaces the former stringly-typed selector.
 			 \param[in]  payload     Bytes to send. See @p protocol for the
 									 expected layout.
 			 \param[in]  completion  Callback invoked on completion or error
 			 *******************************************************************************/
-			virtual void asyncSend(SendProtocol protocol, std::span<const uint8_t> payload,
-								   SendCompletion completion) = 0;
+			void asyncSend(SendProtocol protocol, std::span<const uint8_t> payload,
+						   SendCompletion completion);
 
 			/**************************************************************************/ /**
 			 \brief      Send a NMEA 2000 PGN message
@@ -89,17 +110,15 @@ namespace Actisense
 			 \param[in]  completion   Optional completion callback
 			 \details    Wraps a BST-94 frame and dispatches it via asyncSend.
 			 *******************************************************************************/
-			virtual void sendPgn(uint32_t pgn, std::span<const uint8_t> payload,
-								 uint8_t destination = 0xFF, uint8_t priority = 6,
-								 SendCompletion completion = {}) = 0;
+			void sendPgn(uint32_t pgn, std::span<const uint8_t> payload, uint8_t destination = 0xFF,
+						 uint8_t priority = 6, SendCompletion completion = {});
 
 			/**************************************************************************/ /**
 			 \brief      Get the device's current operating mode
 			 \param[in]  timeout   Response timeout
 			 \param[in]  callback  Invoked with the decoded mode (or an error)
 			 *******************************************************************************/
-			virtual void getOperatingMode(std::chrono::milliseconds timeout,
-										  OperatingModeCallback callback) = 0;
+			void getOperatingMode(std::chrono::milliseconds timeout, OperatingModeCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set the device's operating mode
@@ -109,8 +128,8 @@ namespace Actisense
 			 \note       Some devices restart their protocol stacks when the mode
 						 changes; expect a brief gap in received traffic.
 			 *******************************************************************************/
-			virtual void setOperatingMode(OperatingMode mode, std::chrono::milliseconds timeout,
-										  BemResultCallback callback) = 0;
+			void setOperatingMode(OperatingMode mode, std::chrono::milliseconds timeout,
+								  BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Get the device's product / hardware information
@@ -120,8 +139,7 @@ namespace Actisense
 						 serial number, software version, etc.) reported by the
 						 connected gateway.
 			 *******************************************************************************/
-			virtual void getHardwareInfo(std::chrono::milliseconds timeout,
-										 HardwareInfoCallback callback) = 0;
+			void getHardwareInfo(std::chrono::milliseconds timeout, HardwareInfoCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Open a handle for issuing BEM commands to a remote
@@ -131,8 +149,7 @@ namespace Actisense
 										   locally connected gateway.
 			 \return     Owning handle. Must not outlive the session.
 			 *******************************************************************************/
-			[[nodiscard]] virtual std::unique_ptr<RemoteDevice>
-			openRemote(uint8_t n2kSourceAddress) = 0;
+			[[nodiscard]] std::unique_ptr<RemoteDevice> openRemote(uint8_t n2kSourceAddress);
 
 			/**************************************************************************/ /**
 			 \brief      Transport label reported in ResponseOrigin::transportId
@@ -143,35 +160,35 @@ namespace Actisense
 						 one user callback aggregates replies from multiple
 						 concurrent Sessions and needs to disambiguate.
 			 *******************************************************************************/
-			[[nodiscard]] virtual std::string_view transportLabel() const noexcept = 0;
+			[[nodiscard]] std::string_view transportLabel() const noexcept;
 
 			/**************************************************************************/ /**
 			 \brief      Override the transport label used in ResponseOrigin.
 			 *******************************************************************************/
-			virtual void setTransportLabel(std::string label) = 0;
+			void setTransportLabel(std::string label);
 
 			/**************************************************************************/ /**
 			 \brief      Close the session gracefully
 			 \details    Flushes pending writes, closes transport
 			 *******************************************************************************/
-			virtual void close() = 0;
+			void close();
 
 			/**************************************************************************/ /**
 			 \brief      Check if session is connected
 			 \return     True if transport is open and session is active
 			 *******************************************************************************/
-			[[nodiscard]] virtual bool isConnected() const noexcept = 0;
+			[[nodiscard]] bool isConnected() const noexcept;
 
 			/**************************************************************************/ /**
 			 \brief      Get current session metrics snapshot
 			 \return     Copy of all current metrics (thread-safe)
 			 *******************************************************************************/
-			[[nodiscard]] virtual SessionMetrics metrics() const = 0;
+			[[nodiscard]] SessionMetrics metrics() const;
 
 			/**************************************************************************/ /**
 			 \brief      Reset all metrics counters to zero
 			 *******************************************************************************/
-			virtual void resetMetrics() = 0;
+			void resetMetrics();
 
 			/**************************************************************************/ /**
 			 \brief      Enable a wire-trace sink for this session
@@ -183,7 +200,7 @@ namespace Actisense
 						 not block. Replacing an existing sink is safe; the
 						 previous sink is released after the swap completes.
 			 *******************************************************************************/
-			virtual void setWireTrace(WireTraceConfig config, WireTraceSink sink) = 0;
+			void setWireTrace(WireTraceConfig config, WireTraceSink sink);
 
 			/**************************************************************************/ /**
 			 \brief      Disable any active wire-trace sink
@@ -191,14 +208,37 @@ namespace Actisense
 						 the session's hot path is a single atomic load and
 						 performs no allocation per wire event.
 			 *******************************************************************************/
-			virtual void clearWireTrace() = 0;
+			void clearWireTrace();
 
-		protected:
-			Session() = default;
+			/* Lifecycle --------------------------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Destructor — closes the session and releases the impl.
+			 *******************************************************************************/
+			~Session();
+
+			/* Move-only: the handle owns a unique_ptr<Impl>. Copy is deleted; move
+			   transfers ownership. Defined out-of-line where Impl is complete. */
+			Session(Session&& other) noexcept;
+			Session& operator=(Session&& other) noexcept;
 
 		private:
+			/* The Api facade and openRemote mint Session handles; the access shim
+			   wraps an owned Impl into a handle and reaches the Impl behind one. */
+			friend struct detail::SessionAccess;
+
+			/**************************************************************************/ /**
+			 \brief      Construct a handle adopting an already-built implementation.
+			 \details    Only reachable via detail::SessionAccess (the Api facade
+						 and Session::openRemote). External callers obtain a Session
+						 through the Api facade.
+			 *******************************************************************************/
+			explicit Session(std::unique_ptr<Impl> impl) noexcept;
+
 			Session(const Session&) = delete;
 			Session& operator=(const Session&) = delete;
+
+			std::unique_ptr<Impl> impl_;
 		};
 
 	} /* namespace Sdk */

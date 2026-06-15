@@ -22,8 +22,11 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      SDK version numbers (compile-time constants)
 		 *******************************************************************************/
+		/* 0.5.0 marks the GIT-115 ABI baseline: Session and RemoteDevice became
+		   final, non-polymorphic pimpl handles (one-time intentional ABI break;
+		   source-compatible). Future verbs append symbols, not vtable slots. */
 		constexpr int VERSION_MAJOR = 0;
-		constexpr int VERSION_MINOR = 4;
+		constexpr int VERSION_MINOR = 5;
 		constexpr int VERSION_PATCH = 0;
 
 		/**************************************************************************/ /**

@@ -39,10 +39,14 @@ namespace Actisense
 		   (included transitively via public/session.hpp). */
 
 		/**************************************************************************/ /**
-		 \brief      Concrete session implementation
-		 \details    Manages transport, protocol parsing, and async operations
+		 \brief      Concrete session implementation (the opaque body behind the
+					 public Session pimpl facade — see public/session.hpp).
+		 \details    Manages transport, protocol parsing, and async operations.
+					 Each public Session verb forwards one-line to the like-named
+					 method here; the additional non-forwarded methods below are
+					 the internal surface used by RemoteDevice::Impl and tests.
 		 *******************************************************************************/
-		class SessionImpl final : public Session
+		class Session::Impl final
 		{
 		public:
 			/**************************************************************************/ /**
@@ -51,35 +55,31 @@ namespace Actisense
 			 \param[in]  eventCallback   Callback for parsed events
 			 \param[in]  errorCallback   Callback for errors
 			 *******************************************************************************/
-			SessionImpl(TransportPtr transport, EventCallback eventCallback,
-						ErrorCallback errorCallback);
+			Impl(TransportPtr transport, EventCallback eventCallback, ErrorCallback errorCallback);
 
 			/**************************************************************************/ /**
 			 \brief      Destructor
 			 *******************************************************************************/
-			~SessionImpl() override;
+			~Impl();
 
-			/* Session interface ---------------------------------------------------- */
+			/* Session interface (forwarded to by the public facade) ---------------- */
 
 			void asyncSend(SendProtocol protocol, std::span<const uint8_t> payload,
-						   SendCompletion completion) override;
+						   SendCompletion completion);
 
 			void sendPgn(uint32_t pgn, std::span<const uint8_t> payload, uint8_t destination = 0xFF,
-						 uint8_t priority = 6, SendCompletion completion = {}) override;
+						 uint8_t priority = 6, SendCompletion completion = {});
 
-			void getOperatingMode(std::chrono::milliseconds timeout,
-								  OperatingModeCallback callback) override;
+			void getOperatingMode(std::chrono::milliseconds timeout, OperatingModeCallback callback);
 
 			void setOperatingMode(OperatingMode mode, std::chrono::milliseconds timeout,
-								  BemResultCallback callback) override;
+								  BemResultCallback callback);
 
-			void getHardwareInfo(std::chrono::milliseconds timeout,
-								 HardwareInfoCallback callback) override;
+			void getHardwareInfo(std::chrono::milliseconds timeout, HardwareInfoCallback callback);
 
-			[[nodiscard]] std::unique_ptr<RemoteDevice>
-			openRemote(uint8_t n2kSourceAddress) override;
+			[[nodiscard]] std::unique_ptr<RemoteDevice> openRemote(uint8_t n2kSourceAddress);
 
-			[[nodiscard]] std::string_view transportLabel() const noexcept override {
+			[[nodiscard]] std::string_view transportLabel() const noexcept {
 				return transport_label_;
 			}
 
@@ -90,7 +90,7 @@ namespace Actisense
 			   sets it before startReceiving()), never concurrently with an active
 			   receive thread. The returned string_view is likewise only valid for
 			   as long as the label is not re-set. */
-			void setTransportLabel(std::string label) override {
+			void setTransportLabel(std::string label) {
 				transport_label_ = std::move(label);
 			}
 
@@ -109,17 +109,17 @@ namespace Actisense
 			 *******************************************************************************/
 			[[nodiscard]] ResponseOrigin makeRemoteOrigin(uint8_t remoteN2kSourceAddress) const;
 
-			void close() override;
+			void close();
 
-			[[nodiscard]] bool isConnected() const noexcept override;
+			[[nodiscard]] bool isConnected() const noexcept;
 
-			[[nodiscard]] SessionMetrics metrics() const override;
+			[[nodiscard]] SessionMetrics metrics() const;
 
-			void resetMetrics() override;
+			void resetMetrics();
 
-			void setWireTrace(WireTraceConfig config, WireTraceSink sink) override;
+			void setWireTrace(WireTraceConfig config, WireTraceSink sink);
 
-			void clearWireTrace() override;
+			void clearWireTrace();
 
 			/* Session-specific methods --------------------------------------------- */
 
@@ -762,6 +762,37 @@ namespace Actisense
 			mutable std::mutex wire_trace_mutex_;
 			std::shared_ptr<WireTraceState> wire_trace_state_;
 		};
+
+		/* Alias preserving the historical concrete-class name for internal
+		   callers and tests that construct or hold the implementation directly. */
+		using SessionImpl = Session::Impl;
+
+		namespace detail
+		{
+			/**************************************************************************/ /**
+			 \brief      Sanctioned internal bridge between the public Session pimpl
+						 facade and its implementation (GIT-115).
+			 \details    Lets the Api facade wrap an already-built implementation in
+						 a Session handle, and lets internal callers reach the
+						 implementation behind a handle they were given. Not part of
+						 the public API.
+			 *******************************************************************************/
+			struct SessionAccess
+			{
+				[[nodiscard]] static Session::Impl& impl(Session& session) noexcept {
+					return *session.impl_;
+				}
+
+				[[nodiscard]] static const Session::Impl& impl(const Session& session) noexcept {
+					return *session.impl_;
+				}
+
+				[[nodiscard]] static std::unique_ptr<Session>
+				wrap(std::unique_ptr<Session::Impl> impl) {
+					return std::unique_ptr<Session>(new Session(std::move(impl)));
+				}
+			};
+		} /* namespace detail */
 
 		/**************************************************************************/ /**
 		 \brief      Create a session with serial transport

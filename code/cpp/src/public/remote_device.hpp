@@ -18,12 +18,18 @@
 			cancels any of this handle's outstanding requests with
 			ErrorCode::Canceled.
 
+			ABI: RemoteDevice is a final, non-polymorphic, move-only pimpl
+			facade — its only data member is a std::unique_ptr to an opaque
+			implementation, so it has no vtable and adding a verb appends a
+			member symbol without perturbing layout (GIT-115).
+
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 ==============================================================================*/
 
 /* Dependent includes ------------------------------------------------------- */
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string>
 
@@ -33,6 +39,18 @@ namespace Actisense
 {
 	namespace Sdk
 	{
+		/* Forward declarations ------------------------------------------------- */
+
+		/* Defined in the BEM command layer (delete_pgn_enable_lists.hpp).
+		   Forward-declared here so this public header is self-contained; callers
+		   that pass a concrete selector value include the defining header. */
+		enum class DeletePgnListSelector : uint8_t;
+
+		namespace detail
+		{
+			struct RemoteDeviceAccess;
+		} /* namespace detail */
+
 		/* Definitions ---------------------------------------------------------- */
 
 		/**************************************************************************/ /**
@@ -43,23 +61,29 @@ namespace Actisense
 					 produce many RemoteDevice handles, one per addressable
 					 device on the bus.
 		 *******************************************************************************/
-		class RemoteDevice
+		class RemoteDevice final
 		{
 		public:
-			virtual ~RemoteDevice() = default;
+			/**************************************************************************/ /**
+			 \brief      Opaque implementation type.
+			 \details    Defined internally (see core/remote_device_impl.hpp).
+						 Forward declared here only so the pimpl unique_ptr has a
+						 type; it is incomplete to consumers and cannot be used
+						 directly.
+			 *******************************************************************************/
+			class Impl;
 
 			/**************************************************************************/ /**
 			 \brief      N2K source address this handle targets
 			 *******************************************************************************/
-			[[nodiscard]] virtual uint8_t n2kSourceAddress() const noexcept = 0;
+			[[nodiscard]] uint8_t n2kSourceAddress() const noexcept;
 
 			/**************************************************************************/ /**
 			 \brief      Get the remote device's current operating mode
 			 \param[in]  timeout   Response timeout
 			 \param[in]  callback  Invoked with the decoded mode (or an error)
 			 *******************************************************************************/
-			virtual void getOperatingMode(std::chrono::milliseconds timeout,
-										  OperatingModeCallback callback) = 0;
+			void getOperatingMode(std::chrono::milliseconds timeout, OperatingModeCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set the remote device's operating mode
@@ -67,16 +91,15 @@ namespace Actisense
 			 \param[in]  timeout   Response timeout
 			 \param[in]  callback  Invoked with the device's acknowledgement
 			 *******************************************************************************/
-			virtual void setOperatingMode(OperatingMode mode, std::chrono::milliseconds timeout,
-										  BemResultCallback callback) = 0;
+			void setOperatingMode(OperatingMode mode, std::chrono::milliseconds timeout,
+								  BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Get the remote device's product / hardware information
 			 \param[in]  timeout   Response timeout
 			 \param[in]  callback  Invoked with the decoded HardwareInfo (or an error)
 			 *******************************************************************************/
-			virtual void getHardwareInfo(std::chrono::milliseconds timeout,
-										 HardwareInfoCallback callback) = 0;
+			void getHardwareInfo(std::chrono::milliseconds timeout, HardwareInfoCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Reinitialise the remote device's main application (reboot).
@@ -85,24 +108,21 @@ namespace Actisense
 			 \note       Many devices reboot before sending a reply, in which
 						 case the callback fires with ErrorCode::Timeout.
 			 *******************************************************************************/
-			virtual void reInitMainApp(std::chrono::milliseconds timeout,
-									   BemResultCallback callback) = 0;
+			void reInitMainApp(std::chrono::milliseconds timeout, BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Commit the remote device's session settings to EEPROM.
 			 \param[in]  timeout   Response timeout
 			 \param[in]  callback  Invoked with the device's acknowledgement
 			 *******************************************************************************/
-			virtual void commitToEeprom(std::chrono::milliseconds timeout,
-										BemResultCallback callback) = 0;
+			void commitToEeprom(std::chrono::milliseconds timeout, BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Commit the remote device's session settings to FLASH.
 			 \param[in]  timeout   Response timeout
 			 \param[in]  callback  Invoked with the device's acknowledgement
 			 *******************************************************************************/
-			virtual void commitToFlash(std::chrono::milliseconds timeout,
-									   BemResultCallback callback) = 0;
+			void commitToFlash(std::chrono::milliseconds timeout, BemResultCallback callback);
 
 			/* Port baudrate ----------------------------------------------------- */
 
@@ -113,8 +133,8 @@ namespace Actisense
 			 \param[in]  timeout     Response timeout
 			 \param[in]  callback    Invoked with decoded PortBaudrateResponse
 			 *******************************************************************************/
-			virtual void getPortBaudrate(uint8_t portNumber, std::chrono::milliseconds timeout,
-										 PortBaudrateCallback callback) = 0;
+			void getPortBaudrate(uint8_t portNumber, std::chrono::milliseconds timeout,
+								 PortBaudrateCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set a port's session and/or stored baudrate.
@@ -124,71 +144,64 @@ namespace Actisense
 			 \param[in]  timeout      Response timeout
 			 \param[in]  callback     Invoked with the device's acknowledgement
 			 *******************************************************************************/
-			virtual void setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud,
-										 uint32_t storeBaud, std::chrono::milliseconds timeout,
-										 BemResultCallback callback) = 0;
+			void setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud, uint32_t storeBaud,
+								 std::chrono::milliseconds timeout, BemResultCallback callback);
 
 			/* Port P-Code ------------------------------------------------------- */
 
 			/**************************************************************************/ /**
 			 \brief      Get the device's per-port P-Code values.
 			 *******************************************************************************/
-			virtual void getPortPCode(std::chrono::milliseconds timeout,
-									  PortPCodeCallback callback) = 0;
+			void getPortPCode(std::chrono::milliseconds timeout, PortPCodeCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set per-port P-Code values.
 			 \param[in]  pCodes    One P-Code value per port
 			 *******************************************************************************/
-			virtual void setPortPCode(std::span<const uint8_t> pCodes,
-									  std::chrono::milliseconds timeout,
-									  BemResultCallback callback) = 0;
+			void setPortPCode(std::span<const uint8_t> pCodes, std::chrono::milliseconds timeout,
+							  BemResultCallback callback);
 
 			/* Rx PGN Enable ----------------------------------------------------- */
 
 			/**************************************************************************/ /**
 			 \brief      Get the Rx-enable state for a single PGN.
 			 *******************************************************************************/
-			virtual void getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
-										RxPgnEnableCallback callback) = 0;
+			void getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+								RxPgnEnableCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set the Rx-enable state for a single PGN.
 			 \param[in]  pgn     PGN to configure
 			 \param[in]  enable  0 = disabled, 1 = enabled, 2 = respond mode
 			 *******************************************************************************/
-			virtual void setRxPgnEnable(uint32_t pgn, uint8_t enable,
-										std::chrono::milliseconds timeout,
-										BemResultCallback callback) = 0;
+			void setRxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
+								BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set Rx-enable for a PGN with an explicit instance/group mask.
 			 *******************************************************************************/
-			virtual void setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
-												std::chrono::milliseconds timeout,
-												BemResultCallback callback) = 0;
+			void setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
+										std::chrono::milliseconds timeout, BemResultCallback callback);
 
 			/* Tx PGN Enable ----------------------------------------------------- */
 
 			/**************************************************************************/ /**
 			 \brief      Get the Tx-enable state for a single PGN.
 			 *******************************************************************************/
-			virtual void getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
-										TxPgnEnableCallback callback) = 0;
+			void getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+								TxPgnEnableCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set the Tx-enable state for a single PGN.
 			 *******************************************************************************/
-			virtual void setTxPgnEnable(uint32_t pgn, uint8_t enable,
-										std::chrono::milliseconds timeout,
-										BemResultCallback callback) = 0;
+			void setTxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
+								BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set Tx-enable for a PGN with an explicit transmit rate (ms).
 			 *******************************************************************************/
-			virtual void setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
-												std::chrono::milliseconds timeout,
-												BemResultCallback callback) = 0;
+			void setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
+										std::chrono::milliseconds timeout, BemResultCallback callback);
 
 			/* Aggregated PGN-list verbs ---------------------------------------- */
 
@@ -196,15 +209,15 @@ namespace Actisense
 			 \brief      Fetch the full Rx PGN Enable List F2 (multi-message walk).
 			 \param[in]  inactivityTimeout  Per-message timeout
 			 *******************************************************************************/
-			virtual void getRxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
-											  RxPgnEnableListF2ResultCallback callback) = 0;
+			void getRxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
+									  RxPgnEnableListF2ResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Fetch the full Tx PGN Enable List F2 (multi-message walk +
 						 trailing proprietary bitmap).
 			 *******************************************************************************/
-			virtual void getTxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
-											  TxPgnEnableListF2ResultCallback callback) = 0;
+			void getTxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
+									  TxPgnEnableListF2ResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Fetch one sub-list of the Supported PGN List (0x40).
@@ -213,39 +226,36 @@ namespace Actisense
 						 "give me the whole thing" use case, prefer
 						 getSupportedPgnList_All.
 			 *******************************************************************************/
-			virtual void getSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
-											 std::chrono::milliseconds timeout,
-											 BemResultCallback callback) = 0;
+			void getSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
+									 std::chrono::milliseconds timeout, BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Walk the device's Supported PGN List end-to-end and
 						 deliver the merged result.
 			 *******************************************************************************/
-			virtual void getSupportedPgnList_All(std::chrono::milliseconds perGetTimeout,
-												 SupportedPgnListResultCallback callback) = 0;
+			void getSupportedPgnList_All(std::chrono::milliseconds perGetTimeout,
+										 SupportedPgnListResultCallback callback);
 
 			/* Total time ------------------------------------------------------- */
 
 			/**************************************************************************/ /**
 			 \brief      Get the device's total operating time.
 			 *******************************************************************************/
-			virtual void getTotalTime(std::chrono::milliseconds timeout,
-									  TotalTimeCallback callback) = 0;
+			void getTotalTime(std::chrono::milliseconds timeout, TotalTimeCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set the device's total operating time (requires passkey).
 			 *******************************************************************************/
-			virtual void setTotalTime(uint32_t totalTime, uint32_t passkey,
-									  std::chrono::milliseconds timeout,
-									  BemResultCallback callback) = 0;
+			void setTotalTime(uint32_t totalTime, uint32_t passkey, std::chrono::milliseconds timeout,
+							  BemResultCallback callback);
 
 			/* Echo -------------------------------------------------------------- */
 
 			/**************************************************************************/ /**
 			 \brief      Round-trip up to 252 bytes through the remote device.
 			 *******************************************************************************/
-			virtual void echo(std::span<const uint8_t> data, std::chrono::milliseconds timeout,
-							  EchoCallback callback) = 0;
+			void echo(std::span<const uint8_t> data, std::chrono::milliseconds timeout,
+					  EchoCallback callback);
 
 			/* Product info ----------------------------------------------------- */
 
@@ -255,55 +265,47 @@ namespace Actisense
 						 HardwareInfo view; this verb returns the wire-level
 						 ProductInfoResponse with its raw byte field layout.
 			 *******************************************************************************/
-			virtual void getProductInfo(std::chrono::milliseconds timeout,
-										ProductInfoCallback callback) = 0;
+			void getProductInfo(std::chrono::milliseconds timeout, ProductInfoCallback callback);
 
 			/* CAN config / info ------------------------------------------------ */
 
 			/**************************************************************************/ /**
 			 \brief      Get the device's NMEA 2000 NAME + stored source address.
 			 *******************************************************************************/
-			virtual void getCanConfig(std::chrono::milliseconds timeout,
-									  CanConfigCallback callback) = 0;
+			void getCanConfig(std::chrono::milliseconds timeout, CanConfigCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set the device's NMEA 2000 NAME and stored preferred SA.
 			 *******************************************************************************/
-			virtual void setCanConfig(uint64_t name, uint8_t sourceAddress,
-									  std::chrono::milliseconds timeout,
-									  BemResultCallback callback) = 0;
+			void setCanConfig(uint64_t name, uint8_t sourceAddress,
+							  std::chrono::milliseconds timeout, BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Get CAN Info Field 1 (Installation Description 1).
 			 *******************************************************************************/
-			virtual void getCanInfoField1(std::chrono::milliseconds timeout,
-										  CanInfoFieldCallback callback) = 0;
+			void getCanInfoField1(std::chrono::milliseconds timeout, CanInfoFieldCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set CAN Info Field 1 (max 70 chars).
 			 *******************************************************************************/
-			virtual void setCanInfoField1(const std::string& text,
-										  std::chrono::milliseconds timeout,
-										  BemResultCallback callback) = 0;
+			void setCanInfoField1(const std::string& text, std::chrono::milliseconds timeout,
+								  BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Get CAN Info Field 2 (Installation Description 2).
 			 *******************************************************************************/
-			virtual void getCanInfoField2(std::chrono::milliseconds timeout,
-										  CanInfoFieldCallback callback) = 0;
+			void getCanInfoField2(std::chrono::milliseconds timeout, CanInfoFieldCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set CAN Info Field 2 (max 70 chars).
 			 *******************************************************************************/
-			virtual void setCanInfoField2(const std::string& text,
-										  std::chrono::milliseconds timeout,
-										  BemResultCallback callback) = 0;
+			void setCanInfoField2(const std::string& text, std::chrono::milliseconds timeout,
+								  BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Get CAN Info Field 3 (Manufacturer Info, read-only).
 			 *******************************************************************************/
-			virtual void getCanInfoField3(std::chrono::milliseconds timeout,
-										  CanInfoFieldCallback callback) = 0;
+			void getCanInfoField3(std::chrono::milliseconds timeout, CanInfoFieldCallback callback);
 
 			/* PGN enable-list management --------------------------------------- */
 
@@ -311,35 +313,57 @@ namespace Actisense
 			 \brief      Delete (clear) PGN enable list(s).
 			 \param[in]  selector  0=Rx, 1=Tx, 2=Both
 			 *******************************************************************************/
-			virtual void deletePgnEnableLists(uint8_t selector, std::chrono::milliseconds timeout,
-											  BemResultCallback callback) = 0;
+			void deletePgnEnableLists(uint8_t selector, std::chrono::milliseconds timeout,
+									  BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Activate the device's session PGN-enable lists.
 			 *******************************************************************************/
-			virtual void activatePgnEnableLists(std::chrono::milliseconds timeout,
-												BemResultCallback callback) = 0;
+			void activatePgnEnableLists(std::chrono::milliseconds timeout, BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Restore the operating-mode default Rx/Tx enable list(s).
 			 *******************************************************************************/
-			virtual void defaultPgnEnableList(DeletePgnListSelector selector,
-											  std::chrono::milliseconds timeout,
-											  BemResultCallback callback) = 0;
+			void defaultPgnEnableList(DeletePgnListSelector selector,
+									  std::chrono::milliseconds timeout, BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Query the parameters / status of the device's PGN enable
 						 lists.
 			 *******************************************************************************/
-			virtual void getParamsPgnEnableLists(std::chrono::milliseconds timeout,
-												 ParamsPgnEnableListsCallback callback) = 0;
+			void getParamsPgnEnableLists(std::chrono::milliseconds timeout,
+										 ParamsPgnEnableListsCallback callback);
 
-		protected:
-			RemoteDevice() = default;
+			/* Lifecycle --------------------------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Destructor — releases the impl. Outstanding requests are
+						 cancelled by the owning session, not here.
+			 *******************************************************************************/
+			~RemoteDevice();
+
+			/* Move-only: copy deleted, move transfers ownership of the impl.
+			   Defined out-of-line where Impl is complete. */
+			RemoteDevice(RemoteDevice&& other) noexcept;
+			RemoteDevice& operator=(RemoteDevice&& other) noexcept;
 
 		private:
+			/* Session::openRemote mints RemoteDevice handles; the access shim
+			   wraps an owned Impl into a handle and reaches the Impl behind one. */
+			friend struct detail::RemoteDeviceAccess;
+
+			/**************************************************************************/ /**
+			 \brief      Construct a handle adopting an already-built implementation.
+			 \details    Only reachable via detail::RemoteDeviceAccess
+						 (Session::openRemote). External callers obtain a
+						 RemoteDevice through Session::openRemote().
+			 *******************************************************************************/
+			explicit RemoteDevice(std::unique_ptr<Impl> impl) noexcept;
+
 			RemoteDevice(const RemoteDevice&) = delete;
 			RemoteDevice& operator=(const RemoteDevice&) = delete;
+
+			std::unique_ptr<Impl> impl_;
 		};
 
 	} /* namespace Sdk */

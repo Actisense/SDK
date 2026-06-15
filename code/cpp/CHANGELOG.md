@@ -32,6 +32,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enum value is **retained** for public-API stability, but its documentation
   now marks it legacy — new code should target `OM_CanPacket`.
 
+### Changed
+
+- **ABI hardening: `Session` and `RemoteDevice` are now `final`, non-polymorphic
+  pimpl handles (GIT-115).** Both classes were pure-abstract interfaces (14 and
+  36 pure virtuals); they are now move-only `final` classes whose only data
+  member is a `std::unique_ptr<Impl>`, with non-virtual methods that forward to
+  the implementation. This gives the MIT binary SDK a stable ABI — adding a verb
+  appends a member symbol instead of mutating a vtable, so `sizeof` is one
+  pointer and shipped-binary layout is unaffected by future growth. All public
+  method signatures and the `Api` facade / `Session::openRemote` return and
+  callback types are unchanged, so source compiles unmodified; this is a
+  one-time intentional ABI break (binary version bumped to 0.5.0). A
+  compile-time `static_assert` guard (`tests/unit/test_abi_layout.cpp`) locks the
+  final / non-polymorphic / one-pointer / move-only properties in place.
+
 ### Tests
 
 - **Black-box NGX CAN Packet routing integration test (NGXSW-4207).** New

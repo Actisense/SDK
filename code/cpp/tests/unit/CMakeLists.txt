@@ -73,3 +73,6 @@ add_sdk_test(test_enumerate_serial_devices_macos test_enumerate_serial_devices_m
 
 # ArlModelId helper predicates incl. GIT-109 host-Tx SID byte-0 model gate
 add_sdk_test(test_model_id_helpers test_model_id_helpers.cpp)
+
+# ABI hardening: Session/RemoteDevice are final, non-polymorphic pimpl handles (GIT-115)
+add_sdk_test(test_abi_layout test_abi_layout.cpp)

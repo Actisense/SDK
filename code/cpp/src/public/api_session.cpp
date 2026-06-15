@@ -120,10 +120,10 @@ namespace Actisense
 				return;
 			}
 
-			auto session = std::make_unique<SessionImpl>(std::move(transport), std::move(onEvent),
-														 std::move(onError));
-			session->startReceiving();
-			onOpened(ErrorCode::Ok, std::move(session));
+			auto impl = std::make_unique<SessionImpl>(std::move(transport), std::move(onEvent),
+													  std::move(onError));
+			impl->startReceiving();
+			onOpened(ErrorCode::Ok, detail::SessionAccess::wrap(std::move(impl)));
 		}
 
 		std::unique_ptr<Session> Api::createSerialSession(const SerialConfig& config,
@@ -148,10 +148,10 @@ namespace Actisense
 				return nullptr;
 			}
 
-			auto session = std::make_unique<SessionImpl>(std::move(transport), std::move(onEvent),
-														 std::move(onError));
-			session->startReceiving();
-			return session;
+			auto impl = std::make_unique<SessionImpl>(std::move(transport), std::move(onEvent),
+													  std::move(onError));
+			impl->startReceiving();
+			return detail::SessionAccess::wrap(std::move(impl));
 		}
 
 	} /* namespace Sdk */
