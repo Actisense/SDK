@@ -318,6 +318,8 @@ namespace Actisense
 			}
 
 #if defined(_WIN32)
+			/* Guard the shared OVERLAPPED so concurrent writes cannot corrupt it. */
+			std::lock_guard<std::mutex> writeLock(writeMutex_);
 			DWORD bytesWritten = 0;
 			ResetEvent(writeOverlapped_.hEvent);
 
@@ -468,6 +470,9 @@ namespace Actisense
 					break;
 #endif
 				default:
+					/* Only the standard termios baud constants are supported. Custom
+					   rates would need BOTHER + c_ispeed/c_ospeed (Linux) or
+					   IOSSIOSPEED (macOS); tracked as a follow-up. */
 					return ErrorCode::InvalidArgument;
 			}
 
@@ -532,9 +537,12 @@ namespace Actisense
 			options.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL);
 			options.c_oflag &= ~OPOST;
 
-			/* Set read timeout */
+			/* Set read timeout. VTIME is in tenths of a second and is only a
+			   backstop here — the select() call in readThreadFunc() governs the
+			   actual poll cadence. Round up so a sub-100ms readTimeoutMs (the
+			   default is 10ms) does not silently truncate to VTIME=0. */
 			options.c_cc[VMIN] = 0;
-			options.c_cc[VTIME] = config.readTimeoutMs / 100; /* Tenths of seconds */
+			options.c_cc[VTIME] = static_cast<cc_t>((config.readTimeoutMs + 99) / 100);
 
 			if (tcsetattr(fd_, TCSANOW, &options) != 0) {
 				return ErrorCode::TransportOpenFailed;
@@ -643,8 +651,14 @@ namespace Actisense
 									This is a good time to do some background work. */
 							} break;
 							default:
-								/* Error in the WaitForSingleObject; abort. This indicates
-									a problem with the OVERLAPPED structure's event handle. */
+								/* WAIT_FAILED (or any unexpected result) indicates a
+									problem with the OVERLAPPED structure's event handle.
+									Treat it as a fatal I/O error: cancel the in-flight
+									read and stop the thread rather than busy-spinning. */
+								ACTISENSE_LOG_ERROR("Serial",
+													"WaitForMultipleObjects failed; aborting read thread");
+								CancelIo(handle_);
+								stopRequested_ = true;
 								break;
 						}
 					}
@@ -735,7 +749,21 @@ namespace Actisense
 						const ssize_t result = ::read(fd_, buffer, max_bytes);
 						if (result > 0) {
 							bytes_read = static_cast<std::size_t>(result);
+						} else if (result == 0) {
+							/* read() == 0 means the peer closed the port (e.g. a USB
+							   serial adaptor was unplugged). Stop the thread instead of
+							   busy-spinning select()/read() forever. */
+							ACTISENSE_LOG_ERROR("Serial", "Serial port closed by peer (read returned 0)");
+							stopRequested_ = true;
+						} else if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+							/* A hard I/O error (cable yank, device error). Transient
+							   conditions (EAGAIN/EINTR) are ignored and retried. */
+							ACTISENSE_LOG_ERROR("Serial", "Serial read I/O error; stopping read thread");
+							stopRequested_ = true;
 						}
+					} else if (selectResult < 0 && errno != EINTR) {
+						ACTISENSE_LOG_ERROR("Serial", "Serial select() error; stopping read thread");
+						stopRequested_ = true;
 					}
 					totalBytesReceived_ += bytes_read;
 				}

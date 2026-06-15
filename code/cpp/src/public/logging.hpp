@@ -10,6 +10,7 @@
  *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
+#include <memory>
 #include <string_view>
 
 namespace Actisense
@@ -95,11 +96,12 @@ namespace Actisense
 		 \brief      Set the global logger instance
 		 \param[in]  logger  Logger to use (nullptr to reset to default NullLogger)
 		 \details    Thread-safe: the pointer swap is atomic with acquire/release
-					 ordering. The SDK does not take ownership - the caller must
-					 ensure the logger outlives all threads that may still be
-					 logging through it.
+					 ordering. The SDK now shares ownership via std::shared_ptr (was a raw
+					 ILogger* with ambiguous ownership), so an installed logger
+					 stays alive while active without the caller having to outlive
+					 every logging thread. logger()'s lock-free read is preserved.
 		 *******************************************************************************/
-		void setLogger(ILogger* logger);
+		void setLogger(std::shared_ptr<ILogger> logger);
 
 		/**************************************************************************/ /**
 		 \brief      Get the current global logger

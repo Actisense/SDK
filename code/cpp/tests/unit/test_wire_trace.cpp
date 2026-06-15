@@ -331,7 +331,7 @@ TEST_F(SessionWireTraceTest, NoLinesEmittedWhenSinkIsNotSet)
 
 	const std::vector<uint8_t> payload = {0xDE, 0xAD};
 	bool sendCompleted = false;
-	session_->asyncSend("raw", payload, [&](ErrorCode) { sendCompleted = true; });
+	session_->asyncSend(Session::SendProtocol::Raw, payload, [&](ErrorCode) { sendCompleted = true; });
 
 	/* Allow the loopback transport time to round-trip the bytes. */
 	std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -358,7 +358,7 @@ TEST_F(SessionWireTraceTest, AsyncSendEmitsTxLine)
 
 	const std::vector<uint8_t> payload = {0xCA, 0xFE, 0xBA, 0xBE};
 	bool sendCompleted = false;
-	session_->asyncSend("raw", payload, [&](ErrorCode) { sendCompleted = true; });
+	session_->asyncSend(Session::SendProtocol::Raw, payload, [&](ErrorCode) { sendCompleted = true; });
 
 	/* Wait briefly for the loopback round-trip to fire the RX hook too. */
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -416,7 +416,7 @@ TEST_F(SessionWireTraceTest, ClearWireTraceStopsEmissions)
 	});
 
 	const std::vector<uint8_t> payload1 = {0x01, 0x02};
-	session_->asyncSend("raw", payload1, nullptr);
+	session_->asyncSend(Session::SendProtocol::Raw, payload1, nullptr);
 	std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
 	std::size_t firstCount = 0;
@@ -429,7 +429,7 @@ TEST_F(SessionWireTraceTest, ClearWireTraceStopsEmissions)
 	session_->clearWireTrace();
 
 	const std::vector<uint8_t> payload2 = {0x03, 0x04};
-	session_->asyncSend("raw", payload2, nullptr);
+	session_->asyncSend(Session::SendProtocol::Raw, payload2, nullptr);
 	std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
 	std::lock_guard<std::mutex> lk(mtx);

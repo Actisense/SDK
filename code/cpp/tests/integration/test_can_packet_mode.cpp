@@ -226,7 +226,7 @@ protected:
 			TimestampResolution::Millisecond_1ms, MessageDirection::Transmitted);
 		std::promise<ErrorCode> p;
 		auto f = p.get_future();
-		session_->asyncSend("bst", frame.rawData(),
+		session_->asyncSend(Session::SendProtocol::Bst, frame.rawData(),
 			[&p](ErrorCode ec) { p.set_value(ec); });
 		return f.get();
 	}

@@ -55,26 +55,27 @@ namespace Actisense
 			virtual ~Session() = default;
 
 			/**************************************************************************/ /**
+			 \brief      Selects how an asyncSend() payload is wrapped before it
+						 reaches the transport.
+			 *******************************************************************************/
+			enum class SendProtocol
+			{
+				Bst, ///< payload is raw BST bytes (BST_ID + length + data); the SDK
+					 ///< appends the zero-sum BST checksum and applies DLE+STX/DLE+ETX
+					 ///< framing.
+				Raw  ///< payload is sent verbatim — no checksum, no framing (caller
+					 ///< owns whatever wire format the remote end expects).
+			};
+
+			/**************************************************************************/ /**
 			 \brief      Send a message asynchronously
-			 \param[in]  protocol    Protocol ID selecting how the payload is
-									 wrapped before it hits the transport.
-									 Accepted values:
-									   - "bst"  : @p payload is the raw BST
-												  bytes (BST_ID + length + data).
-												  The SDK appends the zero-sum
-												  BST checksum and applies
-												  DLE+STX/DLE+ETX framing.
-									   - "raw"  : @p payload is sent verbatim
-												  with no checksum or framing
-												  (caller is responsible for
-												  whatever wire format the
-												  remote end expects).
-									 Any other value is treated as "raw".
+			 \param[in]  protocol    Wrapping to apply to @p payload (Bst or Raw).
+									 Replaces the former stringly-typed selector.
 			 \param[in]  payload     Bytes to send. See @p protocol for the
 									 expected layout.
 			 \param[in]  completion  Callback invoked on completion or error
 			 *******************************************************************************/
-			virtual void asyncSend(const std::string& protocol, std::span<const uint8_t> payload,
+			virtual void asyncSend(SendProtocol protocol, std::span<const uint8_t> payload,
 								   SendCompletion completion) = 0;
 
 			/**************************************************************************/ /**

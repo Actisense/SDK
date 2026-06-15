@@ -31,4 +31,4 @@ namespace Actisense
 	} // namespace Sdk
 } // namespace Actisense
 
-#endif /* HEADER_GUARD */
+#endif /* __ACTISENSE_SDK_SERIAL_DEVICE_INFO_HPP */

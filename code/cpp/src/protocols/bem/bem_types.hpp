@@ -28,6 +28,15 @@ namespace Actisense
 	{
 		/* Definitions ---------------------------------------------------------- */
 
+		/* NAMING CARVE-OUT: the POD wire-format structs in this header use
+		   camelBack member names WITHOUT the trailing underscore mandated for
+		   class members by the Actisense style guide. This is deliberate — these
+		   are plain serialisable data records whose field names mirror the
+		   protocol field names (storeLength, bemId, modelId, ...), not
+		   encapsulated class state. The trailing-underscore convention applies to
+		   private class members; aggregate wire structs are exempt for
+		   readability against the byte-layout documentation. */
+
 		/**************************************************************************/ /**
 		 \brief      BEM Gateway→PC response header structure
 		 \details    Header present in all BEM responses (14 bytes before data)

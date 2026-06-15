@@ -12,6 +12,7 @@
 #include <util/log_macros.hpp>
 
 #include <gtest/gtest.h>
+#include <memory>
 #include <sstream>
 #include <thread>
 #include <vector>
@@ -77,22 +78,20 @@ class LoggingTest : public ::testing::Test
 {
 protected:
 	void SetUp() override {
-		/* Save current logger and install test logger */
-		savedLogger_ = &logger();
-		testLogger_ = std::make_unique<TestLogger>();
-		setLogger(testLogger_.get());
+		/* Install a shared test logger; the SDK now shares ownership. */
+		testLogger_ = std::make_shared<TestLogger>();
+		setLogger(testLogger_);
 	}
 
 	void TearDown() override {
-		/* Restore original logger */
-		setLogger(savedLogger_ == &logger() ? nullptr : savedLogger_);
+		/* Reset to the default NullLogger (releases the SDK's shared ref). */
+		setLogger(nullptr);
 	}
 
 	TestLogger& testLogger() { return *testLogger_; }
 
 private:
-	ILogger* savedLogger_ = nullptr;
-	std::unique_ptr<TestLogger> testLogger_;
+	std::shared_ptr<TestLogger> testLogger_;
 };
 
 TEST_F(LoggingTest, LogLevelNames)

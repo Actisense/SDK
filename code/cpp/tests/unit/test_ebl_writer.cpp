@@ -465,7 +465,7 @@ TEST_F(SessionEblWireTraceTest, AsyncSendEmitsTimeDirectionAndStream)
 
 	const std::vector<uint8_t> payload = {0xCA, 0xFE, kEblEscapeCode, 0xBA};
 	bool sendCompleted = false;
-	session_->asyncSend("raw", payload, [&](ErrorCode) { sendCompleted = true; });
+	session_->asyncSend(Session::SendProtocol::Raw, payload, [&](ErrorCode) { sendCompleted = true; });
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	EXPECT_TRUE(sendCompleted);
@@ -512,7 +512,7 @@ TEST_F(SessionEblWireTraceTest, RxBdtpFrameAppearsAsBstRawFrameRecord)
 	   behaviour wrote the raw wire bytes via writeRawStream, which split
 	   chunked frames into separate non-EBL segments and broke EBL Reader's
 	   stateless segment-by-segment decode. Loopback echoes asyncSend bytes
-	   back as Rx so a single asyncSend("bst") exercises both sides. */
+	   back as Rx so a single asyncSend(Session::SendProtocol::Bst) exercises both sides. */
 	std::mutex mtx;
 	std::vector<uint8_t> captured;
 
@@ -527,7 +527,7 @@ TEST_F(SessionEblWireTraceTest, RxBdtpFrameAppearsAsBstRawFrameRecord)
 	   path will append a zero-sum checksum and DLE+STX/DLE+ETX-frame the
 	   bytes before they hit the transport. */
 	const std::vector<uint8_t> inner_payload = {0x93, 0x02, 0xAA, 0x55};
-	session_->asyncSend("bst", inner_payload, nullptr);
+	session_->asyncSend(Session::SendProtocol::Bst, inner_payload, nullptr);
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
@@ -663,7 +663,7 @@ TEST_F(SessionEblWireTraceTest, UnframedRxBytesAppearAsRawStreamByDefault)
 	   arrive outside any DLE+STX..DLE+ETX bracket must be recorded as a
 	   raw-stream segment in the EBL so customer-support captures show
 	   boot banners and other out-of-frame traffic. Loopback echoes Tx
-	   bytes back as Rx — sending non-BDTP-framed bytes via asyncSend("raw")
+	   bytes back as Rx — sending non-BDTP-framed bytes via asyncSend(Session::SendProtocol::Raw)
 	   simulates a device emitting garbage outside any frame. */
 	std::mutex mtx;
 	std::vector<uint8_t> captured;
@@ -683,7 +683,7 @@ TEST_F(SessionEblWireTraceTest, UnframedRxBytesAppearAsRawStreamByDefault)
 	   pure ASCII. The BdtpFrameAssembler must treat the whole lot as
 	   unframed and surface it via the raw-stream path. */
 	const std::vector<uint8_t> garbage = {'B', 'O', 'O', 'T', ' ', 'O', 'K', '\n'};
-	session_->asyncSend("raw", garbage, nullptr);
+	session_->asyncSend(Session::SendProtocol::Raw, garbage, nullptr);
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
@@ -747,7 +747,7 @@ TEST_F(SessionEblWireTraceTest, UnframedRxBytesSuppressedWhenFlagIsFalse)
 	}();
 
 	const std::vector<uint8_t> garbage = {'B', 'O', 'O', 'T', '\n'};
-	session_->asyncSend("raw", garbage, nullptr);
+	session_->asyncSend(Session::SendProtocol::Raw, garbage, nullptr);
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
@@ -789,7 +789,7 @@ TEST_F(SessionEblWireTraceTest, ClearStopsEmissions)
 	});
 
 	const std::vector<uint8_t> payload = {0x01, 0x02};
-	session_->asyncSend("raw", payload, nullptr);
+	session_->asyncSend(Session::SendProtocol::Raw, payload, nullptr);
 	std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
 	std::size_t before;
@@ -801,7 +801,7 @@ TEST_F(SessionEblWireTraceTest, ClearStopsEmissions)
 
 	session_->clearWireTrace();
 
-	session_->asyncSend("raw", payload, nullptr);
+	session_->asyncSend(Session::SendProtocol::Raw, payload, nullptr);
 	std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
 	std::lock_guard<std::mutex> lk(mtx);

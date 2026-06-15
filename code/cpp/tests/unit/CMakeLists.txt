@@ -34,6 +34,7 @@ add_sdk_test(test_total_time test_total_time.cpp)
 add_sdk_test(test_echo test_echo.cpp)
 add_sdk_test(test_unsolicited_messages test_unsolicited_messages.cpp)
 add_sdk_test(test_session_unsolicited test_session_unsolicited.cpp)
+add_sdk_test(test_session_metrics test_session_metrics.cpp)
 
 # Phase 2c NMEA 2000 Product Info tests
 add_sdk_test(test_nmea2000_product_info test_nmea2000_product_info.cpp)

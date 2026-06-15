@@ -133,6 +133,10 @@ namespace Actisense
 			for (uint8_t i = 0; i < response.subCount; ++i) {
 				SupportedPgnEntry entry;
 				entry.pgnIndex = data[offset];
+				/* Each Supported PGN List entry packs the PGN into 3 bytes
+				   (little-endian). This is deliberately narrower than the 4-byte
+				   PGN field in the Rx/Tx PGN Enable commands — both match their
+				   respective firmware codecs. */
 				entry.pgn = static_cast<uint32_t>(data[offset + 1]) |
 							(static_cast<uint32_t>(data[offset + 2]) << 8) |
 							(static_cast<uint32_t>(data[offset + 3]) << 16);

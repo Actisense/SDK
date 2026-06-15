@@ -68,13 +68,30 @@ namespace Actisense
 			 \brief      Open the transport
 			 \param[in]  config      Transport configuration
 			 \param[in]  completion  Called when open completes (or fails)
+			 \note       CONTRACT: the completion MUST be invoked synchronously,
+						 before asyncOpen() returns. The SDK's open paths
+						 (Api::openWithTransport, createSerialSession) read the
+						 ErrorCode immediately after the call returns, so a
+						 transport that deferred the completion to a later thread
+						 would read an uninitialised result. Implementations that
+						 cannot open synchronously must still call the completion
+						 inline (e.g. report the in-progress state and complete the
+						 connect elsewhere). The name is retained for interface
+						 symmetry with the asyncSend/asyncRecv operations, which are
+						 genuinely asynchronous.
 			 *******************************************************************************/
 			virtual void asyncOpen(const TransportConfig& config,
 								   std::function<void(ErrorCode)> completion) = 0;
 
 			/**************************************************************************/ /**
 			 \brief      Close the transport
-			 \details    Graceful shutdown - flushes pending data
+			 \details    Graceful shutdown - flushes pending data.
+			 \note       CONTRACT: close() MUST cause any outstanding asyncRecv()
+						 completion to fire (with ErrorCode::TransportClosed or
+						 Canceled) promptly. The SDK receive thread blocks waiting on
+						 the asyncRecv completion and only exits once it fires; a
+						 transport that closed without completing a pending recv would
+						 hang Session::close() indefinitely.
 			 *******************************************************************************/
 			virtual void close() = 0;
 

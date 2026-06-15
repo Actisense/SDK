@@ -9,6 +9,8 @@
 /* Dependent includes ------------------------------------------------------- */
 #include <array>
 #include <atomic>
+#include <memory>
+#include <mutex>
 
 #include "public/logging.hpp"
 
@@ -46,7 +48,14 @@ namespace Actisense
 			   race; ordering is relaxed because log-level filtering tolerates
 			   brief staleness after a setter returns. */
 			NullLogger gNullLogger;
+			/* Fast, lock-free read path: logger() loads this raw pointer. */
 			std::atomic<ILogger*> gLogger{&gNullLogger};
+			/* Ownership: when the caller installs a logger via shared_ptr we keep
+			   a strong reference here so the object stays alive while it is the
+			   active logger. Guarded by gLoggerMutex (only taken by setLogger,
+			   never on the hot logging path). */
+			std::mutex gLoggerMutex;
+			std::shared_ptr<ILogger> gLoggerOwner;
 			std::atomic<LogLevel> gGlobalLogLevel{LogLevel::Info};
 			std::array<std::atomic<LogLevel>, 6> gCategoryLogLevels = {{
 				std::atomic<LogLevel>{LogLevel::Info}, // General
@@ -73,8 +82,14 @@ namespace Actisense
 
 		/* Public Function Definitions ------------------------------------------ */
 
-		void setLogger(ILogger* logger) {
-			gLogger.store(logger ? logger : &gNullLogger, std::memory_order_release);
+		void setLogger(std::shared_ptr<ILogger> logger) {
+			std::lock_guard<std::mutex> lock(gLoggerMutex);
+			/* Adopt ownership first so the object cannot be destroyed between the
+			   raw-pointer publish and a concurrent logger() read. Passing nullptr
+			   resets to the static NullLogger. */
+			gLoggerOwner = std::move(logger);
+			gLogger.store(gLoggerOwner ? gLoggerOwner.get() : &gNullLogger,
+						  std::memory_order_release);
 		}
 
 		ILogger& logger() noexcept {
