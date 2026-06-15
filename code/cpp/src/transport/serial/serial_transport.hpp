@@ -156,6 +156,9 @@ namespace Actisense
 			HANDLE handle_ = INVALID_HANDLE_VALUE;
 			HANDLE rx_terminate_handle_ = INVALID_HANDLE_VALUE;
 			OVERLAPPED writeOverlapped_{};
+			/* Serialises access to writeOverlapped_: two concurrent writeSync()
+			   calls would otherwise race on the single shared OVERLAPPED. */
+			mutable std::mutex writeMutex_;
 #else
 			int fd_ = -1;
 			// clang-format off

@@ -23,6 +23,8 @@
 #include <string>
 #include <vector>
 
+#include "public/bem_responses/product_info.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -40,27 +42,6 @@ namespace Actisense
 
 		/// String field maximum length (32 bytes each, padded with 0xFF)
 		static constexpr std::size_t kProductInfoStringMaxLen = 32;
-
-		/* Data Structures ------------------------------------------------------ */
-
-		/**************************************************************************/ /**
-		 \brief      Product Info response structure
-		 \details    Decoded product information from BEM 41H response
-		 *******************************************************************************/
-		struct ProductInfoResponse
-		{
-			uint32_t structureVariantId = 0;
-
-			/* NMEA 2000 Product Information fields */
-			uint16_t nmea2000Version = 0;	///< NMEA 2000 database version
-			uint16_t productCode = 0;		///< Manufacturer's product code
-			std::string modelId;			///< Model ID string (max 32 chars)
-			std::string softwareVersion;	///< Software version string (max 32 chars)
-			std::string modelVersion;		///< Model version string (max 32 chars)
-			std::string modelSerialCode;	///< Serial number string (max 32 chars)
-			uint8_t certificationLevel = 0; ///< NMEA 2000 certification level
-			uint8_t loadEquivalency = 0;	///< NMEA 2000 load equivalency (mA / 50)
-		};
 
 		/* Helper Functions ----------------------------------------------------- */
 

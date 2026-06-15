@@ -27,7 +27,7 @@ namespace Actisense
 			 *******************************************************************************/
 			constexpr std::array<std::string_view, static_cast<std::size_t>(ErrorCode::Count)>
 				kErrorMessages = {{
-					/* Coarse codes (0-14) */
+					/* Coarse codes (0-15) */
 					"No error",						   // Ok
 					"Failed to open transport",		   // TransportOpenFailed
 					"Transport I/O error",			   // TransportIo
@@ -43,6 +43,7 @@ namespace Actisense
 					"Not connected",				   // NotConnected
 					"Already connected",			   // AlreadyConnected
 					"Internal SDK error",			   // Internal
+					"Device returned an error response", // BemDeviceError
 
 					/* Transport diagnostics */
 					"Serial port not found",				  // TransportPortNotFound
@@ -74,7 +75,6 @@ namespace Actisense
 					"BST payload exceeds maximum allowed",				  // BstPayloadTooLong
 					"BST header fields invalid",						  // BstInvalidHeader
 					"BEM response sequence ID doesn't match request",	  // BemSequenceMismatch
-					"BEM device returned error (see extended error info)", // BemDeviceError
 					"BEM command timed out waiting for response",		  // BemTimeout
 					"BEM response type doesn't match request",			  // BemUnexpectedResponse
 					"Unknown BEM command ID",							  // BemUnknownCommand

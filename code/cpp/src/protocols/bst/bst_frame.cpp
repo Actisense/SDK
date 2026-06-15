@@ -112,6 +112,12 @@ namespace Actisense
 				pdus = destination;
 			}
 
+			/* The BST Type 1 store-length byte is 8-bit; reject payloads that would
+			   overflow it rather than silently truncating to a corrupt frame. */
+			if (payload.size() > 255 - kBst93OffData) {
+				return BstFrame();
+			}
+
 			const uint8_t data_len = static_cast<uint8_t>(payload.size());
 			const uint8_t store_len = static_cast<uint8_t>(kBst93OffData + data_len);
 
@@ -153,6 +159,11 @@ namespace Actisense
 			   the host-Tx wire format the gateways expect is uniform. Reference:
 			   LibDev/ACCompLib/Codec/WrapBSTN2K.cpp::BSTWrapBSTN2K. (GIT-95) */
 
+			/* Reject payloads that would overflow the 8-bit store-length byte. */
+			if (payload.size() > 255 - kBst94OffData) {
+				return BstFrame();
+			}
+
 			const uint8_t data_len = static_cast<uint8_t>(payload.size());
 			const uint8_t store_len = static_cast<uint8_t>(kBst94OffData + data_len);
 
@@ -177,6 +188,18 @@ namespace Actisense
 									MessageDirection direction, uint8_t priority) {
 			uint8_t pduf, pdus, dp;
 			extractPduFields(pgn, pduf, pdus, dp);
+
+			/* NOTE: create95 writes PDUS straight from the PGN low byte and takes no
+			   destination argument, so a PDU1 (pduf < 240) frame built here is
+			   effectively broadcast — the BST-95 decoder reads PDUS back as the
+			   destination, which will be the PGN's PS byte (normally 0), not a
+			   specific node. Callers needing an addressed PDU1 frame should use
+			   create94()/createD0(), which carry an explicit destination field. */
+
+			/* Reject payloads that would overflow the 8-bit store-length byte. */
+			if (payload.size() > 255 - kBst95OffData) {
+				return BstFrame();
+			}
 
 			const uint8_t store_len = static_cast<uint8_t>(kBst95OffData + payload.size());
 
@@ -217,7 +240,12 @@ namespace Actisense
 				pdus = destination;
 			}
 
-			/* BST-D0 length field includes ID(1) + L0(1) + L1(1) + header(10) + data */
+			/* BST-D0 length field includes ID(1) + L0(1) + L1(1) + header(10) + data.
+			   It is 16-bit; reject payloads large enough to wrap it. */
+			if (3 + kBstD0OffData + payload.size() > 0xFFFF) {
+				return BstFrame();
+			}
+
 			const uint16_t total_len = static_cast<uint16_t>(3 + kBstD0OffData + payload.size());
 
 			std::vector<uint8_t> raw;

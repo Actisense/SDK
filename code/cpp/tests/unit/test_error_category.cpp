@@ -77,9 +77,10 @@ TEST_F(ErrorCategoryTest, CoarseCodeValuesAreStable)
 	EXPECT_EQ(static_cast<int>(ErrorCode::NotConnected), 12);
 	EXPECT_EQ(static_cast<int>(ErrorCode::AlreadyConnected), 13);
 	EXPECT_EQ(static_cast<int>(ErrorCode::Internal), 14);
+	EXPECT_EQ(static_cast<int>(ErrorCode::BemDeviceError), 15);
 
 	/* The appended diagnostics come strictly after the coarse block. */
-	EXPECT_EQ(static_cast<int>(ErrorCode::TransportPortNotFound), 15);
+	EXPECT_EQ(static_cast<int>(ErrorCode::TransportPortNotFound), 16);
 	EXPECT_GT(static_cast<int>(ErrorCode::BdtpFrameCorrupted),
 			  static_cast<int>(ErrorCode::TransportSocketError));
 	EXPECT_GT(static_cast<int>(ErrorCode::Count),

@@ -24,7 +24,7 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      SDK error codes
 		 \details    The single, unified error space for the SDK. The first block
-					 (values 0-14) are the coarse, layer-agnostic codes that every
+					 (values 0-15) are the coarse, layer-agnostic codes that every
 					 transport, protocol and session callback emits. The appended
 					 blocks fold in the fine-grained transport and protocol
 					 diagnostics that previously lived in their own separate
@@ -36,9 +36,9 @@ namespace Actisense
 					 Count. The message lookup in error_category.cpp is index-aligned
 					 with this enum and guarded by a static_assert against Count.
 		 *******************************************************************************/
-		enum class ErrorCode
+		enum class ErrorCode : int32_t
 		{
-			/* Coarse, layer-agnostic codes (values 0-14, ABI-stable) ---------- */
+			/* Coarse, layer-agnostic codes (values 0-15, ABI-stable) ---------- */
 			Ok = 0,				  ///< No error
 			TransportOpenFailed,  ///< Failed to open transport (port busy, not found)
 			TransportIo,		  ///< I/O error during read/write
@@ -54,6 +54,8 @@ namespace Actisense
 			NotConnected,		  ///< Session not connected
 			AlreadyConnected,	  ///< Session already connected
 			Internal,			  ///< Internal SDK error (bug)
+			BemDeviceError,		  ///< Device returned a BEM error response (see
+								  ///< ExtendedError::deviceErrorCode for the raw ARL code)
 
 			/* Transport diagnostics (appended) -------------------------------- */
 			TransportPortNotFound,		  ///< Serial port does not exist
@@ -85,7 +87,6 @@ namespace Actisense
 			BstPayloadTooLong,	   ///< Payload exceeds maximum allowed
 			BstInvalidHeader,	   ///< Required header fields missing or invalid
 			BemSequenceMismatch,   ///< Response sequence != request sequence
-			BemDeviceError,		   ///< Device returned error code (check ExtendedError)
 			BemTimeout,			   ///< No response within timeout
 			BemUnexpectedResponse, ///< Response type doesn't match request
 			BemUnknownCommand,	   ///< Unknown BEM command ID
@@ -132,7 +133,7 @@ namespace Actisense
 		struct ExtendedError
 		{
 			ErrorCode code = ErrorCode::Ok; ///< SDK-level error code
-			int32_t deviceErrorCode = 0;	///< Original device error code (if BemDeviceError)
+			int32_t deviceErrorCode = 0;	///< Raw ARL device error code (set when code == ErrorCode::BemDeviceError)
 			std::string deviceMessage;		///< Device error description
 			std::string context;			///< Additional context (command name, etc.)
 

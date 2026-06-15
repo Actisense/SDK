@@ -28,7 +28,6 @@
 #include <string>
 
 #include "public/bem_callbacks.hpp"
-#include "public/session.hpp"
 
 namespace Actisense
 {

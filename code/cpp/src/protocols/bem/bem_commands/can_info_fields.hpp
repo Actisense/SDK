@@ -30,6 +30,8 @@
 #include <string>
 #include <vector>
 
+#include "public/bem_responses/can_info_fields.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -48,31 +50,6 @@ namespace Actisense
 		/// Encoding type byte values
 		static constexpr uint8_t kCanInfoFieldEncodingUnicode = 0;
 		static constexpr uint8_t kCanInfoFieldEncodingAscii = 1;
-
-		/* Enumerations --------------------------------------------------------- */
-
-		/**************************************************************************/ /**
-		 \brief      CAN Info Field types
-		 \details    Identifies which field is being accessed
-		 *******************************************************************************/
-		enum class CanInfoField : uint8_t
-		{
-			InstallationDesc1 = 1, ///< Installation Description 1 (BEM 0x43)
-			InstallationDesc2 = 2, ///< Installation Description 2 (BEM 0x44)
-			ManufacturerInfo = 3   ///< Manufacturer Information (BEM 0x45, read-only)
-		};
-
-		/* Data Structures ------------------------------------------------------ */
-
-		/**************************************************************************/ /**
-		 \brief      CAN Info Field response structure
-		 \details    Decoded response from CAN Info Field commands
-		 *******************************************************************************/
-		struct CanInfoFieldResponse
-		{
-			CanInfoField field = CanInfoField::InstallationDesc1;
-			std::string text; ///< Field text (max 70 characters)
-		};
 
 		/* Helper Functions ----------------------------------------------------- */
 

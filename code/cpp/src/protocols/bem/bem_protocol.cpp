@@ -23,6 +23,12 @@ namespace Actisense
 		BemProtocol::BemProtocol() = default;
 
 		BemProtocol::~BemProtocol() {
+			/* Reentrancy contract: clearPendingRequests() fires each pending
+			   callback with ErrorCode::Canceled. During destruction these run
+			   while the object is being torn down, so a callback MUST NOT call
+			   back into this BemProtocol (e.g. register a new request). The
+			   owning Session guarantees the Rx thread is already joined before
+			   the protocol is destroyed, so no further responses can arrive. */
 			clearPendingRequests();
 		}
 
@@ -475,6 +481,8 @@ namespace Actisense
 			}
 
 			BemResponse response;
+			/* Safe: the isBemResponse() gate above has already validated that
+			   datagram.bstId is one of the known BEM response IDs (A0/A2/A3/A5). */
 			response.header.bstId = static_cast<BstId>(datagram.bstId);
 			response.header.storeLength = static_cast<uint8_t>(datagram.storeLength);
 			response.checksumValid = true; /* Assumed validated by BDTP layer */
@@ -541,12 +549,11 @@ namespace Actisense
 			}
 		} // namespace
 
-		uint8_t BemProtocol::registerRequest(BemCommandId commandId, BstId bstId,
-											 std::chrono::milliseconds timeout,
-											 BemResponseCallback callback, uint8_t srcAddr) {
+		void BemProtocol::registerRequest(BemCommandId commandId, BstId bstId,
+										  std::chrono::milliseconds timeout,
+										  BemResponseCallback callback, uint8_t srcAddr) {
 			std::lock_guard<std::mutex> lock(mutex_);
 
-			const uint8_t seqId = nextSequenceId();
 			const uint64_t key = buildResponseKey(responseBstIdFor(bstId), commandId, srcAddr);
 
 			PendingRequest req;
@@ -556,18 +563,15 @@ namespace Actisense
 			req.callback = std::move(callback);
 
 			pending_requests_[key] = std::move(req);
-
-			return seqId;
 		}
 
-		uint8_t
+		void
 		BemProtocol::registerMultiReplyRequest(BemCommandId commandId, BstId bstId,
 											   std::chrono::milliseconds inactivityTimeout,
 											   std::function<bool(const BemResponse&)> isComplete,
 											   BemResponseCallback callback, uint8_t srcAddr) {
 			std::lock_guard<std::mutex> lock(mutex_);
 
-			const uint8_t seqId = nextSequenceId();
 			const uint64_t key = buildResponseKey(responseBstIdFor(bstId), commandId, srcAddr);
 
 			PendingRequest req;
@@ -578,14 +582,21 @@ namespace Actisense
 			req.isComplete = std::move(isComplete);
 
 			pending_requests_[key] = std::move(req);
-
-			return seqId;
 		}
 
-		bool BemProtocol::correlateResponse(const BemResponse& response, uint8_t srcAddr) {
+		bool BemProtocol::correlateResponse(const BemResponse& response, uint8_t srcAddr,
+											uint32_t* outLatencyMs) {
 			BemResponseCallback callbackToFire;
 			std::function<bool(const BemResponse&)> isCompletePred;
 			bool releaseEntry = true;
+
+			/* Helper: latency from a request's sentAt to now, clamped to uint32. */
+			const auto now = std::chrono::steady_clock::now();
+			const auto latencyFrom = [&now](std::chrono::steady_clock::time_point sentAt) -> uint32_t {
+				const auto ms =
+					std::chrono::duration_cast<std::chrono::milliseconds>(now - sentAt).count();
+				return ms < 0 ? 0u : static_cast<uint32_t>(ms);
+			};
 
 			{
 				std::lock_guard<std::mutex> lock(mutex_);
@@ -607,10 +618,13 @@ namespace Actisense
 					/* Refresh activity timestamp; if isComplete returns true
 					   below we'll erase, otherwise sentAt now reflects the
 					   most recent response and the inactivity window restarts. */
-					it->second.sentAt = std::chrono::steady_clock::now();
+					it->second.sentAt = now;
 					releaseEntry = false;
 				} else {
 					/* One-shot: move callback out and erase. */
+					if (outLatencyMs) {
+						*outLatencyMs = latencyFrom(it->second.sentAt);
+					}
 					callbackToFire = std::move(it->second.callback);
 					pending_requests_.erase(it);
 					releaseEntry = true;
@@ -630,6 +644,16 @@ namespace Actisense
 			}
 
 			if (!releaseEntry && isCompletePred) {
+				/* The isComplete predicate is user code and must not run under
+				   mutex_ (it may re-enter the session), so the lock is dropped
+				   between the lookup above and the erase below. This leaves a
+				   thin TOCTOU window. It is safe in practice because
+				   correlateResponse() and processTimeouts() are both invoked
+				   only from the single Rx thread; the lock guards solely against
+				   registerRequest() running on a user thread, and that path only
+				   inserts — it never erases or mutates an in-flight entry. The
+				   re-find below additionally tolerates the entry having already
+				   been released. */
 				const bool done = isCompletePred(response);
 				if (done) {
 					std::lock_guard<std::mutex> lock(mutex_);
@@ -638,6 +662,9 @@ namespace Actisense
 										 static_cast<BemCommandId>(response.header.bemId), srcAddr);
 					auto it = pending_requests_.find(key);
 					if (it != pending_requests_.end()) {
+						if (outLatencyMs) {
+							*outLatencyMs = latencyFrom(it->second.sentAt);
+						}
 						pending_requests_.erase(it);
 					}
 					++responses_correlated_;
@@ -725,11 +752,6 @@ namespace Actisense
 			return (static_cast<uint64_t>(srcAddr) << 32) |
 				   (static_cast<uint64_t>(static_cast<uint16_t>(bstId)) << 16) |
 				   static_cast<uint64_t>(static_cast<uint16_t>(bemId));
-		}
-
-		uint8_t BemProtocol::nextSequenceId() {
-			/* Note: mutex_ must be held by caller */
-			return sequence_counter_++;
 		}
 
 	} /* namespace Sdk */

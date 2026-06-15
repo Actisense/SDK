@@ -83,7 +83,7 @@ namespace Actisense
 			return origin;
 		}
 
-		void SessionImpl::asyncSend(const std::string& protocol, std::span<const uint8_t> payload,
+		void SessionImpl::asyncSend(SendProtocol protocol, std::span<const uint8_t> payload,
 									SendCompletion completion) {
 			if (!isConnected()) {
 				if (completion)
@@ -93,7 +93,7 @@ namespace Actisense
 
 			std::vector<uint8_t> frame;
 
-			if (protocol == "bst") {
+			if (protocol == SendProtocol::Bst) {
 				/* BST datagrams require a trailing zero-sum checksum byte:
 				 * sum(ID + length + payload + checksum) must be 0 mod 256.
 				 * Without it the device's BDTP parser drops the frame. The
@@ -106,11 +106,14 @@ namespace Actisense
 				bstPayload.push_back(checksum);
 				BdtpProtocol::encodeFrame(bstPayload, frame);
 			} else {
-				/* "raw" or any other value: pass the bytes through verbatim. */
+				/* SendProtocol::Raw: pass the bytes through verbatim. */
 				frame.assign(payload.begin(), payload.end());
 			}
 
 			traceWire(WireTraceDirection::Tx, frame);
+
+			metricsCollector_.recordWriteCall();
+			metricsCollector_.recordBytesSent(frame.size());
 
 			transport_->asyncSend(frame, [completion](ErrorCode code, std::size_t /*written*/) {
 				if (completion)
@@ -130,7 +133,21 @@ namespace Actisense
 			}
 
 			if (receiveThread_.joinable()) {
-				receiveThread_.join();
+				if (receiveThread_.get_id() == std::this_thread::get_id()) {
+					/* Self-join guard: close() was invoked from a user callback
+					   running ON the receive thread (e.g. an event handler calling
+					   session.close()). Joining ourselves would std::terminate, and
+					   detaching could leave the thread touching a destroyed object.
+					   running_ is now false and the transport is closed, so the
+					   receive loop exits as soon as this callback returns; the
+					   thread stays joinable and is reaped by the next close() /
+					   destructor call from the owning thread. */
+					ACTISENSE_LOG_WARN("Session",
+									   "close() called from the receive thread; deferring join "
+									   "to the owning thread");
+				} else {
+					receiveThread_.join();
+				}
 			}
 
 			bem_.clearPendingRequests();
@@ -291,6 +308,8 @@ namespace Actisense
 		void SessionImpl::asyncSendRaw(std::span<const uint8_t> frame,
 									   SendCompletionHandler completion) {
 			traceWire(WireTraceDirection::Tx, frame);
+			metricsCollector_.recordWriteCall();
+			metricsCollector_.recordBytesSent(frame.size());
 			transport_->asyncSend(frame, std::move(completion));
 		}
 
@@ -329,8 +348,9 @@ namespace Actisense
 
 			bem_.registerRequest(command.bemId, command.bstId, timeout, std::move(callback),
 								 targetN2kSourceAddress);
+			metricsCollector_.recordBemCommand();
 
-			asyncSend("bst", frame->rawData(), [this](ErrorCode code) {
+			asyncSend(SendProtocol::Bst, frame->rawData(), [this](ErrorCode code) {
 				if (code != ErrorCode::Ok && errorCallback_) {
 					errorCallback_(code, "Failed to send remote BEM command");
 				}
@@ -353,8 +373,9 @@ namespace Actisense
 			bem_.registerMultiReplyRequest(command.bemId, command.bstId, inactivityTimeout,
 										   std::move(isComplete), std::move(callback),
 										   targetN2kSourceAddress);
+			metricsCollector_.recordBemCommand();
 
-			asyncSend("bst", frame->rawData(), [this](ErrorCode code) {
+			asyncSend(SendProtocol::Bst, frame->rawData(), [this](ErrorCode code) {
 				if (code != ErrorCode::Ok && errorCallback_) {
 					errorCallback_(code, "Failed to send remote BEM command (multi-reply)");
 				}
@@ -375,9 +396,8 @@ namespace Actisense
 			}
 
 			/* Register for response correlation */
-			const uint8_t seqId =
-				bem_.registerRequest(command.bemId, command.bstId, timeout, std::move(callback));
-			(void)seqId; /* Sequence ID is embedded in the frame by BEM encoder in future */
+			bem_.registerRequest(command.bemId, command.bstId, timeout, std::move(callback));
+			metricsCollector_.recordBemCommand();
 
 			/* GIT-82: route through asyncSendRaw so the wire-trace Tx hook fires.
 			   Calling transport_->asyncSend directly here bypassed traceWire and
@@ -401,7 +421,7 @@ namespace Actisense
 								  uint8_t destination, uint8_t priority,
 								  SendCompletion completion) {
 			const BstFrame frame = BstFrame::create94(pgn, destination, payload, priority);
-			asyncSend("bst", frame.rawData(), std::move(completion));
+			asyncSend(SendProtocol::Bst, frame.rawData(), std::move(completion));
 		}
 
 		void SessionImpl::getOperatingMode(std::chrono::milliseconds timeout,
@@ -1043,7 +1063,7 @@ namespace Actisense
 				cmd.bemId, cmd.bstId, inactivityTimeout, decodeRxPgnEnableListF2Response,
 				std::move(callback), targetN2kSourceAddress);
 
-			asyncSend("bst", frame->rawData(), [this](ErrorCode code) {
+			asyncSend(SendProtocol::Bst, frame->rawData(), [this](ErrorCode code) {
 				if (code != ErrorCode::Ok && errorCallback_) {
 					errorCallback_(code, "Failed to send remote Get Rx PGN Enable List F2");
 				}
@@ -1070,7 +1090,7 @@ namespace Actisense
 				cmd.bemId, cmd.bstId, inactivityTimeout, decodeTxPgnEnableListF2Response,
 				std::move(callback), targetN2kSourceAddress);
 
-			asyncSend("bst", frame->rawData(), [this](ErrorCode code) {
+			asyncSend(SendProtocol::Bst, frame->rawData(), [this](ErrorCode code) {
 				if (code != ErrorCode::Ok && errorCallback_) {
 					errorCallback_(code, "Failed to send remote Get Tx PGN Enable List F2");
 				}
@@ -1089,7 +1109,7 @@ namespace Actisense
 					}
 					return;
 				}
-				asyncSend("bst", frame->rawData(), [this](ErrorCode code) {
+				asyncSend(SendProtocol::Bst, frame->rawData(), [this](ErrorCode code) {
 					if (code != ErrorCode::Ok && errorCallback_) {
 						errorCallback_(code, "Failed to send remote Get Supported PGN List");
 					}
@@ -1141,11 +1161,26 @@ namespace Actisense
 				return; /* Already running */
 			}
 
+			/* Guard against spawn-after-close: if the transport is not open (e.g.
+			   startReceiving raced a close(), or was called post-close), don't
+			   spawn a receive thread that would immediately exit yet never be
+			   joined. NOTE: startReceiving() and close() assume a single owning
+			   lifecycle thread (the pattern used by Api::open*); they are not
+			   safe to call concurrently from different threads. */
+			if (!isConnected()) {
+				running_ = false;
+				return;
+			}
+
 			receiveThread_ = std::thread(&SessionImpl::receiveThreadFunc, this);
 		}
 
 		std::size_t SessionImpl::processTimeouts() {
-			return bem_.processTimeouts();
+			const std::size_t timedOut = bem_.processTimeouts();
+			for (std::size_t i = 0; i < timedOut; ++i) {
+				metricsCollector_.recordBemTimeout();
+			}
+			return timedOut;
 		}
 
 		void SessionImpl::receiveThreadFunc() {
@@ -1167,6 +1202,8 @@ namespace Actisense
 				   must not leave this scope until `completed` becomes true. */
 				transport_->asyncRecv([&](ErrorCode code, ConstByteSpan data) {
 					if (code == ErrorCode::Ok && !data.empty()) {
+						metricsCollector_.recordReadCall();
+						metricsCollector_.recordBytesReceived(data.size());
 						{
 							std::ostringstream ss;
 							ss << "Received " << data.size() << " bytes from transport";
@@ -1176,6 +1213,10 @@ namespace Actisense
 										  data.size());
 						traceWire(WireTraceDirection::Rx, data);
 						processReceivedData(data);
+					} else if (code != ErrorCode::Ok && code != ErrorCode::TransportClosed &&
+							   code != ErrorCode::Canceled) {
+						/* Genuine transport error (not a normal close/cancel). */
+						metricsCollector_.recordTransportError(code);
 					}
 					{
 						std::lock_guard<std::mutex> lk(completion_mtx);
@@ -1229,6 +1270,11 @@ namespace Actisense
 				[this](ErrorCode code, std::string_view message) {
 					ACTISENSE_LOG_ERROR("Session",
 										std::string("BDTP error: ") + std::string(message));
+					if (code == ErrorCode::ChecksumError) {
+						metricsCollector_.recordChecksumError();
+					} else {
+						metricsCollector_.recordFramingError();
+					}
 					if (errorCallback_) {
 						errorCallback_(code, std::string(message));
 					}
@@ -1238,14 +1284,23 @@ namespace Actisense
 		void SessionImpl::handleBstDatagram(const BstDatagram& datagram) {
 			const auto bstId = static_cast<BstId>(datagram.bstId);
 
+			/* Every BDTP-emitted datagram is one BST frame received off the wire.
+			   Count it here (not only on the non-BEM branch) so framesReceived()
+			   includes BEM responses too. */
+			++frames_received_;
+			metricsCollector_.recordFrameParsed(datagram.bstId);
+
 			/* Check if this is a BEM response */
 			if (isBemResponse(bstId)) {
 				std::string error;
 				auto response = bem_.decodeResponse(datagram, error);
 				if (response) {
 					handleBemResponse(*response);
-				} else if (errorCallback_) {
-					errorCallback_(ErrorCode::MalformedFrame, error);
+				} else {
+					metricsCollector_.recordFrameDropped();
+					if (errorCallback_) {
+						errorCallback_(ErrorCode::MalformedFrame, error);
+					}
 				}
 				return;
 			}
@@ -1275,10 +1330,12 @@ namespace Actisense
 			std::string decodeError;
 			auto frame = bstDecoder_.decode(rawBst, decodeError);
 			if (frame) {
-				++frames_received_;
 				handleBstFrame(*frame);
-			} else if (errorCallback_) {
-				errorCallback_(ErrorCode::MalformedFrame, decodeError);
+			} else {
+				metricsCollector_.recordFrameDropped();
+				if (errorCallback_) {
+					errorCallback_(ErrorCode::MalformedFrame, decodeError);
+				}
 			}
 		}
 
@@ -1298,7 +1355,12 @@ namespace Actisense
 					auto response = bem_.decodeResponseFromBytes(innerBst, decodeError);
 					if (response) {
 						++bem_responses_received_;
-						if (bem_.correlateResponse(*response, frame.source())) {
+						if (response->header.errorCode != 0) {
+							metricsCollector_.recordBemDeviceError();
+						}
+						uint32_t latencyMs = 0;
+						if (bem_.correlateResponse(*response, frame.source(), &latencyMs)) {
+							metricsCollector_.recordBemResponse(latencyMs);
 							return;
 						}
 						emitUncorrelatedBemResponse(*response);
@@ -1322,8 +1384,14 @@ namespace Actisense
 		void SessionImpl::handleBemResponse(const BemResponse& response) {
 			++bem_responses_received_;
 
+			if (response.header.errorCode != 0) {
+				metricsCollector_.recordBemDeviceError();
+			}
+
 			/* Try to correlate with pending request */
-			if (bem_.correlateResponse(response)) {
+			uint32_t latencyMs = 0;
+			if (bem_.correlateResponse(response, kLocalSrcAddr, &latencyMs)) {
+				metricsCollector_.recordBemResponse(latencyMs);
 				return; /* Callback was invoked by correlator */
 			}
 

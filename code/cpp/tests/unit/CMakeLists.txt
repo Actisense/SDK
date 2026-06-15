@@ -27,6 +27,9 @@ add_sdk_test(test_port_pcode test_port_pcode.cpp)
 add_sdk_test(test_rx_pgn_enable test_rx_pgn_enable.cpp)
 add_sdk_test(test_tx_pgn_enable test_tx_pgn_enable.cpp)
 
+# Public BEM callbacks header standalone-compile check (GIT-112)
+add_sdk_test(test_bem_callbacks_standalone test_bem_callbacks_standalone.cpp)
+
 # Phase 2a/2b BEM Command tests
 add_sdk_test(test_device_control test_device_control.cpp)
 add_sdk_test(test_session_device_control test_session_device_control.cpp)
@@ -34,6 +37,7 @@ add_sdk_test(test_total_time test_total_time.cpp)
 add_sdk_test(test_echo test_echo.cpp)
 add_sdk_test(test_unsolicited_messages test_unsolicited_messages.cpp)
 add_sdk_test(test_session_unsolicited test_session_unsolicited.cpp)
+add_sdk_test(test_session_metrics test_session_metrics.cpp)
 
 # Phase 2c NMEA 2000 Product Info tests
 add_sdk_test(test_nmea2000_product_info test_nmea2000_product_info.cpp)

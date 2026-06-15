@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include "public/bem_responses/rx_pgn_enable.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -41,19 +43,6 @@ namespace Actisense
 		/// Default mask: accept from all sources
 		static constexpr uint32_t kRxPgnMaskAcceptAll = 0xFFFFFFFF;
 
-		/* Enumerations --------------------------------------------------------- */
-
-		/**************************************************************************/ /**
-		 \brief      Rx PGN Enable flag values
-		 \details    Controls PGN reception filtering
-		 *******************************************************************************/
-		enum class RxPgnEnableFlag : uint8_t
-		{
-			Disabled = 0x00,   ///< PGN reception disabled (filtered out)
-			Enabled = 0x01,	   ///< PGN reception enabled (passed through)
-			RespondMode = 0x02 ///< Device-specific respond mode
-		};
-
 		/* Data Structures ------------------------------------------------------ */
 
 		/**************************************************************************/ /**
@@ -65,17 +54,6 @@ namespace Actisense
 			uint32_t pgn = 0;					   ///< 24-bit PGN ID (stored in 32-bit)
 			std::optional<RxPgnEnableFlag> enable; ///< Enable flag (omit for GET)
 			std::optional<uint32_t> mask;		   ///< PGN mask (optional for SET)
-		};
-
-		/**************************************************************************/ /**
-		 \brief      Rx PGN Enable response structure
-		 \details    Decoded response from Rx PGN Enable command
-		 *******************************************************************************/
-		struct RxPgnEnableResponse
-		{
-			uint32_t pgn = 0;									///< PGN ID
-			RxPgnEnableFlag enable = RxPgnEnableFlag::Disabled; ///< Current enable state
-			uint32_t mask = 0;									///< Current PGN mask
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -97,7 +75,11 @@ namespace Actisense
 				return false;
 			}
 
-			/* PGN ID: bytes 0-3, little-endian */
+			/* PGN ID: bytes 0-3, little-endian (full 32-bit field). NOTE: the
+			   Rx/Tx PGN Enable command wire format carries a 4-byte PGN, unlike
+			   the Supported PGN List response (supported_pgn_list.hpp), which
+			   packs each PGN into 3 bytes. Both are correct per their command
+			   specs — do not "reconcile" them to a common width. */
 			response.pgn = static_cast<uint32_t>(data[0]) | (static_cast<uint32_t>(data[1]) << 8) |
 						   (static_cast<uint32_t>(data[2]) << 16) |
 						   (static_cast<uint32_t>(data[3]) << 24);

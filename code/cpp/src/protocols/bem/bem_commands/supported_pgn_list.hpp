@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "protocols/bem/bem_commands/rx_pgn_enable_list_f2.hpp" /* PgnListAccumulatorStatus */
+#include "public/bem_responses/supported_pgn_list.hpp"
 
 namespace Actisense
 {
@@ -54,31 +55,6 @@ namespace Actisense
 
 		/// Max PGNs per response message (firmware limit)
 		static constexpr std::size_t kSupportedPgnListMaxPgnsPerMessage = 48;
-
-		/* Data Structures ------------------------------------------------------ */
-
-		/**************************************************************************/ /**
-		 \brief      A single (pgnIndex, pgn) row in the Supported PGN List.
-		 *******************************************************************************/
-		struct SupportedPgnEntry
-		{
-			uint8_t pgnIndex = 0; ///< Device-local PGN index referenced by 0x4E/0x4F
-			uint32_t pgn = 0;	  ///< 24-bit NMEA 2000 PGN value
-		};
-
-		/**************************************************************************/ /**
-		 \brief      Supported PGN List response (single sub-list message).
-		 *******************************************************************************/
-		struct SupportedPgnListResponse
-		{
-			uint8_t transferId = 0;			 ///< Device-set transfer ID
-			uint32_t structureVariantId = 0; ///< Expected kSupportedPgnListSvId
-			uint16_t nmea2000DbVersion = 0;	 ///< × 1000 (e.g. 2100 = v2.100)
-			uint8_t totalListSize = 0;		 ///< Total PGNs in device's table
-			uint8_t firstSubIdx = 0;		 ///< First entry's index in this sub-list
-			uint8_t subCount = 0;			 ///< Entries in this sub-list
-			std::vector<SupportedPgnEntry> entries;
-		};
 
 		/* Helper Functions ----------------------------------------------------- */
 
@@ -133,6 +109,10 @@ namespace Actisense
 			for (uint8_t i = 0; i < response.subCount; ++i) {
 				SupportedPgnEntry entry;
 				entry.pgnIndex = data[offset];
+				/* Each Supported PGN List entry packs the PGN into 3 bytes
+				   (little-endian). This is deliberately narrower than the 4-byte
+				   PGN field in the Rx/Tx PGN Enable commands — both match their
+				   respective firmware codecs. */
 				entry.pgn = static_cast<uint32_t>(data[offset + 1]) |
 							(static_cast<uint32_t>(data[offset + 2]) << 8) |
 							(static_cast<uint32_t>(data[offset + 3]) << 16);
@@ -169,21 +149,6 @@ namespace Actisense
 		}
 
 		/* Chunked-walk aggregation ---------------------------------------- */
-
-		/**************************************************************************/ /**
-		 \brief      Aggregated Supported PGN List result.
-		 \details    Populated by SupportedPgnListAccumulator once a full walk
-					 (all sub-list GETs) has completed. `entries` is sized
-					 totalListSize on Done with the merged (pgnIndex → pgn)
-					 rows in device order.
-		 *******************************************************************************/
-		struct SupportedPgnListResult
-		{
-			uint8_t transferId = 0; ///< Device-set xid latched from reply #1
-			uint16_t nmea2000DbVersion = 0;
-			uint8_t totalListSize = 0;
-			std::vector<SupportedPgnEntry> entries;
-		};
 
 		/**************************************************************************/ /**
 		 \brief      Accumulator that merges 0x40 sub-list replies from a

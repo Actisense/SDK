@@ -1,5 +1,5 @@
-#if defined(__linux__) && !defined(__ENUMERATE_SERIAL_DEVICES_LINUX_H)
-#define __ENUMERATE_SERIAL_DEVICES_LINUX_H
+#if defined(__linux__) && !defined(__ACTISENSE_SDK_PLATFORM_LINUX_ENUMERATE_SERIAL_DEVICES)
+#define __ACTISENSE_SDK_PLATFORM_LINUX_ENUMERATE_SERIAL_DEVICES
 
 /**************************************************************************/ /**
  \file     	enumerate_serial_devices_linux.hpppp
@@ -31,4 +31,4 @@ namespace Actisense
 	} // namespace Sdk
 } // namespace Actisense
 
-#endif /* HEADER_GUARD */
+#endif /* __linux__ && __ACTISENSE_SDK_PLATFORM_LINUX_ENUMERATE_SERIAL_DEVICES */

@@ -40,4 +40,16 @@ endfunction()
 add_subdirectory(unit)
 add_subdirectory(integration)
 
+# ============================================================================
+# Static guard (GIT-112): no header under src/public/ may #include an internal
+# "protocols/" header. Pure CMake script test — portable, needs no compiler.
+# ============================================================================
+add_test(
+    NAME public_headers_no_protocols_include
+    COMMAND ${CMAKE_COMMAND}
+            -DPUBLIC_DIR=${SDK_PUBLIC_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/check_public_headers_guard.cmake
+)
+set_tests_properties(public_headers_no_protocols_include PROPERTIES LABELS "guard")
+
 message(STATUS "Tests configured (add test files in tests/unit/ and tests/integration/)")

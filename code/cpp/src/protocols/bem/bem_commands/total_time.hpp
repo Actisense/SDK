@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include "public/bem_responses/total_time.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -45,15 +47,6 @@ namespace Actisense
 		{
 			std::optional<uint32_t> totalTime; ///< Time to set in seconds (omit for GET)
 			std::optional<uint32_t> passkey;   ///< Security passkey (required for SET)
-		};
-
-		/**************************************************************************/ /**
-		 \brief      Total Time response structure
-		 \details    Decoded response from Total Time command
-		 *******************************************************************************/
-		struct TotalTimeResponse
-		{
-			uint32_t totalTime = 0; ///< Total operating time in seconds
 		};
 
 		/* Helper Functions ----------------------------------------------------- */

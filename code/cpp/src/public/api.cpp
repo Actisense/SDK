@@ -22,16 +22,15 @@ namespace Actisense
 	{
 		/**************************************************************************/ /**
 		 \brief      Convert version to string
-		 \return     C-string representation of the version (e.g., "0.1.0")
-		 \details    Uses a thread-local buffer so concurrent calls from multiple
-					 threads don't clobber each other's return value. The returned
-					 pointer is valid until the next call to toString() on the same
-					 thread.
+		 \return     String representation of the version (e.g., "0.1.0")
+		 \details    Returns an owning std::string so the result cannot alias a
+					 shared buffer across calls (the previous thread_local char[]
+					 returned a pointer that was overwritten by the next call).
 		 *******************************************************************************/
-		const char* Version::toString() const noexcept {
-			thread_local char buffer[32];
+		std::string Version::toString() const {
+			char buffer[32];
 			std::snprintf(buffer, sizeof(buffer), "%d.%d.%d", major, minor, patch);
-			return buffer;
+			return std::string(buffer);
 		}
 
 		/**************************************************************************/ /**

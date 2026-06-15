@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include "public/bem_responses/echo.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -45,15 +47,6 @@ namespace Actisense
 			std::vector<uint8_t> data; ///< Data to echo (0-252 bytes)
 		};
 
-		/**************************************************************************/ /**
-		 \brief      Echo response structure
-		 \details    Decoded response from Echo command
-		 *******************************************************************************/
-		struct EchoResponse
-		{
-			std::vector<uint8_t> data; ///< Echoed data (should match request)
-		};
-
 		/* Helper Functions ----------------------------------------------------- */
 
 		/**************************************************************************/ /**
@@ -75,7 +68,9 @@ namespace Actisense
 			}
 
 			const std::size_t arraySize = data[0];
-			if (arraySize > data.size() - 1) {
+			/* Written as an addition (not data.size() - 1) so it stays correct for
+			   any size without risking an unsigned underflow. */
+			if (1 + arraySize > data.size()) {
 				outError = "Echo response truncated: header reports " + std::to_string(arraySize) +
 						   " bytes, only " + std::to_string(data.size() - 1) + " present";
 				return false;

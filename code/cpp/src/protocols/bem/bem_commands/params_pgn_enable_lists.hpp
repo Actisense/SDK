@@ -19,6 +19,8 @@
 #include <string>
 #include <vector>
 
+#include "public/bem_responses/params_pgn_enable_lists.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -30,38 +32,6 @@ namespace Actisense
 
 		/// Params PGN Enable Lists response size (14 bytes)
 		static constexpr std::size_t kParamsPgnEnableListsResponseSize = 14;
-
-		/* Data Structures ------------------------------------------------------ */
-
-		/**************************************************************************/ /**
-		 \brief      Params PGN Enable Lists response structure
-		 \details    Contains capacity and synchronization status for PGN enable lists
-		 *******************************************************************************/
-		struct ParamsPgnEnableListsResponse
-		{
-			/* Rx PGN Enable List parameters */
-			uint16_t rxListMaxCapacity = 0;	 ///< Maximum Rx list entries
-			uint16_t rxListSessionCount = 0; ///< Current Rx session entries
-			uint16_t rxListActiveCount = 0;	 ///< Current Rx active entries
-
-			/* Tx PGN Enable List parameters */
-			uint16_t txListMaxCapacity = 0;	 ///< Maximum Tx list entries
-			uint16_t txListSessionCount = 0; ///< Current Tx session entries
-			uint16_t txListActiveCount = 0;	 ///< Current Tx active entries
-
-			/* Sync status flags */
-			uint8_t rxSyncStatus = 0; ///< Rx list sync status (0=synced, 1=pending)
-			uint8_t txSyncStatus = 0; ///< Tx list sync status (0=synced, 1=pending)
-
-			/// Check if Rx list is in sync with hardware
-			[[nodiscard]] bool isRxSynced() const noexcept { return rxSyncStatus == 0; }
-
-			/// Check if Tx list is in sync with hardware
-			[[nodiscard]] bool isTxSynced() const noexcept { return txSyncStatus == 0; }
-
-			/// Check if both lists are in sync
-			[[nodiscard]] bool isSynced() const noexcept { return isRxSynced() && isTxSynced(); }
-		};
 
 		/* Helper Functions ----------------------------------------------------- */
 

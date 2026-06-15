@@ -148,18 +148,26 @@ namespace Actisense
 
 				std::lock_guard<std::mutex> lock(mutex_);
 
-				/* Log to console if level enabled */
+				/* Log to console if level enabled. Use '\n' rather than std::endl:
+				   std::endl forces a flush on every line (CLAUDE.md anti-pattern).
+				   std::cerr is already unit-buffered, so errors still appear
+				   promptly. */
 				if (lvl <= consoleLvl) {
 					if (consoleOutput_) {
 						consoleOutput_(level, formatted);
 					} else {
-						std::cerr << formatted << std::endl;
+						std::cerr << formatted << '\n';
 					}
 				}
 
-				/* Log to file if level enabled and file is open */
+				/* Log to file if level enabled and file is open. '\n' (not
+				   std::endl) avoids an implicit flush; the explicit flush() below
+				   keeps the file current for crash diagnostics. NOTE (GIT-104
+				   follow-up): this flush runs while holding mutex_, so a slow disk
+				   can stall all logging threads — moving the file write to a
+				   background flush thread / double buffer is tracked separately. */
 				if (lvl <= fileLvl && logFile_.is_open()) {
-					logFile_ << formatted << std::endl;
+					logFile_ << formatted << '\n';
 					logFile_.flush();
 				}
 			}
