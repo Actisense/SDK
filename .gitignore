@@ -1,5 +1,9 @@
 *.log
 **/.vs/
 **/.claude/
+
+# CMake / MSBuild build output (e.g. build/, build_linux/, build_git114/)
+build/
+build_*/
 /code/python/utils/n2ksender/n2ksender.ini
 /code/python/utils/n2ksender/__pycache__/n2ksender.cpython-314.pyc
