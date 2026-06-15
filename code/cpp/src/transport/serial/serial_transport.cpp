@@ -27,6 +27,12 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+
+#include "transport/serial/posix_custom_baud.hpp"
+
+#if defined(__APPLE__)
+#include <IOKit/serial/ioss.h> /* IOSSIOSPEED for non-standard baud rates */
+#endif
 #endif
 
 namespace Actisense
@@ -104,6 +110,12 @@ namespace Actisense
 #endif
 			stopRequested_ = true;
 
+#if !defined(_WIN32)
+			/* Interrupt the read thread's select() immediately (POSIX). The flag
+			   is set above so it is visible once select() returns. */
+			signalWakePipe();
+#endif
+
 			/* Wake up any waiting threads */
 			messageBuffer_.notifyAll();
 
@@ -127,6 +139,7 @@ namespace Actisense
 				::close(fd_);
 				fd_ = -1;
 			}
+			closeWakePipe();
 #endif
 
 			portName_.clear();
@@ -253,6 +266,18 @@ namespace Actisense
 			if (tcgetattr(fd_, &originalTermios_) == 0) {
 				termiosRestoreNeeded_ = true;
 			}
+
+			/* Self-pipe so close() can interrupt the read thread's select()
+			   immediately instead of waiting for the next poll tick. */
+			if (!createWakePipe()) {
+				if (termiosRestoreNeeded_) {
+					tcsetattr(fd_, TCSANOW, &originalTermios_);
+					termiosRestoreNeeded_ = false;
+				}
+				::close(fd_);
+				fd_ = -1;
+				return ErrorCode::TransportOpenFailed;
+			}
 #endif
 
 			/* Configure port parameters. On failure, tear the handle/event down
@@ -278,6 +303,7 @@ namespace Actisense
 					::close(fd_);
 					fd_ = -1;
 				}
+				closeWakePipe();
 #endif
 				portName_.clear();
 				return configResult;
@@ -443,8 +469,13 @@ namespace Actisense
 				return ErrorCode::TransportOpenFailed;
 			}
 
-			/* Set baud rate */
-			speed_t baudSpeed;
+			/* Set baud rate. Standard rates map to a termios B-constant and are
+			   applied here via cfset[io]speed(). Non-standard rates have no
+			   B-constant; they are flagged and applied AFTER tcsetattr() via the
+			   platform's custom-baud mechanism (Linux BOTHER/TCSETS2, macOS
+			   IOSSIOSPEED) so that framing is configured first. */
+			bool standardBaud = true;
+			speed_t baudSpeed = B0;
 			switch (config.baud) {
 				case 9600:
 					baudSpeed = B9600;
@@ -470,14 +501,14 @@ namespace Actisense
 					break;
 #endif
 				default:
-					/* Only the standard termios baud constants are supported. Custom
-					   rates would need BOTHER + c_ispeed/c_ospeed (Linux) or
-					   IOSSIOSPEED (macOS); tracked as a follow-up. */
-					return ErrorCode::InvalidArgument;
+					standardBaud = false;
+					break;
 			}
 
-			cfsetispeed(&options, baudSpeed);
-			cfsetospeed(&options, baudSpeed);
+			if (standardBaud) {
+				cfsetispeed(&options, baudSpeed);
+				cfsetospeed(&options, baudSpeed);
+			}
 
 			/* Set data bits */
 			options.c_cflag &= ~CSIZE;
@@ -546,6 +577,27 @@ namespace Actisense
 
 			if (tcsetattr(fd_, TCSANOW, &options) != 0) {
 				return ErrorCode::TransportOpenFailed;
+			}
+
+			/* Apply a non-standard baud rate now that framing is configured.
+			   Must come after tcsetattr() (which would otherwise overwrite the
+			   custom speed). On a POSIX platform with no custom-baud mechanism
+			   the request is rejected rather than silently honoured at a wrong
+			   rate. */
+			if (!standardBaud) {
+#if defined(__linux__)
+				if (!detail::setCustomBaudLinux(fd_, config.baud)) {
+					return ErrorCode::TransportConfigurationFailed;
+				}
+#elif defined(__APPLE__)
+				speed_t customSpeed = static_cast<speed_t>(config.baud);
+				if (ioctl(fd_, IOSSIOSPEED, &customSpeed) != 0) {
+					return ErrorCode::TransportConfigurationFailed;
+				}
+#else
+				/* No portable custom-baud mechanism on this POSIX platform. */
+				return ErrorCode::TransportConfigurationFailed;
+#endif
 			}
 
 			/* Flush buffers */
@@ -739,27 +791,40 @@ namespace Actisense
 					fd_set readSet;
 					FD_ZERO(&readSet);
 					FD_SET(fd_, &readSet);
+					/* Watch the self-pipe too so close() can wake us at once. */
+					FD_SET(wakePipe_[0], &readSet);
+					const int nfds = std::max(fd_, wakePipe_[0]) + 1;
 
 					struct timeval tv;
 					tv.tv_sec = pollMs / 1000;
 					tv.tv_usec = (pollMs % 1000) * 1000;
 
-					const int selectResult = select(fd_ + 1, &readSet, nullptr, nullptr, &tv);
+					const int selectResult = select(nfds, &readSet, nullptr, nullptr, &tv);
 					if (selectResult > 0) {
-						const ssize_t result = ::read(fd_, buffer, max_bytes);
-						if (result > 0) {
-							bytes_read = static_cast<std::size_t>(result);
-						} else if (result == 0) {
-							/* read() == 0 means the peer closed the port (e.g. a USB
-							   serial adaptor was unplugged). Stop the thread instead of
-							   busy-spinning select()/read() forever. */
-							ACTISENSE_LOG_ERROR("Serial", "Serial port closed by peer (read returned 0)");
-							stopRequested_ = true;
-						} else if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
-							/* A hard I/O error (cable yank, device error). Transient
-							   conditions (EAGAIN/EINTR) are ignored and retried. */
-							ACTISENSE_LOG_ERROR("Serial", "Serial read I/O error; stopping read thread");
-							stopRequested_ = true;
+						if (FD_ISSET(wakePipe_[0], &readSet)) {
+							/* close() signalled shutdown. Drain the pipe and exit
+							   promptly rather than waiting for the next poll tick. */
+							drainWakePipe();
+							break;
+						}
+						if (FD_ISSET(fd_, &readSet)) {
+							const ssize_t result = ::read(fd_, buffer, max_bytes);
+							if (result > 0) {
+								bytes_read = static_cast<std::size_t>(result);
+							} else if (result == 0) {
+								/* read() == 0 means the peer closed the port (e.g. a USB
+								   serial adaptor was unplugged). Stop the thread instead of
+								   busy-spinning select()/read() forever. */
+								ACTISENSE_LOG_ERROR("Serial",
+													"Serial port closed by peer (read returned 0)");
+								stopRequested_ = true;
+							} else if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+								/* A hard I/O error (cable yank, device error). Transient
+								   conditions (EAGAIN/EINTR) are ignored and retried. */
+								ACTISENSE_LOG_ERROR("Serial",
+													"Serial read I/O error; stopping read thread");
+								stopRequested_ = true;
+							}
 						}
 					} else if (selectResult < 0 && errno != EINTR) {
 						ACTISENSE_LOG_ERROR("Serial", "Serial select() error; stopping read thread");
@@ -773,6 +838,70 @@ namespace Actisense
 			ACTISENSE_LOG_INFO("Serial", "Read thread exiting");
 		}
 #endif
+
+#if !defined(_WIN32)
+
+		bool SerialTransport::createWakePipe() noexcept {
+			if (pipe(wakePipe_) != 0) {
+				wakePipe_[0] = -1;
+				wakePipe_[1] = -1;
+				return false;
+			}
+			/* Make both ends non-blocking and close-on-exec. pipe2() would do
+			   this atomically on Linux but is unavailable on macOS, so use the
+			   portable fcntl() sequence on all POSIX targets. */
+			for (int i = 0; i < 2; ++i) {
+				const int statusFlags = fcntl(wakePipe_[i], F_GETFL, 0);
+				if (statusFlags == -1 ||
+					fcntl(wakePipe_[i], F_SETFL, statusFlags | O_NONBLOCK) == -1) {
+					closeWakePipe();
+					return false;
+				}
+				const int descFlags = fcntl(wakePipe_[i], F_GETFD, 0);
+				if (descFlags == -1 || fcntl(wakePipe_[i], F_SETFD, descFlags | FD_CLOEXEC) == -1) {
+					closeWakePipe();
+					return false;
+				}
+			}
+			return true;
+		}
+
+		void SerialTransport::signalWakePipe() noexcept {
+			if (wakePipe_[1] < 0) {
+				return;
+			}
+			const uint8_t byte = 1;
+			ssize_t written;
+			do {
+				written = ::write(wakePipe_[1], &byte, 1);
+			} while (written < 0 && errno == EINTR);
+			/* A full pipe (EAGAIN) means a wakeup is already pending — the read
+			   thread will still see the read end as readable, so that is fine. */
+		}
+
+		void SerialTransport::drainWakePipe() noexcept {
+			if (wakePipe_[0] < 0) {
+				return;
+			}
+			uint8_t scratch[64];
+			ssize_t got;
+			do {
+				got = ::read(wakePipe_[0], scratch, sizeof(scratch));
+			} while (got > 0 || (got < 0 && errno == EINTR));
+		}
+
+		void SerialTransport::closeWakePipe() noexcept {
+			if (wakePipe_[0] >= 0) {
+				::close(wakePipe_[0]);
+				wakePipe_[0] = -1;
+			}
+			if (wakePipe_[1] >= 0) {
+				::close(wakePipe_[1]);
+				wakePipe_[1] = -1;
+			}
+		}
+
+#endif /* !_WIN32 */
 
 		void SerialTransport::processAsyncOperations(uint8_t* buffer, std::size_t bytes_read) {
 			if (bytes_read == 0) {

@@ -17,6 +17,9 @@ add_sdk_test(test_debug_log test_debug_log.cpp)
 
 # Transport tests
 add_sdk_test(test_loopback_transport test_loopback_transport.cpp)
+# POSIX serial transport: custom baud + prompt-close wakeup (GIT-119).
+# Real tests are gated to POSIX; on Windows the exe contains a single skip.
+add_sdk_test(test_serial_transport_posix test_serial_transport_posix.cpp)
 
 # Protocol tests
 add_sdk_test(test_bdtp_protocol test_bdtp_protocol.cpp)

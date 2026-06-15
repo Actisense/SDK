@@ -55,6 +55,10 @@ set(SDK_SOURCES
     # Transport layer (internal)
     transport/loopback/loopback_transport.cpp
     transport/serial/serial_transport.cpp
+    # Linux custom-baud (BOTHER/TCSETS2) helper. Built on every platform; the
+    # body is gated to __linux__ and compiles to a no-op elsewhere. Kept in its
+    # own TU so <asm/termbits.h> never co-includes <termios.h>.
+    transport/serial/posix_custom_baud.cpp
 
     # Protocols
     protocols/bdtp/bdtp_protocol.cpp

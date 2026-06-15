@@ -151,6 +151,29 @@ namespace Actisense
 			 *******************************************************************************/
 			void processAsyncOperations(uint8_t* buffer, std::size_t bytes_read);
 
+#if !defined(_WIN32)
+			/**************************************************************************/ /**
+			 \brief      Create the self-pipe used to wake the read thread (POSIX).
+			 \return     true on success; on failure both ends are left closed.
+			 *******************************************************************************/
+			bool createWakePipe() noexcept;
+
+			/**************************************************************************/ /**
+			 \brief      Write a byte to the self-pipe to interrupt select() (POSIX).
+			 *******************************************************************************/
+			void signalWakePipe() noexcept;
+
+			/**************************************************************************/ /**
+			 \brief      Drain any pending bytes from the self-pipe read end (POSIX).
+			 *******************************************************************************/
+			void drainWakePipe() noexcept;
+
+			/**************************************************************************/ /**
+			 \brief      Close both ends of the self-pipe if open (POSIX).
+			 *******************************************************************************/
+			void closeWakePipe() noexcept;
+#endif
+
 			/* Platform handle */
 #if defined(_WIN32)
 			HANDLE handle_ = INVALID_HANDLE_VALUE;
@@ -165,6 +188,14 @@ namespace Actisense
 			struct termios originalTermios_{};
 			// clang-format on
 			bool termiosRestoreNeeded_ = false;
+			/* Self-pipe used to wake the read thread's select() promptly on
+			   close(), instead of waiting up to one poll tick. wakePipe_[0] is
+			   the read end (added to the select set); wakePipe_[1] is the write
+			   end (written by close()). A self-pipe is used on all POSIX targets
+			   — rather than eventfd on Linux — so Linux and macOS run identical
+			   wakeup code (the macOS path cannot be compiled on the Windows dev
+			   box, so keeping it identical to the testable Linux path is safest). */
+			int wakePipe_[2] = {-1, -1};
 #endif
 
 			std::string portName_;
