@@ -15,7 +15,7 @@
             ----------------------------------------------------------------
             The local gateway always lives on the host serial port
             (ACTISENSE_TEST_PORT, default "COM5"). It must be in
-            OM_NGTransferRxAllMode so PGN 126720 replies are forwarded to
+            NgTransferRxAllMode so PGN 126720 replies are forwarded to
             the host. The fixture saves the gateway's starting mode in
             SetUp, switches to Rx-All if needed, and restores in TearDown.
 
@@ -197,7 +197,7 @@ protected:
 		session_->startReceiving();
 		std::this_thread::sleep_for(kSetupDelay);
 
-		/* The local gateway must be in OM_NGTransferRxAllMode (2) for the
+		/* The local gateway must be in NgTransferRxAllMode (2) for the
 		   PGN 126720 reply path to reach the host (Toolkit observation:
 		   non-Rx-All gateway modes drop incoming PGN 126720 wrap replies on
 		   the floor — see project_ngt_transfer_mode_remote_bem memory).
@@ -394,7 +394,7 @@ private:
 		ASSERT_TRUE(current.has_value())
 			<< "Could not read local gateway operating mode - rig configuration broken";
 
-		const uint16_t rxAll = static_cast<uint16_t>(OperatingMode::OM_NGTransferRxAllMode);
+		const uint16_t rxAll = static_cast<uint16_t>(OperatingMode::NgTransferRxAllMode);
 		if (*current == rxAll) {
 			std::cout << "  Local gateway already in Rx-All mode" << std::endl;
 			return;
@@ -810,9 +810,9 @@ TEST_F(BemRemoteDeviceTest, OperatingMode_RoundTrip)
 	const OperatingMode baselineMode = *baseline;
 
 	const OperatingMode targetMode =
-		(baselineMode == OperatingMode::OM_NGTransferNormalMode)
-			? OperatingMode::OM_NGTransferRxAllMode
-			: OperatingMode::OM_NGTransferNormalMode;
+		(baselineMode == OperatingMode::NgTransferNormalMode)
+			? OperatingMode::NgTransferRxAllMode
+			: OperatingMode::NgTransferNormalMode;
 
 	struct ModeRestorer {
 		std::function<bool(OperatingMode, const char*)> set;
@@ -846,7 +846,7 @@ TEST_F(BemRemoteDeviceTest, OperatingMode_RoundTrip)
 
 TEST_F(BemRemoteDeviceTest, OperatingMode_NGConvertNormalMode_RoundTrip)
 {
-	/* OM_NGConvertNormalMode (4) is supported on NGW-1 and NGX-1 only — it
+	/* NgConvertNormalMode (4) is supported on NGW-1 and NGX-1 only — it
 	   switches the device into NGW-style NMEA 2000 → 0183 conversion. NGT-1
 	   rejects it. Gate on remoteIsNgx() so this round-trips the canonical
 	   convertible device when present, and SKIPs cleanly on the GIT-92
@@ -857,7 +857,7 @@ TEST_F(BemRemoteDeviceTest, OperatingMode_NGConvertNormalMode_RoundTrip)
 	   guard ModeRestorer ensures the remote is left clean even if any
 	   assertion mid-test fails. Mirrors test_bem_device.cpp:2355. */
 	if (!remoteIsNgx()) {
-		GTEST_SKIP() << "OM_NGConvertNormalMode round-trip is NGX-1 only (remote model="
+		GTEST_SKIP() << "NgConvertNormalMode round-trip is NGX-1 only (remote model="
 		             << modelIdToString(remoteModelId_) << ")";
 	}
 
@@ -888,12 +888,12 @@ TEST_F(BemRemoteDeviceTest, OperatingMode_NGConvertNormalMode_RoundTrip)
 	ASSERT_TRUE(baseline.has_value());
 	const OperatingMode baselineMode = *baseline;
 
-	const OperatingMode targetMode = OperatingMode::OM_NGConvertNormalMode;
+	const OperatingMode targetMode = OperatingMode::NgConvertNormalMode;
 
 	/* Skip if already in convert mode — OperatingMode_RoundTrip covers the
 	   alternate Normal↔Rx-All transition on this model. */
 	if (baselineMode == targetMode) {
-		GTEST_SKIP() << "Remote already in OM_NGConvertNormalMode; "
+		GTEST_SKIP() << "Remote already in NgConvertNormalMode; "
 		                "OperatingMode_RoundTrip covers the alternate transition";
 	}
 
@@ -915,7 +915,7 @@ TEST_F(BemRemoteDeviceTest, OperatingMode_NGConvertNormalMode_RoundTrip)
 	const auto changed = readMode("after-set-convert");
 	ASSERT_TRUE(changed.has_value());
 	ASSERT_EQ(*changed, targetMode)
-		<< "Remote did not report OM_NGConvertNormalMode after SET (got="
+		<< "Remote did not report NgConvertNormalMode after SET (got="
 		<< static_cast<uint16_t>(*changed) << ")";
 
 	ASSERT_TRUE(setMode(baselineMode, "back-to-baseline"));
@@ -930,7 +930,7 @@ TEST_F(BemRemoteDeviceTest, OperatingMode_NGConvertNormalMode_RoundTrip)
 
 TEST_F(BemRemoteDeviceTest, SetOperatingMode_RejectsBuffer1OnNgx)
 {
-	/* OM_BUFFER_1 (16) is a Buffer/Combiner mode supported only on multi-port
+	/* Buffer1 (16) is a Buffer/Combiner mode supported only on multi-port
 	   PRO-NDC-class hardware — an NGX must reject it. Verifies the firmware
 	   contract documented on OperatingMode: "if a mode is requested which is
 	   not available, the device will return an error code and remain in the
@@ -961,7 +961,7 @@ TEST_F(BemRemoteDeviceTest, SetOperatingMode_RejectsBuffer1OnNgx)
 	ASSERT_TRUE(before.has_value()) << "Could not read baseline mode";
 
 	auto setResult = syncAck([this](auto t, auto cb) {
-		remote_->setOperatingMode(OperatingMode::OM_BUFFER_1, t, std::move(cb));
+		remote_->setOperatingMode(OperatingMode::Buffer1, t, std::move(cb));
 	});
 
 	/* Either outcome is evidence of rejection:
@@ -969,9 +969,9 @@ TEST_F(BemRemoteDeviceTest, SetOperatingMode_RejectsBuffer1OnNgx)
 	   - Timeout (device declined to ack at all).
 	   The follow-up GET is what actually proves the SET didn't stick. */
 	EXPECT_NE(setResult.errorCode, ErrorCode::Ok)
-		<< "Remote NGX accepted OM_BUFFER_1 — firmware should reject "
+		<< "Remote NGX accepted Buffer1 — firmware should reject "
 		   "buffer/combiner modes on NGX-class hardware";
-	std::cout << "  SET OM_BUFFER_1 surfaced: ec="
+	std::cout << "  SET Buffer1 surfaced: ec="
 	          << static_cast<int>(setResult.errorCode)
 	          << " msg=\"" << setResult.errorMsg << "\"" << std::endl;
 

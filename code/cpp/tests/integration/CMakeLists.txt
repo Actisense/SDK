@@ -26,7 +26,7 @@ add_sdk_test(test_tx_pgn_blocking_fastpacket_proprietary test_tx_pgn_blocking_fa
 # GIT-106 diagnostic: NGT vs NGX divergence on PGN 59904 (ISO Request) host-Tx.
 # Requires ACTISENSE_TEST_NGT_PORT (NGT-1) and ACTISENSE_TEST_NGX_PORT (NGX-1).
 add_sdk_test(test_iso_request_git106 test_iso_request_git106.cpp)
-# Black-box NGX CAN Packet routing — OM_CanPacket / OM_CanPacketASCII (NGXSW-4207).
+# Black-box NGX CAN Packet routing — CanPacket / CanPacketAscii (NGXSW-4207).
 # Requires ACTISENSE_TEST_PORT (a real NGX on a live N2K bus); skips otherwise.
 add_sdk_test(test_can_packet_mode test_can_packet_mode.cpp)
 

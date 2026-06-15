@@ -427,7 +427,7 @@ int main(int argc, char* argv[]) {
 	bool modeSet = false;
 	{
 		SyncSignal sig;
-		session->setOperatingMode(OperatingMode::OM_NGTransferNormalMode, 5s,
+		session->setOperatingMode(OperatingMode::NgTransferNormalMode, 5s,
 			[&](ErrorCode code, std::string_view msg, ResponseOrigin) {
 				if (code == ErrorCode::Ok) {
 					modeSet = true;

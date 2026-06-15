@@ -17,7 +17,7 @@
             The original GIT-106 "failure" was a false negative: the
             witness gateway used to confirm the EA00 reached the bus was
             checked for "did the witness forward the EA00 back to host?",
-            and an NGX-class gateway in OM_NGTransferRxAllMode silently
+            and an NGX-class gateway in NgTransferRxAllMode silently
             filters PGN 59904 out of its bus-to-host forwarding (an NGX
             firmware quirk, tracked separately). The correct success
             indicator is the EE00 (Address Claim, PGN 60928) burst that
@@ -223,14 +223,14 @@ protected:
 		const auto curRx = getModeSync(rx);
 		ASSERT_TRUE(curRx.has_value()) << "Could not read Rx operating mode";
 
-		const uint16_t txTarget = static_cast<uint16_t>(OperatingMode::OM_NGTransferNormalMode);
-		const uint16_t rxTarget = static_cast<uint16_t>(OperatingMode::OM_NGTransferRxAllMode);
+		const uint16_t txTarget = static_cast<uint16_t>(OperatingMode::NgTransferNormalMode);
+		const uint16_t rxTarget = static_cast<uint16_t>(OperatingMode::NgTransferRxAllMode);
 
 		if (*curTx != txTarget) {
 			if (!savedTx.has_value()) {
 				savedTx = *curTx;
 			}
-			ASSERT_TRUE(setModeSync(tx, OperatingMode::OM_NGTransferNormalMode))
+			ASSERT_TRUE(setModeSync(tx, OperatingMode::NgTransferNormalMode))
 				<< "Failed to set Tx to Normal";
 			std::this_thread::sleep_for(kModeChangeSettle);
 		}
@@ -238,7 +238,7 @@ protected:
 			if (!savedRx.has_value()) {
 				savedRx = *curRx;
 			}
-			ASSERT_TRUE(setModeSync(rx, OperatingMode::OM_NGTransferRxAllMode))
+			ASSERT_TRUE(setModeSync(rx, OperatingMode::NgTransferRxAllMode))
 				<< "Failed to set Rx to Rx-All";
 			std::this_thread::sleep_for(kModeChangeSettle);
 		}
@@ -607,14 +607,14 @@ TEST(IsoRequestGit106BareTest, NgtSendAfterDualModeSet)
 
 	{
 		std::promise<ErrorCode> p; auto f = p.get_future();
-		ngt->setOperatingMode(OperatingMode::OM_NGTransferNormalMode, kDefaultTimeout,
+		ngt->setOperatingMode(OperatingMode::NgTransferNormalMode, kDefaultTimeout,
 			[&p](ErrorCode ec, std::string_view, ResponseOrigin) { p.set_value(ec); });
 		std::cout << "    NGT SetMode(Normal) ec=" << static_cast<int>(f.get()) << std::endl;
 	}
 	std::this_thread::sleep_for(std::chrono::milliseconds(1500));
 	{
 		std::promise<ErrorCode> p; auto f = p.get_future();
-		ngx->setOperatingMode(OperatingMode::OM_NGTransferRxAllMode, kDefaultTimeout,
+		ngx->setOperatingMode(OperatingMode::NgTransferRxAllMode, kDefaultTimeout,
 			[&p](ErrorCode ec, std::string_view, ResponseOrigin) { p.set_value(ec); });
 		std::cout << "    NGX SetMode(RxAll) ec=" << static_cast<int>(f.get()) << std::endl;
 	}
@@ -673,14 +673,14 @@ TEST(IsoRequestGit106BareTest, NgtPhaseAExactPriority6)
 
 	{
 		std::promise<ErrorCode> p; auto f = p.get_future();
-		ngt->setOperatingMode(OperatingMode::OM_NGTransferNormalMode, kDefaultTimeout,
+		ngt->setOperatingMode(OperatingMode::NgTransferNormalMode, kDefaultTimeout,
 			[&p](ErrorCode ec, std::string_view, ResponseOrigin) { p.set_value(ec); });
 		std::cout << "    NGT SetMode(Normal) ec=" << static_cast<int>(f.get()) << std::endl;
 	}
 	std::this_thread::sleep_for(std::chrono::milliseconds(1500));
 	{
 		std::promise<ErrorCode> p; auto f = p.get_future();
-		ngx->setOperatingMode(OperatingMode::OM_NGTransferRxAllMode, kDefaultTimeout,
+		ngx->setOperatingMode(OperatingMode::NgTransferRxAllMode, kDefaultTimeout,
 			[&p](ErrorCode ec, std::string_view, ResponseOrigin) { p.set_value(ec); });
 		std::cout << "    NGX SetMode(RxAll) ec=" << static_cast<int>(f.get()) << std::endl;
 	}
@@ -737,7 +737,7 @@ TEST(IsoRequestGit106BareTest, NgtSendAfterSetOperatingMode)
 
 	{
 		std::promise<ErrorCode> p; auto f = p.get_future();
-		session->setOperatingMode(OperatingMode::OM_NGTransferNormalMode, kDefaultTimeout,
+		session->setOperatingMode(OperatingMode::NgTransferNormalMode, kDefaultTimeout,
 			[&p](ErrorCode ec, std::string_view, ResponseOrigin) { p.set_value(ec); });
 		std::cout << "    SetOperatingMode(Normal) ec=" << static_cast<int>(f.get()) << std::endl;
 	}

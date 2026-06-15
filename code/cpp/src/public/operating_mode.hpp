@@ -50,7 +50,7 @@ namespace Actisense
 			 \details  	Use ARLModel ID to initialise correctly.
 			 \note		Enum value 0.
 			 ***************************************************************************/
-			OM_UndefinedMode = 0,
+			UndefinedMode = 0,
 
 			/* NGT-1 / NGX Operating Modes (1 to 3) -------------------------------- */
 
@@ -59,7 +59,7 @@ namespace Actisense
 			 \details  	Rx & Tx PGN Enable Lists are active.
 			 \note		Enum value 1.
 			 ***************************************************************************/
-			OM_NGTransferNormalMode = 1,
+			NgTransferNormalMode = 1,
 
 			/**********************************************************************/ /**
 			 \brief    	Rx Transfer All & Normal Tx Transfers using BST Protocol.
@@ -69,20 +69,20 @@ namespace Actisense
 						 Transfer method is BST93/94
 			 \note		Enum value 2.
 			 ***************************************************************************/
-			OM_NGTransferRxAllMode = 2,
+			NgTransferRxAllMode = 2,
 
 			/**********************************************************************/ /**
 			 \brief    	Legacy / spare transfer mode slot (mode 3).
 			 \details  	Historically labelled "Raw Rx & Tx Transfers". NGT never
 						 implemented mode 3, and the NGX no longer uses it for raw
-						 CAN — raw CAN-frame transfer moved to OM_CanPacket (5) /
-						 OM_CanPacketASCII (6), matching firmware OperatingModeCodes.h
+						 CAN — raw CAN-frame transfer moved to CanPacket (5) /
+						 CanPacketAscii (6), matching firmware OperatingModeCodes.h
 						 where mode 3 is now OM_NGTransferSpareMode. The enum value is
 						 retained (not removed) to preserve the public API surface for
-						 existing clients; new code should target OM_CanPacket instead.
+						 existing clients; new code should target CanPacket instead.
 			 \note		Enum value 3.
 			 ***************************************************************************/
-			OM_NGTransferRawMode = 3,
+			NgTransferRawMode = 3,
 
 			/* NGW-1 & NGX Operating Modes (4 to 4) -------------------------------- */
 			/**********************************************************************/ /**
@@ -92,7 +92,7 @@ namespace Actisense
 						 NGX: Switches device to NGW mode and translates NMEA 2000 to 0183
 			 \note		Enum value 4.
 			 ***************************************************************************/
-			OM_NGConvertNormalMode = 4,
+			NgConvertNormalMode = 4,
 
 			/* NGX / Gateway raw CAN Operating Modes (5 to 6) --------------------- */
 			/**********************************************************************/ /**
@@ -108,16 +108,16 @@ namespace Actisense
 						 serial-wired CAN-analyser mode.
 			 \note		Enum value 5. Matches firmware OperatingModeCodes.h OM_CanPacket.
 			 ***************************************************************************/
-			OM_CanPacket = 5,
+			CanPacket = 5,
 
 			/**********************************************************************/ /**
 			 \brief    	CAN Packet mode — raw CAN frames in ASCII.
-			 \details  	As OM_CanPacket, but CAN frames are transferred in ASCII
+			 \details  	As CanPacket, but CAN frames are transferred in ASCII
 						 format rather than as binary BST-95 frames.
 			 \note		Enum value 6. Matches firmware OperatingModeCodes.h
 						 OM_CanPacketASCII.
 			 ***************************************************************************/
-			OM_CanPacketASCII = 6,
+			CanPacketAscii = 6,
 
 
 			/* ---  Enum values 7 to 15 are reserved for use by Gateway products  --- */
@@ -128,20 +128,20 @@ namespace Actisense
 			 \details  	Input 1 -> Outputs 1 to 12. Output Baudrate = Input baudrate.
 			 \note		Enum value 16.
 			 ***************************************************************************/
-			OM_BUFFER_1 = 16,
+			Buffer1 = 16,
 			/**********************************************************************/ /**
 			 \brief    	Buffer Mode 2.
 			 \details  	Input 2 -> Outputs 1 to 12.	Output Baudrate = Input baudrate.
 			 \note		Enum value 17.
 			 ***************************************************************************/
-			OM_BUFFER_2,
+			Buffer2,
 			/**********************************************************************/ /**
 			 \brief    	Buffer Mode 3.
 			 \details  	Input 1 -> Outputs 1 to 6, Input 2 -> Output 7 to 12.
 						 Output Baudrate = Input baudrate.
 			 \note		Enum value 18.
 			 ***************************************************************************/
-			OM_BUFFER_3,
+			Buffer3,
 			/**********************************************************************/ /**
 			 \brief    	Autoswitch Direct 'Simple' Mode (1)
 			 \details  	Simple Autoswitch - signal detection only.
@@ -151,7 +151,7 @@ namespace Actisense
 						 DO NOT USE FOR NEW DESIGNS!
 			 \note		Enum value 19.
 			 ***************************************************************************/
-			OM_AUTOSWITCH_DIRECT,
+			AutoswitchDirect,
 			/**********************************************************************/ /**
 			 \brief    	Autoswitch 'Smart' Mode (2)
 			 \details  	SMART Autoswitch - full sentence and deep inspection.
@@ -164,7 +164,7 @@ namespace Actisense
 						 functions.
 			 \note		Enum value 20.
 			 ***************************************************************************/
-			OM_AUTOSWITCH_SMART,
+			AutoswitchSmart,
 			/**********************************************************************/ /**
 			 \brief    	Combiner / Multiplexer 'Slow' Mode (1)
 			 \details  	Output baud rate = slowest of all inputs
@@ -173,7 +173,7 @@ namespace Actisense
 						 algorithm if output data rate exceeds input.
 			 \note		Enum value 21.
 			 ***************************************************************************/
-			OM_COMBINE_1,
+			Combine1,
 			/**********************************************************************/ /**
 			 \brief    	Combiner / Multiplexer 'Fast' Mode (2).
 			 \details  	Output baud rate = fastest of all inputs.
@@ -182,23 +182,23 @@ namespace Actisense
 						 is present.
 			 \note		Enum value 22.
 			 ***************************************************************************/
-			OM_COMBINE_2,
+			Combine2,
 			/**********************************************************************/ /**
 			 \brief    	Test Mode 1.
 			 \details  	Instrument dependent "test" mode. Programmer can use this to
 						 initialise unit into a non-standard test mode such as simulator.
 			 \note		Enum value 23.
 			 ***************************************************************************/
-			OM_TEST_1,
+			Test1,
 			/**********************************************************************/ /**
 			 \brief    	NSI Mode 1.
 			 \details  	Reserved for NSI mode.
 			 \note		Enum value 24.
 			 ***************************************************************************/
-			OM_NSI_MODE_1 = 24, /* Reserved for NSI mode */
+			NsiMode1 = 24, /* Reserved for NSI mode */
 
 			/* All "Standard" modes are less than this number */
-			OM_LAST = 253,
+			LastStandard = 253,
 
 			/* General device/instrument Operating Modes  -------------------------- */
 			/**********************************************************************/ /**
@@ -210,9 +210,9 @@ namespace Actisense
 						 Any other modes supported will be special modes used to
 						 change operation or put into tests
 						 When such a device has started and initialised correctly, it
-						 will transition from OM_UndefinedMode to OM_NORMAL
+						 will transition from UndefinedMode to Normal
 			 ***************************************************************************/
-			OM_NORMAL = 512,
+			Normal = 512,
 
 			/* EMU/Perception Specific (Special) Operating Modes  -------------------------- */
 			/* none defined yet */
@@ -226,14 +226,14 @@ namespace Actisense
 			 \details  	Some devices support predefined modes that are
 						 not user configurable. These modes are defined
 						 here in the reserved range 40000 to 40255.
-						 OM_PREDEFINED_MODE_1 is the predefined default mode
+						 PredefinedMode1 is the predefined default mode
 			 \note		Enum start value 40000
 			 ***************************************************************************/
-			OM_PREDEFINED_MODE_1 = 40000,
-			OM_PREDEFINED_MODE_2 = 40001,
+			PredefinedMode1 = 40000,
+			PredefinedMode2 = 40001,
 
 			/* Max value of predefined mode reserved range */
-			OM_PREDEFINED_MODE_END = 40255,
+			PredefinedModeEnd = 40255,
 
 			/* User Operating Modes  ------------------------------------------------ */
 			/**********************************************************************/ /**
@@ -253,16 +253,16 @@ namespace Actisense
 
 			 \note		Enum value range 50000 to 59999 - to offer 9999 user modes!
 			 *******************************************************************************/
-			OM_USER_START = 50000,
-			OM_USER_1 = OM_USER_START,
-			OM_USER_2,
-			OM_USER_3,
-			OM_USER_4,
-			OM_USER_5,
-			OM_USER_LAST_DEFINED,
-			//* User modes can be defined up to OM_USER_END
-			OM_USER_END = 59999,
-			OM_NULL = 65535
+			UserStart = 50000,
+			User1 = UserStart,
+			User2,
+			User3,
+			User4,
+			User5,
+			UserLastDefined,
+			//* User modes can be defined up to UserEnd
+			UserEnd = 59999,
+			Null = 65535
 
 		};
 

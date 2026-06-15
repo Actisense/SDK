@@ -9,7 +9,7 @@
 
             Companion to the firmware work in NGXSW-4206 (XGXConfigurator routes
             SystemNames::CAN <-> serial, BST-95 / CAN-ASCII). Because the SDK now
-            exposes OM_CanPacket (5) and OM_CanPacketASCII (6) an SDK client can
+            exposes CanPacket (5) and CanPacketAscii (6) an SDK client can
             request the mode the firmware implements.
 
             ----------------------------------------------------------------
@@ -291,7 +291,7 @@ protected:
 	};
 
 	/* Core round-trip exercised once per CAN Packet mode. @p expectBst95Traffic
-	   is true only for the binary BST-95 mode (OM_CanPacket): in ASCII mode the
+	   is true only for the binary BST-95 mode (CanPacket): in ASCII mode the
 	   device emits CAN frames as ASCII text, which the SDK's BST decoder does
 	   not surface as BST-95 ParsedMessageEvents, so no BST-95 count is expected
 	   there. */
@@ -370,16 +370,16 @@ protected:
 
 /* Tests -------------------------------------------------------------------- */
 
-TEST_F(CanPacketModeTest, OM_CanPacket_RoundTrip)
+TEST_F(CanPacketModeTest, CanPacket_RoundTrip)
 {
 	/* Binary BST-95 CAN Packet mode (firmware mode 5). */
-	runRoundTrip(OperatingMode::OM_CanPacket, /*expectBst95Traffic=*/true);
+	runRoundTrip(OperatingMode::CanPacket, /*expectBst95Traffic=*/true);
 }
 
-TEST_F(CanPacketModeTest, OM_CanPacketASCII_RoundTrip)
+TEST_F(CanPacketModeTest, CanPacketAscii_RoundTrip)
 {
 	/* ASCII CAN Packet mode (firmware mode 6). */
-	runRoundTrip(OperatingMode::OM_CanPacketASCII, /*expectBst95Traffic=*/false);
+	runRoundTrip(OperatingMode::CanPacketAscii, /*expectBst95Traffic=*/false);
 }
 
 } /* namespace Test */

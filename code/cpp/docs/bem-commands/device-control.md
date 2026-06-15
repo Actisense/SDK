@@ -57,7 +57,7 @@ to EEPROM so they survive a power cycle. Wire-protocol detail:
 Typical pattern after a series of configuration `Set` commands:
 
 ```cpp
-bem.buildSetOperatingMode(static_cast<uint16_t>(OperatingMode::OM_NGTransferRxAllMode),
+bem.buildSetOperatingMode(static_cast<uint16_t>(OperatingMode::NgTransferRxAllMode),
                           frame, err);
 session->asyncSend("raw", frame, /* ... */);
 

@@ -12,8 +12,8 @@ Commands that read or write basic device-level state.
 
 ## Get / Set Operating Mode (`0x11`)
 
-Reads or sets the device operating mode (e.g. `OM_NGTransferNormalMode`,
-`OM_NGTransferRxAllMode`, `OM_NGConvertNormalMode`). Wire-protocol detail:
+Reads or sets the device operating mode (e.g. `NgTransferNormalMode`,
+`NgTransferRxAllMode`, `NgConvertNormalMode`). Wire-protocol detail:
 [operating-mode.md](../../../../docs/DataFormats/Binary/bem-detail/operating-mode.md).
 
 ```cpp
@@ -32,7 +32,7 @@ the wire. Use the `OperatingMode` enum from
 ```cpp
 #include "protocols/bem/bem_commands/operating_mode.hpp"
 
-bem.buildSetOperatingMode(static_cast<uint16_t>(OperatingMode::OM_NGTransferRxAllMode),
+bem.buildSetOperatingMode(static_cast<uint16_t>(OperatingMode::NgTransferRxAllMode),
                           frame, err);
 ```
 

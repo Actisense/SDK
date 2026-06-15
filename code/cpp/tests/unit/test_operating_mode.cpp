@@ -63,7 +63,7 @@ protected:
 
 TEST_F(OperatingModeHelperTest, EncodeSet_NormalMode)
 {
-	encodeOperatingModeSetRequest(OperatingMode::OM_NGTransferNormalMode, data_);
+	encodeOperatingModeSetRequest(OperatingMode::NgTransferNormalMode, data_);
 	ASSERT_EQ(data_.size(), kOperatingModeSetRequestSize);
 	EXPECT_EQ(data_[0], 0x01);
 	EXPECT_EQ(data_[1], 0x00);
@@ -71,7 +71,7 @@ TEST_F(OperatingModeHelperTest, EncodeSet_NormalMode)
 
 TEST_F(OperatingModeHelperTest, EncodeSet_RxAllMode)
 {
-	encodeOperatingModeSetRequest(OperatingMode::OM_NGTransferRxAllMode, data_);
+	encodeOperatingModeSetRequest(OperatingMode::NgTransferRxAllMode, data_);
 	ASSERT_EQ(data_.size(), 2u);
 	EXPECT_EQ(data_[0], 0x02);
 	EXPECT_EQ(data_[1], 0x00);
@@ -79,7 +79,7 @@ TEST_F(OperatingModeHelperTest, EncodeSet_RxAllMode)
 
 TEST_F(OperatingModeHelperTest, EncodeSet_ConvertNormalMode)
 {
-	encodeOperatingModeSetRequest(OperatingMode::OM_NGConvertNormalMode, data_);
+	encodeOperatingModeSetRequest(OperatingMode::NgConvertNormalMode, data_);
 	ASSERT_EQ(data_.size(), 2u);
 	EXPECT_EQ(data_[0], 0x04);
 	EXPECT_EQ(data_[1], 0x00);
@@ -87,8 +87,8 @@ TEST_F(OperatingModeHelperTest, EncodeSet_ConvertNormalMode)
 
 TEST_F(OperatingModeHelperTest, EncodeSet_CanPacketMode)
 {
-	/* NGXSW-4207: OM_CanPacket = 5 — raw CAN frames via BST-95. */
-	encodeOperatingModeSetRequest(OperatingMode::OM_CanPacket, data_);
+	/* NGXSW-4207: CanPacket = 5 — raw CAN frames via BST-95. */
+	encodeOperatingModeSetRequest(OperatingMode::CanPacket, data_);
 	ASSERT_EQ(data_.size(), 2u);
 	EXPECT_EQ(data_[0], 0x05);
 	EXPECT_EQ(data_[1], 0x00);
@@ -96,8 +96,8 @@ TEST_F(OperatingModeHelperTest, EncodeSet_CanPacketMode)
 
 TEST_F(OperatingModeHelperTest, EncodeSet_CanPacketAsciiMode)
 {
-	/* NGXSW-4207: OM_CanPacketASCII = 6 — raw CAN frames in ASCII. */
-	encodeOperatingModeSetRequest(OperatingMode::OM_CanPacketASCII, data_);
+	/* NGXSW-4207: CanPacketAscii = 6 — raw CAN frames in ASCII. */
+	encodeOperatingModeSetRequest(OperatingMode::CanPacketAscii, data_);
 	ASSERT_EQ(data_.size(), 2u);
 	EXPECT_EQ(data_[0], 0x06);
 	EXPECT_EQ(data_[1], 0x00);
@@ -105,8 +105,8 @@ TEST_F(OperatingModeHelperTest, EncodeSet_CanPacketAsciiMode)
 
 TEST_F(OperatingModeHelperTest, EncodeSet_LittleEndianHighByte)
 {
-	/* OM_NORMAL = 512 = 0x0200 — exercises the high byte */
-	encodeOperatingModeSetRequest(OperatingMode::OM_NORMAL, data_);
+	/* Normal = 512 = 0x0200 — exercises the high byte */
+	encodeOperatingModeSetRequest(OperatingMode::Normal, data_);
 	ASSERT_EQ(data_.size(), 2u);
 	EXPECT_EQ(data_[0], 0x00);
 	EXPECT_EQ(data_[1], 0x02);
@@ -114,8 +114,8 @@ TEST_F(OperatingModeHelperTest, EncodeSet_LittleEndianHighByte)
 
 TEST_F(OperatingModeHelperTest, EncodeSet_UserModeRange)
 {
-	/* OM_USER_1 = 50000 = 0xC350 */
-	encodeOperatingModeSetRequest(OperatingMode::OM_USER_1, data_);
+	/* User1 = 50000 = 0xC350 */
+	encodeOperatingModeSetRequest(OperatingMode::User1, data_);
 	ASSERT_EQ(data_.size(), 2u);
 	EXPECT_EQ(data_[0], 0x50);
 	EXPECT_EQ(data_[1], 0xC3);
@@ -123,8 +123,8 @@ TEST_F(OperatingModeHelperTest, EncodeSet_UserModeRange)
 
 TEST_F(OperatingModeHelperTest, EncodeSet_NullModeBoundary)
 {
-	/* OM_NULL = 0xFFFF — both bytes set */
-	encodeOperatingModeSetRequest(OperatingMode::OM_NULL, data_);
+	/* Null = 0xFFFF — both bytes set */
+	encodeOperatingModeSetRequest(OperatingMode::Null, data_);
 	ASSERT_EQ(data_.size(), 2u);
 	EXPECT_EQ(data_[0], 0xFF);
 	EXPECT_EQ(data_[1], 0xFF);
@@ -141,7 +141,7 @@ TEST_F(OperatingModeHelperTest, EncodeSet_RawUint16Overload)
 TEST_F(OperatingModeHelperTest, EncodeSet_ClearsExistingData)
 {
 	data_ = {0xDE, 0xAD, 0xBE, 0xEF};
-	encodeOperatingModeSetRequest(OperatingMode::OM_NGTransferNormalMode, data_);
+	encodeOperatingModeSetRequest(OperatingMode::NgTransferNormalMode, data_);
 	ASSERT_EQ(data_.size(), 2u);
 	EXPECT_EQ(data_[0], 0x01);
 	EXPECT_EQ(data_[1], 0x00);
@@ -150,26 +150,26 @@ TEST_F(OperatingModeHelperTest, EncodeSet_ClearsExistingData)
 TEST_F(OperatingModeHelperTest, DecodeResponse_NormalMode)
 {
 	const std::array<uint8_t, 2> payload = {0x01, 0x00};
-	OperatingMode mode = OperatingMode::OM_UndefinedMode;
+	OperatingMode mode = OperatingMode::UndefinedMode;
 	EXPECT_TRUE(decodeOperatingModeResponse(payload, mode, error_));
 	EXPECT_TRUE(error_.empty());
-	EXPECT_EQ(mode, OperatingMode::OM_NGTransferNormalMode);
+	EXPECT_EQ(mode, OperatingMode::NgTransferNormalMode);
 }
 
 TEST_F(OperatingModeHelperTest, DecodeResponse_HighByte)
 {
-	/* 0x0200 = 512 = OM_NORMAL */
+	/* 0x0200 = 512 = Normal */
 	const std::array<uint8_t, 2> payload = {0x00, 0x02};
-	OperatingMode mode = OperatingMode::OM_UndefinedMode;
+	OperatingMode mode = OperatingMode::UndefinedMode;
 	EXPECT_TRUE(decodeOperatingModeResponse(payload, mode, error_));
-	EXPECT_EQ(mode, OperatingMode::OM_NORMAL);
+	EXPECT_EQ(mode, OperatingMode::Normal);
 }
 
 TEST_F(OperatingModeHelperTest, DecodeResponse_UserMode)
 {
-	/* 0xC350 = 50000 = OM_USER_1 */
+	/* 0xC350 = 50000 = User1 */
 	const std::array<uint8_t, 2> payload = {0x50, 0xC3};
-	OperatingMode mode = OperatingMode::OM_UndefinedMode;
+	OperatingMode mode = OperatingMode::UndefinedMode;
 	EXPECT_TRUE(decodeOperatingModeResponse(payload, mode, error_));
 	EXPECT_EQ(static_cast<uint16_t>(mode), 50000u);
 }
@@ -178,15 +178,15 @@ TEST_F(OperatingModeHelperTest, DecodeResponse_AllowsTrailingBytes)
 {
 	/* Response with extra trailing bytes — decoder reads first 2 only */
 	const std::array<uint8_t, 5> payload = {0x02, 0x00, 0xAA, 0xBB, 0xCC};
-	OperatingMode mode = OperatingMode::OM_UndefinedMode;
+	OperatingMode mode = OperatingMode::UndefinedMode;
 	EXPECT_TRUE(decodeOperatingModeResponse(payload, mode, error_));
-	EXPECT_EQ(mode, OperatingMode::OM_NGTransferRxAllMode);
+	EXPECT_EQ(mode, OperatingMode::NgTransferRxAllMode);
 }
 
 TEST_F(OperatingModeHelperTest, DecodeResponse_TooShort_OneByte)
 {
 	const std::array<uint8_t, 1> payload = {0x01};
-	OperatingMode mode = OperatingMode::OM_UndefinedMode;
+	OperatingMode mode = OperatingMode::UndefinedMode;
 	EXPECT_FALSE(decodeOperatingModeResponse(payload, mode, error_));
 	EXPECT_FALSE(error_.empty());
 	EXPECT_NE(error_.find("too short"), std::string::npos);
@@ -195,7 +195,7 @@ TEST_F(OperatingModeHelperTest, DecodeResponse_TooShort_OneByte)
 TEST_F(OperatingModeHelperTest, DecodeResponse_TooShort_Empty)
 {
 	const std::array<uint8_t, 0> payload = {};
-	OperatingMode mode = OperatingMode::OM_UndefinedMode;
+	OperatingMode mode = OperatingMode::UndefinedMode;
 	EXPECT_FALSE(decodeOperatingModeResponse(payload, mode, error_));
 	EXPECT_FALSE(error_.empty());
 }
@@ -247,7 +247,7 @@ TEST_F(OperatingModeFrameTest, BuildGet_FrameContainsBemId)
 TEST_F(OperatingModeFrameTest, BuildSet_FrameContainsBemIdAndModeBytes)
 {
 	EXPECT_TRUE(protocol_.buildSetOperatingMode(
-		static_cast<uint16_t>(OperatingMode::OM_NGTransferRxAllMode), frame_, error_));
+		static_cast<uint16_t>(OperatingMode::NgTransferRxAllMode), frame_, error_));
 	EXPECT_TRUE(error_.empty());
 	EXPECT_FALSE(frame_.empty());
 
@@ -265,9 +265,9 @@ TEST_F(OperatingModeFrameTest, BuildSet_FrameContainsBemIdAndModeBytes)
 
 TEST_F(OperatingModeFrameTest, BuildSet_HighByteMode)
 {
-	/* OM_USER_1 = 50000 = 0xC350 */
+	/* User1 = 50000 = 0xC350 */
 	EXPECT_TRUE(protocol_.buildSetOperatingMode(
-		static_cast<uint16_t>(OperatingMode::OM_USER_1), frame_, error_));
+		static_cast<uint16_t>(OperatingMode::User1), frame_, error_));
 
 	bool ok = false;
 	for (std::size_t i = 4; i + 2 < frame_.size(); ++i) {
@@ -362,7 +362,7 @@ TEST_F(SessionOperatingModeTest, GetOperatingMode_SendsBareCommandWithBemId)
 
 TEST_F(SessionOperatingModeTest, SetOperatingMode_WritesModeLittleEndian)
 {
-	session_->setOperatingMode(OperatingMode::OM_NGTransferRxAllMode, kTimeout, nullptr);
+	session_->setOperatingMode(OperatingMode::NgTransferRxAllMode, kTimeout, nullptr);
 
 	const auto dgm = captureSentDatagram();
 	EXPECT_EQ(dgm.bstId, static_cast<uint8_t>(BstId::Bem_PG_A1));
@@ -374,7 +374,7 @@ TEST_F(SessionOperatingModeTest, SetOperatingMode_WritesModeLittleEndian)
 
 TEST_F(SessionOperatingModeTest, SetOperatingMode_HighByteMode)
 {
-	session_->setOperatingMode(OperatingMode::OM_USER_1, kTimeout, nullptr);
+	session_->setOperatingMode(OperatingMode::User1, kTimeout, nullptr);
 
 	const auto dgm = captureSentDatagram();
 	ASSERT_EQ(dgm.data.size(), 3u);
@@ -389,65 +389,65 @@ TEST_F(SessionOperatingModeTest, SetOperatingMode_HighByteMode)
 
 TEST(OperatingModeNameTest, NamedCases_NgGateway)
 {
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_UndefinedMode), "Undefined Mode");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_NGTransferNormalMode),
+	EXPECT_STREQ(OperatingModeName(OperatingMode::UndefinedMode), "Undefined Mode");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::NgTransferNormalMode),
 	             "NGT Transfer Normal Mode");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_NGTransferRxAllMode),
+	EXPECT_STREQ(OperatingModeName(OperatingMode::NgTransferRxAllMode),
 	             "NGT Transfer Rx All Mode");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_NGTransferRawMode),
+	EXPECT_STREQ(OperatingModeName(OperatingMode::NgTransferRawMode),
 	             "NGT Transfer Raw Mode");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_NGConvertNormalMode),
+	EXPECT_STREQ(OperatingModeName(OperatingMode::NgConvertNormalMode),
 	             "NGW Convert Normal Mode");
 }
 
 TEST(OperatingModeNameTest, NamedCases_CanPacket)
 {
 	/* NGXSW-4207: raw CAN-frame transfer modes (firmware modes 5 and 6). */
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_CanPacket), "CAN Packet Mode");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_CanPacketASCII),
+	EXPECT_STREQ(OperatingModeName(OperatingMode::CanPacket), "CAN Packet Mode");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::CanPacketAscii),
 	             "CAN Packet ASCII Mode");
 }
 
 TEST(OperatingModeNameTest, NamedCases_BufferAndCombiner)
 {
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_BUFFER_1), "Buffer Mode 1");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_BUFFER_2), "Buffer Mode 2");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_BUFFER_3), "Buffer Mode 3");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_AUTOSWITCH_DIRECT),
+	EXPECT_STREQ(OperatingModeName(OperatingMode::Buffer1), "Buffer Mode 1");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::Buffer2), "Buffer Mode 2");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::Buffer3), "Buffer Mode 3");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::AutoswitchDirect),
 	             "Autoswitch Direct (Deprecated)");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_AUTOSWITCH_SMART),
+	EXPECT_STREQ(OperatingModeName(OperatingMode::AutoswitchSmart),
 	             "Autoswitch Smart Mode");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_COMBINE_1), "Combiner Slow Mode");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_COMBINE_2), "Combiner Fast Mode");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_TEST_1), "Test Mode 1");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_NSI_MODE_1), "NSI Mode 1");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_LAST), "Last Standard Mode");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::Combine1), "Combiner Slow Mode");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::Combine2), "Combiner Fast Mode");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::Test1), "Test Mode 1");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::NsiMode1), "NSI Mode 1");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::LastStandard), "Last Standard Mode");
 }
 
 TEST(OperatingModeNameTest, NamedCases_GeneralAndPredefined)
 {
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_NORMAL), "Normal Mode");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_PREDEFINED_MODE_1), "Predefined Mode 1");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_PREDEFINED_MODE_2), "Predefined Mode 2");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_PREDEFINED_MODE_END),
+	EXPECT_STREQ(OperatingModeName(OperatingMode::Normal), "Normal Mode");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::PredefinedMode1), "Predefined Mode 1");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::PredefinedMode2), "Predefined Mode 2");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::PredefinedModeEnd),
 	             "Predefined Mode End");
 }
 
 TEST(OperatingModeNameTest, NamedCases_UserAndNull)
 {
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_USER_1), "User Mode 1");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_USER_2), "User Mode 2");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_USER_3), "User Mode 3");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_USER_4), "User Mode 4");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_USER_5), "User Mode 5");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_USER_LAST_DEFINED), "User Last Defined");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_USER_END), "User Mode End");
-	EXPECT_STREQ(OperatingModeName(OperatingMode::OM_NULL), "Null Mode");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::User1), "User Mode 1");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::User2), "User Mode 2");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::User3), "User Mode 3");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::User4), "User Mode 4");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::User5), "User Mode 5");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::UserLastDefined), "User Last Defined");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::UserEnd), "User Mode End");
+	EXPECT_STREQ(OperatingModeName(OperatingMode::Null), "Null Mode");
 }
 
 TEST(OperatingModeNameTest, UserModeRange_FallsThroughToGeneric)
 {
-	/* Unnamed value inside [OM_USER_START, OM_USER_END] should hit the
+	/* Unnamed value inside [UserStart, UserEnd] should hit the
 	   range fall-through and report "User Mode" (not "Unknown"). */
 	const auto unnamedUser = static_cast<OperatingMode>(50100u);
 	EXPECT_STREQ(OperatingModeName(unnamedUser), "User Mode");
@@ -455,8 +455,8 @@ TEST(OperatingModeNameTest, UserModeRange_FallsThroughToGeneric)
 
 TEST(OperatingModeNameTest, PredefinedModeRange_FallsThroughToGeneric)
 {
-	/* Unnamed value inside [OM_PREDEFINED_MODE_1, OM_PREDEFINED_MODE_END]
-	   that is not OM_PREDEFINED_MODE_1/2/END. */
+	/* Unnamed value inside [PredefinedMode1, PredefinedModeEnd]
+	   that is not PredefinedMode1/2/END. */
 	const auto unnamedPredef = static_cast<OperatingMode>(40100u);
 	EXPECT_STREQ(OperatingModeName(unnamedPredef), "Predefined Mode");
 }

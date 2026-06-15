@@ -358,8 +358,8 @@ TEST_F(RemoteBemLoopbackTest, GetOperatingMode_RoundTripsThroughPgn126720)
 	EXPECT_EQ(pgnPayload[0], kActisenseManufacturerByte1);
 	EXPECT_EQ(pgnPayload[1], kActisenseManufacturerByte2);
 
-	/* Synthesise a remote device reply: OperatingMode = OM_NGTransferNormalMode (1). */
-	const uint16_t mode = static_cast<uint16_t>(OperatingMode::OM_NGTransferNormalMode);
+	/* Synthesise a remote device reply: OperatingMode = NgTransferNormalMode (1). */
+	const uint16_t mode = static_cast<uint16_t>(OperatingMode::NgTransferNormalMode);
 	const std::array<uint8_t, 2> bemPayload{
 		static_cast<uint8_t>(mode & 0xFF), static_cast<uint8_t>((mode >> 8) & 0xFF)};
 
@@ -374,7 +374,7 @@ TEST_F(RemoteBemLoopbackTest, GetOperatingMode_RoundTripsThroughPgn126720)
 	auto [ec, errMsg, decoded] = fut.get();
 	EXPECT_EQ(ec, ErrorCode::Ok) << errMsg;
 	ASSERT_TRUE(decoded.has_value());
-	EXPECT_EQ(*decoded, OperatingMode::OM_NGTransferNormalMode);
+	EXPECT_EQ(*decoded, OperatingMode::NgTransferNormalMode);
 }
 
 TEST_F(RemoteBemLoopbackTest, SetOperatingMode_AckedReply)
@@ -383,7 +383,7 @@ TEST_F(RemoteBemLoopbackTest, SetOperatingMode_AckedReply)
 
 	std::promise<std::pair<ErrorCode, std::string>> promise;
 	remote->setOperatingMode(
-		OperatingMode::OM_NGTransferNormalMode, std::chrono::seconds(2),
+		OperatingMode::NgTransferNormalMode, std::chrono::seconds(2),
 		[&](ErrorCode ec, std::string_view msg, ResponseOrigin) {
 			promise.set_value({ec, std::string(msg)});
 		});
@@ -451,7 +451,7 @@ TEST_F(RemoteBemLoopbackTest, ReplyFromWrongSourceAddressDoesNotResolve)
 
 	/* Reply from a *different* remote address (0x43) — must not satisfy the
 	   request bound for 0x42. */
-	const uint16_t mode = static_cast<uint16_t>(OperatingMode::OM_NGTransferNormalMode);
+	const uint16_t mode = static_cast<uint16_t>(OperatingMode::NgTransferNormalMode);
 	const std::array<uint8_t, 2> bemPayload{
 		static_cast<uint8_t>(mode & 0xFF), static_cast<uint8_t>((mode >> 8) & 0xFF)};
 	const auto wrongSrc = buildWrappedReply(

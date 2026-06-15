@@ -15,10 +15,10 @@
               - DUT (transmitter):   any Actisense gateway capable of Tx
                 whose firmware emits the proprietary F2 enable-list variant
                 (NGX-1 and later). On ACTISENSE_TEST_PORT, switched to
-                OM_NGTransferNormalMode so the Tx PGN Enable list (including
+                NgTransferNormalMode so the Tx PGN Enable list (including
                 DP0) is honoured by the host-Tx path.
               - Receiver:            second Actisense gateway on
-                ACTISENSE_TEST_RX_PORT in OM_NGTransferRxAllMode so every
+                ACTISENSE_TEST_RX_PORT in NgTransferRxAllMode so every
                 PGN on the bus is forwarded to the host without applying
                 the receiver's own Rx-enable filter.
               - Both gateways physically on the same N2K bus.
@@ -564,7 +564,7 @@ private:
 		const auto current = getFut.get();
 		ASSERT_TRUE(current.has_value()) << "Could not read DUT operating mode";
 
-		const uint16_t target = static_cast<uint16_t>(OperatingMode::OM_NGTransferNormalMode);
+		const uint16_t target = static_cast<uint16_t>(OperatingMode::NgTransferNormalMode);
 		if (*current == target) {
 			std::cout << "  DUT already in Normal mode" << std::endl;
 			return;
@@ -573,7 +573,7 @@ private:
 
 		std::promise<ErrorCode> setProm;
 		auto setFut = setProm.get_future();
-		dut_->setOperatingMode(OperatingMode::OM_NGTransferNormalMode, kDefaultTimeout,
+		dut_->setOperatingMode(OperatingMode::NgTransferNormalMode, kDefaultTimeout,
 			[&setProm](ErrorCode ec, std::string_view, ResponseOrigin) {
 				setProm.set_value(ec);
 			});
@@ -597,7 +597,7 @@ private:
 		const auto current = getFut.get();
 		ASSERT_TRUE(current.has_value()) << "Could not read Rx operating mode";
 
-		const uint16_t target = static_cast<uint16_t>(OperatingMode::OM_NGTransferRxAllMode);
+		const uint16_t target = static_cast<uint16_t>(OperatingMode::NgTransferRxAllMode);
 		if (*current == target) {
 			std::cout << "  Rx already in Rx-All mode" << std::endl;
 			return;
@@ -606,7 +606,7 @@ private:
 
 		std::promise<ErrorCode> setProm;
 		auto setFut = setProm.get_future();
-		rx_->setOperatingMode(OperatingMode::OM_NGTransferRxAllMode, kDefaultTimeout,
+		rx_->setOperatingMode(OperatingMode::NgTransferRxAllMode, kDefaultTimeout,
 			[&setProm](ErrorCode ec, std::string_view, ResponseOrigin) {
 				setProm.set_value(ec);
 			});

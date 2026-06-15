@@ -176,7 +176,7 @@ protected:
 	}
 
 	/* True if the connected device is an NGX-1. Used to gate operating-mode
-	   tests that depend on NGX-only modes (OM_NGConvertNormalMode) or on
+	   tests that depend on NGX-only modes (NgConvertNormalMode) or on
 	   NGX-specific rejection of buffer/combiner modes. */
 	bool deviceIsNgx() const noexcept
 	{
@@ -300,10 +300,10 @@ TEST_F(BemDeviceTest, GetOperatingMode)
 
 	const uint16_t mode = static_cast<uint16_t>(data[0]) |
 	                      (static_cast<uint16_t>(data[1]) << 8);
-	EXPECT_NE(mode, static_cast<uint16_t>(OperatingMode::OM_UndefinedMode))
-		<< "Device reported OM_UndefinedMode (uninitialised)";
-	EXPECT_NE(mode, static_cast<uint16_t>(OperatingMode::OM_NULL))
-		<< "Device reported OM_NULL";
+	EXPECT_NE(mode, static_cast<uint16_t>(OperatingMode::UndefinedMode))
+		<< "Device reported UndefinedMode (uninitialised)";
+	EXPECT_NE(mode, static_cast<uint16_t>(OperatingMode::Null))
+		<< "Device reported Null";
 	std::cout << "  Operating Mode: " << OperatingModeName(static_cast<OperatingMode>(mode))
 	          << " (" << mode << ")" << std::endl;
 }
@@ -1485,8 +1485,8 @@ TEST_F(BemDeviceTest, RxPgnEnable_WellKnownPgnsAddressableViaPerPgn)
 		}
 	} restorer{setMode, baselineMode, true};
 
-	const auto kNormal = static_cast<uint16_t>(OperatingMode::OM_NGTransferNormalMode);
-	const auto kRxAll  = static_cast<uint16_t>(OperatingMode::OM_NGTransferRxAllMode);
+	const auto kNormal = static_cast<uint16_t>(OperatingMode::NgTransferNormalMode);
+	const auto kRxAll  = static_cast<uint16_t>(OperatingMode::NgTransferRxAllMode);
 
 	/* Pass 1: TransferNormal. */
 	ASSERT_TRUE(setMode(kNormal)) << "SET to TransferNormal failed";
@@ -1610,7 +1610,7 @@ TEST_F(BemDeviceTest, PgnEnable_ComprehensiveSweep)
 		true
 	};
 
-	const auto kNormal = static_cast<uint16_t>(OperatingMode::OM_NGTransferNormalMode);
+	const auto kNormal = static_cast<uint16_t>(OperatingMode::NgTransferNormalMode);
 	if (*baselineMode != kNormal) {
 		auto r = sendConvenience([this, kNormal](auto t, auto cb) {
 			session_->setOperatingMode(kNormal, t, std::move(cb));
@@ -2256,9 +2256,9 @@ TEST_F(BemDeviceTest, OperatingMode_RoundTrip)
 
 	/* Pick a different valid mode. Both 1 and 2 are accepted by NGT and NGX. */
 	const uint16_t targetMode =
-		(baselineMode == static_cast<uint16_t>(OperatingMode::OM_NGTransferNormalMode))
-			? static_cast<uint16_t>(OperatingMode::OM_NGTransferRxAllMode)
-			: static_cast<uint16_t>(OperatingMode::OM_NGTransferNormalMode);
+		(baselineMode == static_cast<uint16_t>(OperatingMode::NgTransferNormalMode))
+			? static_cast<uint16_t>(OperatingMode::NgTransferRxAllMode)
+			: static_cast<uint16_t>(OperatingMode::NgTransferNormalMode);
 
 	/* Scope guard: always SET the device back to the baseline mode on exit,
 	   even if an ASSERT_* below early-returns from the test body. */
@@ -2354,12 +2354,12 @@ TEST_F(BemDeviceTest, SetOperatingMode_NoChange)
 
 TEST_F(BemDeviceTest, OperatingMode_NGConvertNormalMode_RoundTrip)
 {
-	/* OM_NGConvertNormalMode (4) is supported on NGW-1 and NGX-1 only — it
+	/* NgConvertNormalMode (4) is supported on NGW-1 and NGX-1 only — it
 	   switches NGX into NGW-style NMEA 2000 → 0183 conversion. NGT-1 rejects
 	   it. Gate on NGX so the test runs on the canonical convertible device.
 	   See GIT-76 scope: third mode in the operating-mode coverage matrix. */
 	if (!deviceIsNgx()) {
-		GTEST_SKIP() << "OM_NGConvertNormalMode round-trip is NGX-1 only (model="
+		GTEST_SKIP() << "NgConvertNormalMode round-trip is NGX-1 only (model="
 		             << modelIdToString(modelId_) << ")";
 	}
 
@@ -2394,11 +2394,11 @@ TEST_F(BemDeviceTest, OperatingMode_NGConvertNormalMode_RoundTrip)
 	std::cout << "  Baseline: " << OperatingModeName(static_cast<OperatingMode>(baselineMode))
 	          << " (" << baselineMode << ")" << std::endl;
 
-	const uint16_t targetMode = static_cast<uint16_t>(OperatingMode::OM_NGConvertNormalMode);
+	const uint16_t targetMode = static_cast<uint16_t>(OperatingMode::NgConvertNormalMode);
 
 	/* Skip if already in convert mode — pick a different round-trip target. */
 	if (baselineMode == targetMode) {
-		GTEST_SKIP() << "Device already in OM_NGConvertNormalMode; "
+		GTEST_SKIP() << "Device already in NgConvertNormalMode; "
 		                "OperatingMode_RoundTrip covers the alternate transition";
 	}
 
@@ -2420,7 +2420,7 @@ TEST_F(BemDeviceTest, OperatingMode_NGConvertNormalMode_RoundTrip)
 	const auto changed = readMode("after-set-convert");
 	ASSERT_TRUE(changed.has_value());
 	ASSERT_EQ(*changed, targetMode)
-		<< "Device did not report OM_NGConvertNormalMode after SET (got=" << *changed << ")";
+		<< "Device did not report NgConvertNormalMode after SET (got=" << *changed << ")";
 	std::cout << "  After SET: " << OperatingModeName(static_cast<OperatingMode>(*changed))
 	          << " (" << *changed << ")" << std::endl;
 
@@ -2645,7 +2645,7 @@ TEST_F(BemDeviceTest, CanInfoField2_RoundTrip)
 
 TEST_F(BemDeviceTest, SetOperatingMode_RejectsBuffer1OnNgx)
 {
-	/* OM_BUFFER_1 (16) is a Buffer/Combiner mode supported only on multi-port
+	/* Buffer1 (16) is a Buffer/Combiner mode supported only on multi-port
 	   PRO-NDC-class hardware — an NGX must reject it. Verifies the firmware
 	   contract documented on OperatingMode: "if a mode is requested which is
 	   not available, the device will return an error code and remain in the
@@ -2675,7 +2675,7 @@ TEST_F(BemDeviceTest, SetOperatingMode_RejectsBuffer1OnNgx)
 	   BemResultCallback collapses that into a generic MalformedFrame. */
 	std::promise<BemResult> promise;
 	auto future = promise.get_future();
-	session_->setOperatingMode(static_cast<uint16_t>(OperatingMode::OM_BUFFER_1),
+	session_->setOperatingMode(static_cast<uint16_t>(OperatingMode::Buffer1),
 		kDefaultTimeout,
 		[&promise](const std::optional<BemResponse>& resp, ErrorCode ec,
 		           std::string_view msg)
@@ -2694,11 +2694,11 @@ TEST_F(BemDeviceTest, SetOperatingMode_RejectsBuffer1OnNgx)
 	   Either way, the device must remain in its baseline mode. */
 	if (setResult.errorCode == ErrorCode::Ok && setResult.response.has_value()) {
 		EXPECT_NE(setResult.response->header.errorCode, 0u)
-			<< "NGX accepted OM_BUFFER_1 — firmware should reject buffer/combiner modes";
-		std::cout << "  NGX rejected OM_BUFFER_1 with ARL error 0x" << std::hex
+			<< "NGX accepted Buffer1 — firmware should reject buffer/combiner modes";
+		std::cout << "  NGX rejected Buffer1 with ARL error 0x" << std::hex
 		          << setResult.response->header.errorCode << std::dec << std::endl;
 	} else {
-		std::cout << "  SET OM_BUFFER_1 surfaced SDK error: " << setResult.errorMsg
+		std::cout << "  SET Buffer1 surfaced SDK error: " << setResult.errorMsg
 		          << " (also acceptable evidence of rejection)" << std::endl;
 	}
 

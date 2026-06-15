@@ -647,9 +647,9 @@ void processUserInput(std::unique_ptr<SessionImpl>& session)
 
 		case 's':
 		case 'S':
-			std::cout << "[USER] Setting Operating Mode to 2 (OM_NGTransferRxAllMode)..." << std::endl;
+			std::cout << "[USER] Setting Operating Mode to 2 (NgTransferRxAllMode)..." << std::endl;
 			session->setOperatingMode(
-				2,  // OM_NGTransferRxAllMode
+				2,  // NgTransferRxAllMode
 				std::chrono::seconds(5),
 				[](const std::optional<BemResponse>& response, ErrorCode code, std::string_view errorMsg) {
 					if (code == ErrorCode::Ok && response)
@@ -662,7 +662,7 @@ void processUserInput(std::unique_ptr<SessionImpl>& session)
 
 						if (response->header.errorCode == 0)
 						{
-							std::cout << "      Operating Mode successfully set to 2 (OM_NGTransferRxAllMode)" << std::endl;
+							std::cout << "      Operating Mode successfully set to 2 (NgTransferRxAllMode)" << std::endl;
 						}
 						else
 						{

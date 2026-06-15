@@ -16,10 +16,10 @@ using namespace Actisense::Sdk;
 
 ## 1. Put the device into a transmitting mode
 
-PGN transmission only happens when the gateway is in an operating mode that has its Tx PGN list active. For NGT/NGX gateways that is `OM_NGTransferNormalMode` (mode 1):
+PGN transmission only happens when the gateway is in an operating mode that has its Tx PGN list active. For NGT/NGX gateways that is `NgTransferNormalMode` (mode 1):
 
 ```cpp
-session->setOperatingMode(OperatingMode::OM_NGTransferNormalMode,
+session->setOperatingMode(OperatingMode::NgTransferNormalMode,
                           std::chrono::seconds(5),
                           [](ErrorCode code, std::string_view msg) {
     if (code != ErrorCode::Ok) {
