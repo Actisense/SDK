@@ -42,6 +42,10 @@ set(SDK_SOURCES
     core/error_category.cpp
     core/session.cpp
     core/session_impl.cpp
+    core/session_commands.cpp
+    core/session_remote.cpp
+    core/session_receive.cpp
+    core/session_wire_trace.cpp
     core/remote_device.cpp
     core/remote_device_impl.cpp
     core/logger.cpp

@@ -14,6 +14,7 @@
 #include <string>
 #include <utility>
 
+#include "core/bem_helpers.hpp"
 #include "core/session_impl.hpp"
 #include "protocols/bem/bem_commands/can_config.hpp"
 #include "protocols/bem/bem_commands/can_info_fields.hpp"
@@ -32,87 +33,13 @@ namespace Actisense
 {
 	namespace Sdk
 	{
-		namespace
-		{
-			BemCommand makeBemA1(BemCommandId id) {
-				BemCommand cmd;
-				cmd.bstId = BstId::Bem_PG_A1;
-				cmd.bemId = id;
-				return cmd;
-			}
-
-			/* Translate a BEM response into "ack" semantics: invoke the typed
-			   ack callback with origin, mapping device errorCode != 0 to
-			   ErrorCode::MalformedFrame so callers see a non-Ok result. */
-			/* Populate the responder-identity fields on @p origin from the
-			   BEM reply header. Called when a response is in hand. */
-			void stampOriginFromResponse(ResponseOrigin& origin,
-										 const BemResponse& response) noexcept {
-				origin.modelId = response.header.modelId;
-				origin.serialNumber = response.header.serialNumber;
-			}
-
-			template <typename AckCallback>
-			BemResponseCallback wrapAck(SessionImpl& session, uint8_t srcAddr,
-										AckCallback callback) {
-				return BemResponseCallback{[&session, srcAddr, cb = std::move(callback)](
-											   const std::optional<BemResponse>& response,
-											   ErrorCode code, std::string_view errorMsg) {
-					if (!cb) {
-						return;
-					}
-					ResponseOrigin origin = session.makeRemoteOrigin(srcAddr);
-					if (response) {
-						stampOriginFromResponse(origin, *response);
-					}
-					if (code != ErrorCode::Ok || !response) {
-						cb(code, errorMsg, std::move(origin));
-						return;
-					}
-					if (response->header.errorCode != 0) {
-						cb(ErrorCode::MalformedFrame, "Device returned BEM error code",
-						   std::move(origin));
-						return;
-					}
-					cb(ErrorCode::Ok, {}, std::move(origin));
-				}};
-			}
-
-			/* Translate a BEM response into a typed get-result: decode and
-			   invoke the typed callback (code, errMsg, optional<value>, origin). */
-			template <typename DecodedT, typename Decoder, typename TypedCallback>
-			BemResponseCallback wrapTyped(SessionImpl& session, uint8_t srcAddr, Decoder decoder,
-										  TypedCallback callback) {
-				return BemResponseCallback{[&session, srcAddr, decoder, cb = std::move(callback)](
-											   const std::optional<BemResponse>& response,
-											   ErrorCode code, std::string_view errorMsg) {
-					if (!cb) {
-						return;
-					}
-					ResponseOrigin origin = session.makeRemoteOrigin(srcAddr);
-					if (response) {
-						stampOriginFromResponse(origin, *response);
-					}
-					if (code != ErrorCode::Ok || !response) {
-						cb(code, errorMsg, std::nullopt, std::move(origin));
-						return;
-					}
-					if (response->header.errorCode != 0) {
-						cb(ErrorCode::MalformedFrame, "Device returned BEM error code",
-						   std::nullopt, std::move(origin));
-						return;
-					}
-					DecodedT decoded;
-					std::string decodeError;
-					if (!decoder(response->data, decoded, decodeError)) {
-						cb(ErrorCode::MalformedFrame, decodeError, std::nullopt, std::move(origin));
-						return;
-					}
-					cb(ErrorCode::Ok, {}, std::make_optional(std::move(decoded)),
-					   std::move(origin));
-				}};
-			}
-		} /* namespace */
+		/* Shared BEM helpers (GIT-116): makeBemA1, wrapAck and wrapTyped now live
+		   in core/bem_helpers.hpp. RemoteDevice always targets a real remote
+		   source address (never the kLocalSrcAddr sentinel), so makeOrigin()
+		   inside the wrappers resolves to makeRemoteOrigin() exactly as before. */
+		using detail::makeBemA1;
+		using detail::wrapAck;
+		using detail::wrapTyped;
 
 		RemoteDevice::Impl::Impl(SessionImpl& session, uint8_t n2kSourceAddress) noexcept
 			: session_(session), src_addr_(n2kSourceAddress) {}
