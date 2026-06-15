@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`Api::openWithTransport()` lets callers supply their own transport
+  (GIT-108).** The transport abstraction `ITransport` is now part of the public
+  surface (`public/transport.hpp`); `openWithTransport(options, transport, …)`
+  opens a session over a caller-provided `ITransport` instead of the built-in
+  `TransportKind` selection, so the SDK can be driven over a custom transport
+  (e.g. a test harness bridging to an emulated device). `Api::open()` now
+  delegates to it. A null transport or null `onOpened` reports
+  `ErrorCode::InvalidArgument`; a failed transport open propagates the failure
+  code. The change is additive — existing `Api::open()` behaviour is unchanged.
 - **`OM_CanPacket` (5) and `OM_CanPacketASCII` (6) added to the public
   `OperatingMode` enum (NGXSW-4207).** These let an SDK client request the NGX
   raw-CAN modes the firmware implements (NGXSW-4206), in which the device
