@@ -15,6 +15,7 @@
 
 #include <gtest/gtest.h>
 #include <array>
+#include <span>
 #include <vector>
 
 namespace Actisense
@@ -141,13 +142,35 @@ TEST_F(Nmea2000ProductInfoTest, ProductInfo_RejectsLegacyMultiMessage)
 TEST_F(Nmea2000ProductInfoTest, ProductInfo_ConvertPaddedString)
 {
 	const uint8_t data[] = {'H', 'e', 'l', 'l', 'o', 0xFF, 0xFF, 0xFF};
-	EXPECT_EQ(convertPaddedString(data, 8), "Hello");
+	EXPECT_EQ(convertPaddedString(std::span<const uint8_t>(data)), "Hello");
 }
 
 TEST_F(Nmea2000ProductInfoTest, ProductInfo_ConvertPaddedStringEmpty)
 {
 	const uint8_t data[] = {0xFF, 0xFF, 0xFF, 0xFF};
-	EXPECT_EQ(convertPaddedString(data, 4), "");
+	EXPECT_EQ(convertPaddedString(std::span<const uint8_t>(data)), "");
+}
+
+TEST_F(Nmea2000ProductInfoTest, ProductInfo_EncodePaddedStringRoundTrip)
+{
+	/* encodePaddedString fills the field width and 0xFF-pads the tail; the
+	   convertPaddedString round-trip must recover the original string. */
+	std::array<uint8_t, kProductInfoStringMaxLen> buffer{};
+	encodePaddedString("NGT-1", buffer);
+
+	EXPECT_EQ(buffer[5], 0xFF); /* First pad byte after the string */
+	EXPECT_EQ(buffer.back(), 0xFF);
+	EXPECT_EQ(convertPaddedString(buffer), "NGT-1");
+}
+
+TEST_F(Nmea2000ProductInfoTest, ProductInfo_EncodePaddedStringTruncatesToBuffer)
+{
+	/* A string longer than the buffer is truncated to the field width with no
+	   padding bytes left over. */
+	std::array<uint8_t, 4> buffer{};
+	encodePaddedString("TooLong", buffer);
+
+	EXPECT_EQ(convertPaddedString(buffer), "TooL");
 }
 
 TEST_F(Nmea2000ProductInfoTest, ProductInfo_Constants)

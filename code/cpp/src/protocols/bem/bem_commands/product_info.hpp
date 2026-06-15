@@ -47,22 +47,21 @@ namespace Actisense
 
 		/**************************************************************************/ /**
 		 \brief      Convert 0xFF-padded buffer to string
-		 \param[in]  data       Buffer containing padded string
-		 \param[in]  maxLen     Maximum string length
+		 \param[in]  data       Buffer containing the padded string; its extent is
+								 the fixed field width to scan.
 		 \return     Converted string (trimmed of 0xFF padding)
 		 \details    Strings in Product Info are padded with 0xFF to fill the
 					 fixed-length fields. This function extracts the actual string.
 		 *******************************************************************************/
-		[[nodiscard]] inline std::string convertPaddedString(const uint8_t* data,
-															 std::size_t maxLen) {
+		[[nodiscard]] inline std::string convertPaddedString(std::span<const uint8_t> data) {
 			std::string result;
-			result.reserve(maxLen);
+			result.reserve(data.size());
 
-			for (std::size_t i = 0; i < maxLen; ++i) {
-				if (data[i] == 0xFF || data[i] == 0x00) {
+			for (const uint8_t byte : data) {
+				if (byte == 0xFF || byte == 0x00) {
 					break; /* End of string (0xFF padding or null terminator) */
 				}
-				result += static_cast<char>(data[i]);
+				result += static_cast<char>(byte);
 			}
 
 			return result;
@@ -71,19 +70,19 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Encode string to 0xFF-padded buffer
 		 \param[in]  str        String to encode
-		 \param[out] data       Output buffer
-		 \param[in]  maxLen     Maximum string length (buffer will be padded to this)
+		 \param[out] data       Output buffer; filled to its full extent (the field
+								 width) and padded with 0xFF beyond the string.
 		 \details    Encodes a string into a fixed-length buffer, padding with 0xFF.
 		 *******************************************************************************/
-		inline void encodePaddedString(const std::string& str, uint8_t* data, std::size_t maxLen) {
-			const std::size_t copyLen = (str.size() < maxLen) ? str.size() : maxLen;
+		inline void encodePaddedString(const std::string& str, std::span<uint8_t> data) {
+			const std::size_t copyLen = (str.size() < data.size()) ? str.size() : data.size();
 
 			for (std::size_t i = 0; i < copyLen; ++i) {
 				data[i] = static_cast<uint8_t>(str[i]);
 			}
 
 			/* Pad remaining bytes with 0xFF */
-			for (std::size_t i = copyLen; i < maxLen; ++i) {
+			for (std::size_t i = copyLen; i < data.size(); ++i) {
 				data[i] = 0xFF;
 			}
 		}
@@ -140,16 +139,19 @@ namespace Actisense
 				static_cast<uint16_t>(data[6]) | (static_cast<uint16_t>(data[7]) << 8);
 
 			/* Model ID: bytes 8-39 (32 bytes) */
-			response.modelId = convertPaddedString(&data[8], kProductInfoStringMaxLen);
+			response.modelId = convertPaddedString(data.subspan(8, kProductInfoStringMaxLen));
 
 			/* Software Version: bytes 40-71 (32 bytes) */
-			response.softwareVersion = convertPaddedString(&data[40], kProductInfoStringMaxLen);
+			response.softwareVersion =
+				convertPaddedString(data.subspan(40, kProductInfoStringMaxLen));
 
 			/* Model Version: bytes 72-103 (32 bytes) */
-			response.modelVersion = convertPaddedString(&data[72], kProductInfoStringMaxLen);
+			response.modelVersion =
+				convertPaddedString(data.subspan(72, kProductInfoStringMaxLen));
 
 			/* Model Serial Code: bytes 104-135 (32 bytes) */
-			response.modelSerialCode = convertPaddedString(&data[104], kProductInfoStringMaxLen);
+			response.modelSerialCode =
+				convertPaddedString(data.subspan(104, kProductInfoStringMaxLen));
 
 			/* Certification Level: byte 136 */
 			response.certificationLevel = data[136];

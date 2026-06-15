@@ -55,50 +55,66 @@ namespace Actisense
 		 *******************************************************************************/
 		struct ResponseOrigin
 		{
-			/// N2K source address of the responding device. For TransportPath::Local
-			/// this is 0xFF (kLocalSrcAddr sentinel — i.e. "the locally connected
-			/// gateway", whose actual N2K SA is not reported in the BEM reply
-			/// header). For TransportPath::Remote it is the SA of the remote
-			/// device the RemoteDevice handle was opened against.
+			/**********************************************************************/ /**
+			 \brief      N2K source address of the responding device.
+			 \details    For TransportPath::Local this is 0xFF (kLocalSrcAddr
+						 sentinel — i.e. "the locally connected gateway", whose
+						 actual N2K SA is not reported in the BEM reply header).
+						 For TransportPath::Remote it is the SA of the remote device
+						 the RemoteDevice handle was opened against.
+			 ***************************************************************************/
 			uint8_t n2kSourceAddress = 0xFF;
 
-			/// Human-readable identifier of the Session/transport that received
-			/// this reply. Derived from the transport configuration at session
-			/// open (e.g. "COM5", "tcp://host:port", "loopback"). Useful when a
-			/// single callback aggregates replies from multiple concurrent
-			/// Sessions. Empty if the session did not record a label.
-			///
-			/// DESIGN NOTE (GIT-104): deliberately an owning std::string rather
-			/// than a std::string_view into a session-owned label. ResponseOrigin
-			/// is passed by value into callbacks and consumers are free to copy it
-			/// out and inspect it after the originating Session has closed; a view
-			/// would dangle in that case. The per-callback string allocation is an
-			/// accepted cost for that lifetime safety.
+			/**********************************************************************/ /**
+			 \brief      Identifier of the Session/transport that received this reply.
+			 \details    Human-readable; derived from the transport configuration at
+						 session open (e.g. "COM5", "tcp://host:port", "loopback").
+						 Useful when a single callback aggregates replies from multiple
+						 concurrent Sessions. Empty if the session did not record a
+						 label.
+			 \note       DESIGN NOTE (GIT-104): deliberately an owning std::string
+						 rather than a std::string_view into a session-owned label.
+						 ResponseOrigin is passed by value into callbacks and consumers
+						 are free to copy it out and inspect it after the originating
+						 Session has closed; a view would dangle in that case. The
+						 per-callback string allocation is an accepted cost for that
+						 lifetime safety.
+			 ***************************************************************************/
 			std::string transportId;
 
-			/// Wrapping path: Local (direct BEM) vs Remote (PGN 126720 wrap).
+			/**********************************************************************/ /**
+			 \brief      Wrapping path: Local (direct BEM) vs Remote (PGN 126720 wrap).
+			 ***************************************************************************/
 			TransportPath path = TransportPath::Local;
 
-			/// Steady-clock timestamp captured at response delivery (BEM decode
-			/// step inside the SDK). Not a precise wire-arrival time — there is
-			/// some hop latency between the transport read and BEM decode —
-			/// but consistently sampled, so suitable for latency tracking and
-			/// log correlation across many replies.
+			/**********************************************************************/ /**
+			 \brief      Steady-clock timestamp captured at response delivery.
+			 \details    Sampled at the BEM decode step inside the SDK. Not a precise
+						 wire-arrival time — there is some hop latency between the
+						 transport read and BEM decode — but consistently sampled, so
+						 suitable for latency tracking and log correlation across many
+						 replies.
+			 ***************************************************************************/
 			std::chrono::steady_clock::time_point receivedAt{};
 
-			/// ARL model ID self-reported by the responding device in the BEM
-			/// reply header (see ArlModelId). Lets callers identify *what*
-			/// kind of device replied without an extra getHardwareInfo round
-			/// trip — particularly useful when the responder is a previously
-			/// unknown N2K device behind the gateway. Zero if the reply did
-			/// not carry a header (e.g. transport-level failure before any
-			/// bytes returned), or for aggregated multi-message callbacks
-			/// where no single header captures the train.
+			/**********************************************************************/ /**
+			 \brief      ARL model ID self-reported by the responding device.
+			 \details    Decoded from the BEM reply header (see ArlModelId). Lets
+						 callers identify *what* kind of device replied without an
+						 extra getHardwareInfo round trip — particularly useful when
+						 the responder is a previously unknown N2K device behind the
+						 gateway. Zero if the reply did not carry a header (e.g.
+						 transport-level failure before any bytes returned), or for
+						 aggregated multi-message callbacks where no single header
+						 captures the train.
+			 ***************************************************************************/
 			uint16_t modelId = 0;
 
-			/// Responding device's hardware serial number, decoded from the
-			/// BEM reply header. Zero under the same conditions as
-			/// modelId == 0.
+			/**********************************************************************/ /**
+			 \brief      Responding device's hardware serial number.
+			 \details    Decoded from the BEM reply header. Zero under the same
+						 conditions as modelId == 0.
+			 ***************************************************************************/
 			uint32_t serialNumber = 0;
 		};
 
