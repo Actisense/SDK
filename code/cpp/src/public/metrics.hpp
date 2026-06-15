@@ -1,13 +1,15 @@
 #ifndef __ACTISENSE_SDK_METRICS_HPP
 #define __ACTISENSE_SDK_METRICS_HPP
 
-/**************************************************************************/ /**
- \file       metrics.hpp
- \brief      Metrics data structures for Actisense SDK
- \details    Defines structures for collecting operational metrics and statistics
+/*==============================================================================
+\file       metrics.hpp
+\author     (Created) Phil Whitehurst
+\date       (Created) 25/01/2026
+\brief      Metrics data structures for Actisense SDK
+\details    Defines structures for collecting operational metrics and statistics
 
- \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
- *******************************************************************************/
+\copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
+==============================================================================*/
 
 /* Dependent includes ------------------------------------------------------- */
 #include <chrono>

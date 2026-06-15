@@ -1,17 +1,19 @@
 #ifndef __ACTISENSE_SDK_SESSION_HPP
 #define __ACTISENSE_SDK_SESSION_HPP
 
-/**************************************************************************/ /**
- \file       session.hpp
- \brief      Session handle for Actisense SDK
- \details    Protocol-aware device communication handle. Session is a
-			 non-polymorphic, move-only, ABI-stable pimpl facade: every method
-			 forwards one-line to an opaque implementation held via
-			 std::unique_ptr. Growing the API appends member symbols rather than
-			 mutating a vtable (GIT-115).
+/*==============================================================================
+\file       session.hpp
+\author     (Created) Phil Whitehurst
+\date       (Created) 02/01/2026
+\brief      Session handle for Actisense SDK
+\details    Protocol-aware device communication handle. Session is a
+			non-polymorphic, move-only, ABI-stable pimpl facade: every method
+			forwards one-line to an opaque implementation held via
+			std::unique_ptr. Growing the API appends member symbols rather than
+			mutating a vtable (GIT-115).
 
- \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
- *******************************************************************************/
+\copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
+==============================================================================*/
 
 /* Dependent includes ------------------------------------------------------- */
 #include <chrono>

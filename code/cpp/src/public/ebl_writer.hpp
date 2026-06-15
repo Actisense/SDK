@@ -1,22 +1,24 @@
 #ifndef __ACTISENSE_SDK_EBL_WRITER_HPP
 #define __ACTISENSE_SDK_EBL_WRITER_HPP
 
-/**************************************************************************/ /**
- \file       ebl_writer.hpp
- \brief      EBL (Enhanced Binary Log) record writer
- \details    Customer-facing helper that emits Actisense EBL log records to a
-			 user-supplied byte sink. EBL is a self-describing binary format
-			 carrying timestamp markers, direction markers and raw byte data;
-			 files written by this class are readable by the EBL Reader tool
-			 and any other consumer of the Actisense EBL format.
+/*==============================================================================
+\file       ebl_writer.hpp
+\author     (Created) Phil Whitehurst
+\date       (Created) 30/04/2026
+\brief      EBL (Enhanced Binary Log) record writer
+\details    Customer-facing helper that emits Actisense EBL log records to a
+			user-supplied byte sink. EBL is a self-describing binary format
+			carrying timestamp markers, direction markers and raw byte data;
+			files written by this class are readable by the EBL Reader tool
+			and any other consumer of the Actisense EBL format.
 
-			 This is a port of the embedded-side EBL writer (CommonLib's
-			 EblEmbedded and DesktopLib's EBLDocExportEBL) into the modern
-			 C++20 SDK so that customers no longer need to reference the
-			 private internal libraries to capture or replay traffic.
+			This is a port of the embedded-side EBL writer (CommonLib's
+			EblEmbedded and DesktopLib's EBLDocExportEBL) into the modern
+			C++20 SDK so that customers no longer need to reference the
+			private internal libraries to capture or replay traffic.
 
- \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
- *******************************************************************************/
+\copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
+==============================================================================*/
 
 /* Dependent includes ------------------------------------------------------- */
 #include <chrono>

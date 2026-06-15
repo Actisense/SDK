@@ -1,13 +1,15 @@
 #ifndef __ACTISENSE_SDK_LOGGING_HPP
 #define __ACTISENSE_SDK_LOGGING_HPP
 
-/**************************************************************************/ /**
- \file       logging.hpp
- \brief      Logging interface and configuration for Actisense SDK
- \details    Defines pluggable logging interface with log levels and categories
+/*==============================================================================
+\file       logging.hpp
+\author     (Created) Phil Whitehurst
+\date       (Created) 25/01/2026
+\brief      Logging interface and configuration for Actisense SDK
+\details    Defines pluggable logging interface with log levels and categories
 
- \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
- *******************************************************************************/
+\copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
+==============================================================================*/
 
 /* Dependent includes ------------------------------------------------------- */
 #include <memory>

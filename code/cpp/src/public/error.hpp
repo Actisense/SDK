@@ -1,13 +1,15 @@
 #ifndef __ACTISENSE_SDK_ERROR_HPP
 #define __ACTISENSE_SDK_ERROR_HPP
 
-/**************************************************************************/ /**
- \file       error.hpp
- \brief      Error codes and error category for Actisense SDK
- \details    Defines ErrorCode enum and std::error_category integration
+/*==============================================================================
+\file       error.hpp
+\author     (Created) Phil Whitehurst
+\date       (Created) 02/01/2026
+\brief      Error codes and error category for Actisense SDK
+\details    Defines ErrorCode enum and std::error_category integration
 
- \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
- *******************************************************************************/
+\copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
+==============================================================================*/
 
 /* Dependent includes ------------------------------------------------------- */
 #include <functional>

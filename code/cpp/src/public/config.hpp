@@ -1,13 +1,15 @@
 #ifndef __ACTISENSE_SDK_CONFIG_HPP
 #define __ACTISENSE_SDK_CONFIG_HPP
 
-/**************************************************************************/ /**
- \file       config.hpp
- \brief      Configuration structures for Actisense SDK
- \details    Transport configuration, session options, and endpoint definitions
+/*==============================================================================
+\file       config.hpp
+\author     (Created) Phil Whitehurst
+\date       (Created) 02/01/2026
+\brief      Configuration structures for Actisense SDK
+\details    Transport configuration, session options, and endpoint definitions
 
- \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
- *******************************************************************************/
+\copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
+==============================================================================*/
 
 /* Dependent includes ------------------------------------------------------- */
 #include <chrono>

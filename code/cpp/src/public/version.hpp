@@ -1,13 +1,15 @@
 #ifndef __ACTISENSE_SDK_VERSION_HPP
 #define __ACTISENSE_SDK_VERSION_HPP
 
-/**************************************************************************/ /**
- \file       version.hpp
- \brief      Actisense SDK version information
- \details    Compile-time version constants and runtime version query
+/*==============================================================================
+\file       version.hpp
+\author     (Created) Phil Whitehurst
+\date       (Created) 02/01/2026
+\brief      Actisense SDK version information
+\details    Compile-time version constants and runtime version query
 
- \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
- *******************************************************************************/
+\copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
+==============================================================================*/
 
 /* Dependent includes ------------------------------------------------------- */
 #include <cstdint>

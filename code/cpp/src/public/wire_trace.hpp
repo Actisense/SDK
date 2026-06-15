@@ -1,16 +1,18 @@
 #ifndef __ACTISENSE_SDK_WIRE_TRACE_HPP
 #define __ACTISENSE_SDK_WIRE_TRACE_HPP
 
-/**************************************************************************/ /**
- \file       wire_trace.hpp
- \brief      Optional wire-trace (hex dump) callback for protocol debugging
- \details    Captures every byte the SDK reads from or writes to the transport
-			 and renders it as a human-readable hex dump (or, in a future
-			 extension, an Actisense EBL binary log). Disabled by default;
-			 enabled per session via Session::setWireTrace().
+/*==============================================================================
+\file       wire_trace.hpp
+\author     (Created) Phil Whitehurst
+\date       (Created) 30/04/2026
+\brief      Optional wire-trace (hex dump) callback for protocol debugging
+\details    Captures every byte the SDK reads from or writes to the transport
+			and renders it as a human-readable hex dump (or, in a future
+			extension, an Actisense EBL binary log). Disabled by default;
+			enabled per session via Session::setWireTrace().
 
- \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
- *******************************************************************************/
+\copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
+==============================================================================*/
 
 /* Dependent includes ------------------------------------------------------- */
 #include <chrono>

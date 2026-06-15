@@ -1,13 +1,15 @@
 #ifndef __ACTISENSE_SDK_EVENTS_HPP
 #define __ACTISENSE_SDK_EVENTS_HPP
 
-/**************************************************************************/ /**
- \file       events.hpp
- \brief      Event types for Actisense SDK
- \details    Defines parsed message events and device status events
+/*==============================================================================
+\file       events.hpp
+\author     (Created) Phil Whitehurst
+\date       (Created) 02/01/2026
+\brief      Event types for Actisense SDK
+\details    Defines parsed message events and device status events
 
- \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
- *******************************************************************************/
+\copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
+==============================================================================*/
 
 /* Dependent includes ------------------------------------------------------- */
 #include <any>
