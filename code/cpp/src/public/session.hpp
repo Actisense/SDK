@@ -66,6 +66,18 @@ namespace Actisense
 					 no vtable, so sizeof(Session) == sizeof(a pointer) and adding a
 					 new verb only appends a member symbol — the binary layout of
 					 shipped consumers is unaffected (GIT-115).
+
+		 \par Threading
+					 Callbacks — send completions and every typed BEM callback — are
+					 delivered on the SDK's internal receive thread
+					 (SessionImpl::receiveThreadFunc), never on the thread that
+					 issued the request. A callback may safely make further SDK
+					 calls (re-entrancy is permitted), but must not block: it runs
+					 on the single receive thread, so blocking it stalls delivery of
+					 all subsequent callbacks and responses. std::span and
+					 std::string_view arguments handed to a callback are valid only
+					 for the duration of that callback — copy them (to std::string /
+					 std::vector) if they must outlive it.
 		 *******************************************************************************/
 		class Session final
 		{

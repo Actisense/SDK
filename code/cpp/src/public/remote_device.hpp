@@ -60,6 +60,18 @@ namespace Actisense
 		 \details    Obtained from Session::openRemote(). The same Session can
 					 produce many RemoteDevice handles, one per addressable
 					 device on the bus.
+
+		 \par Threading
+					 RemoteDevice callbacks follow the same contract as Session:
+					 every typed BEM callback is delivered on the owning session's
+					 internal receive thread (SessionImpl::receiveThreadFunc), never
+					 on the thread that issued the request. A callback may safely
+					 make further SDK calls (re-entrancy is permitted), but must not
+					 block, since it runs on the single receive thread and blocking
+					 it stalls delivery of all subsequent callbacks and responses.
+					 std::span and std::string_view arguments handed to a callback
+					 are valid only for the duration of that callback — copy them
+					 (to std::string / std::vector) if they must outlive it.
 		 *******************************************************************************/
 		class RemoteDevice final
 		{
