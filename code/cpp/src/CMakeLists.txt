@@ -66,6 +66,7 @@ set(SDK_SOURCES
 
     # Utilities
     util/bdtp_frame_assembler.cpp
+    util/debug_log.cpp
     util/stderr_logger.cpp
 
     # Public API implementation

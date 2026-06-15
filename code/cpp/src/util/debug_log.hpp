@@ -8,19 +8,27 @@
 			 protocol and transport issues. Supports separate log levels
 			 for console and file outputs.
 
+			 Console output is synchronous (written on the calling thread so
+			 it remains visible right up to a crash). File output is handed to
+			 a single background worker thread via an in-memory queue, so a slow
+			 disk never stalls callers on the serial / BDTP / session hot paths
+			 (GIT-118). Use flush() to guarantee queued lines are on disk.
+
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
+#include <deque>
 #include <fstream>
 #include <functional>
-#include <iomanip>
-#include <iostream>
 #include <mutex>
-#include <sstream>
+#include <stop_token>
+#include <string>
 #include <string_view>
+#include <thread>
 
 namespace Actisense
 {
@@ -41,7 +49,10 @@ namespace Actisense
 
 		/**************************************************************************/ /**
 		 \brief      Debug logger singleton
-		 \details    Thread-safe logging with configurable levels for console and file
+		 \details    Thread-safe logging with configurable levels for console and
+					 file. Console output is synchronous; file output is performed
+					 off-thread by a background worker so logging callers are never
+					 blocked on disk I/O.
 		 *******************************************************************************/
 		class DebugLog
 		{
@@ -107,70 +118,27 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Set log file path
 			 \param[in]  path  Path to log file (empty to disable file logging)
+			 \details    Opens the file in append mode and lazily starts the
+						 background flush worker on first successful open.
 			 *******************************************************************************/
-			void setLogFile(const std::string& path) {
-				std::lock_guard<std::mutex> lock(mutex_);
-				if (logFile_.is_open()) {
-					logFile_.close();
-				}
-				if (!path.empty()) {
-					logFile_.open(path, std::ios::out | std::ios::app);
-				}
-			}
+			void setLogFile(const std::string& path);
 
 			/**************************************************************************/ /**
 			 \brief      Set custom output callback (replaces default console output)
 			 \param[in]  callback  Function to handle console output (nullptr for stderr)
 			 *******************************************************************************/
-			void setConsoleOutput(OutputCallback callback) {
-				std::lock_guard<std::mutex> lock(mutex_);
-				consoleOutput_ = std::move(callback);
-			}
+			void setConsoleOutput(OutputCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Log a message
 			 \param[in]  level    Log level
 			 \param[in]  tag      Component tag
 			 \param[in]  message  Log message
+			 \details    Formats the line lock-free, writes to the console
+						 synchronously, and enqueues it for the background worker
+						 to write to file. No disk I/O happens on the caller.
 			 *******************************************************************************/
-			void log(LogLevel level, std::string_view tag, std::string_view message) {
-				const auto lvl = static_cast<uint8_t>(level);
-				const auto consoleLvl = consoleLevel_.load(std::memory_order_acquire);
-				const auto fileLvl = fileLevel_.load(std::memory_order_acquire);
-
-				if (lvl > consoleLvl && lvl > fileLvl) {
-					return;
-				}
-
-				std::ostringstream ss;
-				ss << "[" << levelName(level) << "] [" << tag << "] " << message;
-				const std::string formatted = ss.str();
-
-				std::lock_guard<std::mutex> lock(mutex_);
-
-				/* Log to console if level enabled. Use '\n' rather than std::endl:
-				   std::endl forces a flush on every line (CLAUDE.md anti-pattern).
-				   std::cerr is already unit-buffered, so errors still appear
-				   promptly. */
-				if (lvl <= consoleLvl) {
-					if (consoleOutput_) {
-						consoleOutput_(level, formatted);
-					} else {
-						std::cerr << formatted << '\n';
-					}
-				}
-
-				/* Log to file if level enabled and file is open. '\n' (not
-				   std::endl) avoids an implicit flush; the explicit flush() below
-				   keeps the file current for crash diagnostics. NOTE (GIT-104
-				   follow-up): this flush runs while holding mutex_, so a slow disk
-				   can stall all logging threads — moving the file write to a
-				   background flush thread / double buffer is tracked separately. */
-				if (lvl <= fileLvl && logFile_.is_open()) {
-					logFile_ << formatted << '\n';
-					logFile_.flush();
-				}
-			}
+			void log(LogLevel level, std::string_view tag, std::string_view message);
 
 			/**************************************************************************/ /**
 			 \brief      Log hex bytes (for protocol debugging)
@@ -182,95 +150,61 @@ namespace Actisense
 			 \details    Logs all data in chunks of 32 bytes per line for readability
 			 *******************************************************************************/
 			void logHex(LogLevel level, std::string_view tag, std::string_view prefix,
-						const uint8_t* data, std::size_t size) {
-				if (!isEnabled(level)) {
-					return;
-				}
+						const uint8_t* data, std::size_t size);
 
-				constexpr std::size_t kBytesPerLine = 32;
-
-				/* First line includes the prefix and total size */
-				std::ostringstream ss;
-				ss << prefix << " [" << size << " bytes]:";
-
-				if (size == 0) {
-					log(level, tag, ss.str());
-					return;
-				}
-
-				/* For small amounts of data, put it on the same line */
-				if (size <= kBytesPerLine) {
-					ss << " ";
-					for (std::size_t i = 0; i < size; ++i) {
-						ss << std::hex << std::setw(2) << std::setfill('0')
-						   << static_cast<int>(data[i]) << " ";
-					}
-					log(level, tag, ss.str());
-					return;
-				}
-
-				/* For larger data, log the header then each chunk on its own line */
-				log(level, tag, ss.str());
-
-				for (std::size_t offset = 0; offset < size; offset += kBytesPerLine) {
-					std::ostringstream line;
-					line << "  [" << std::setw(4) << std::setfill('0') << std::dec << offset
-						 << "] ";
-
-					const std::size_t remaining = size - offset;
-					const std::size_t chunkSize =
-						(remaining < kBytesPerLine) ? remaining : kBytesPerLine;
-
-					for (std::size_t i = 0; i < chunkSize; ++i) {
-						line << std::hex << std::setw(2) << std::setfill('0')
-							 << static_cast<int>(data[offset + i]) << " ";
-					}
-
-					/* Add ASCII representation for easier pattern recognition */
-					if (chunkSize < kBytesPerLine) {
-						/* Pad to align ASCII column */
-						for (std::size_t i = chunkSize; i < kBytesPerLine; ++i) {
-							line << "   ";
-						}
-					}
-					line << " |";
-					for (std::size_t i = 0; i < chunkSize; ++i) {
-						const uint8_t byte = data[offset + i];
-						line << (byte >= 0x20 && byte < 0x7F ? static_cast<char>(byte) : '.');
-					}
-					line << "|";
-
-					log(level, tag, line.str());
-				}
-			}
+			/**************************************************************************/ /**
+			 \brief      Flush queued file output to disk
+			 \details    Blocks until the background worker has written and flushed
+						 every line enqueued up to the moment of the call, guaranteeing
+						 it is on disk before returning. Console output is synchronous
+						 and so is always already current. Returns immediately when no
+						 file logging is active.
+			 *******************************************************************************/
+			void flush();
 
 		private:
-			DebugLog()
-				: consoleLevel_(static_cast<uint8_t>(LogLevel::None)),
-				  fileLevel_(static_cast<uint8_t>(LogLevel::None)) {}
+			DebugLog();
+			~DebugLog();
 
-			static constexpr const char* levelName(LogLevel level) noexcept {
-				switch (level) {
-					case LogLevel::Error:
-						return "ERROR";
-					case LogLevel::Warn:
-						return "WARN ";
-					case LogLevel::Info:
-						return "INFO ";
-					case LogLevel::Debug:
-						return "DEBUG";
-					case LogLevel::Trace:
-						return "TRACE";
-					default:
-						return "?????";
-				}
-			}
+			DebugLog(const DebugLog&) = delete;
+			DebugLog& operator=(const DebugLog&) = delete;
 
+			/* Lazily start the background flush worker (idempotent). */
+			void startWorker();
+
+			/* Background worker body: drains the queue to file until stopped. */
+			void worker(std::stop_token stop_token);
+
+			/* Level gates — lock-free fast path. */
 			std::atomic<uint8_t> consoleLevel_;
 			std::atomic<uint8_t> fileLevel_;
-			std::mutex mutex_;
+
+			/* Console output — synchronous, serialised by its own short lock so a
+			   slow disk on the file path can never block console writers. */
+			std::mutex console_mutex_;
 			OutputCallback consoleOutput_;
+
+			/* File output — owned exclusively by the worker thread. file_mutex_
+			   guards open/close (setLogFile) against the worker's writes; the
+			   producer never takes it, so callers are never stalled on disk I/O.
+			   fileOpen_ lets the producer skip enqueuing when no file is set. */
+			std::atomic<bool> fileOpen_{false};
+			std::mutex file_mutex_;
 			std::ofstream logFile_;
+
+			/* Producer/consumer queue. queue_mutex_ is held only briefly to push
+			   or swap out a batch — never across disk I/O. pushed_/written_ count
+			   total lines enqueued / written so flush() can wait deterministically. */
+			std::mutex queue_mutex_;
+			std::condition_variable_any queue_cv_; ///< worker wake-up (+ stop)
+			std::condition_variable flush_cv_;	   ///< flush() completion
+			std::deque<std::string> queue_;
+			std::uint64_t pushed_ = 0;
+			std::uint64_t written_ = 0;
+
+			/* Declared last so it is destroyed (and joined) before the queue and
+			   file it touches. */
+			std::jthread worker_;
 		};
 
 		/* Convenience macros --------------------------------------------------- */

@@ -12,6 +12,9 @@ add_sdk_test(test_metrics test_metrics.cpp)
 # Utility tests
 add_sdk_test(test_message_ring_buffer test_message_ring_buffer.cpp)
 
+# Debug log async file flush (GIT-118)
+add_sdk_test(test_debug_log test_debug_log.cpp)
+
 # Transport tests
 add_sdk_test(test_loopback_transport test_loopback_transport.cpp)
 
