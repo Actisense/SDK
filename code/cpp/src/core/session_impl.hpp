@@ -626,8 +626,9 @@ namespace Actisense
 				ResultCallback userCallback, uint8_t srcAddr = kLocalSrcAddr);
 
 			/**************************************************************************/ /**
-			 \brief      Sequencer for the 0x40 SupportedPgnList chunked walk.
-			 \details    Issues a GET, on reply feeds the
+			 \brief      Factory for the 0x40 SupportedPgnList chunked walk.
+			 \details    Builds and starts a `SupportedPgnListWalk` state machine
+						 (GIT-117), which issues a GET, on reply feeds the
 						 SupportedPgnListAccumulator, and either delivers the
 						 merged result (Done), issues a follow-up GET
 						 (Continue), or delivers a partial result on

@@ -14,12 +14,14 @@
 #include <condition_variable>
 #include <cstring>
 #include <format>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <utility>
 
 #include "core/bem_helpers.hpp"
+#include "core/supported_pgn_list_walk.hpp"
 #include "protocols/bem/bem_wrap_126720.hpp"
 #include "protocols/bst/bst_frame.hpp"
 #include "util/debug_log.hpp"
@@ -131,98 +133,17 @@ namespace Actisense
 												  std::chrono::milliseconds perGetTimeout,
 												  SupportedPgnListResultCallback callback,
 												  std::function<void(const BemCommand&)> submitFn) {
-			struct State
-			{
-				SupportedPgnListAccumulator accumulator;
-				SupportedPgnListResultCallback userCallback;
-				std::function<void(const BemCommand&)> submitFn;
-				std::chrono::milliseconds perGetTimeout{0};
-				uint8_t srcAddr = kLocalSrcAddr;
-				bool delivered = false;
-			};
-			auto state = std::make_shared<State>();
-			state->userCallback = std::move(callback);
-			state->submitFn = std::move(submitFn);
-			state->perGetTimeout = perGetTimeout;
-			state->srcAddr = srcAddr;
+			/* Thin factory: build a self-owning state machine (GIT-117) and
+			   start it. The walk keeps itself alive via shared_from_this for as
+			   long as a BEM request is in flight; the origin selector picks
+			   makeLocalOrigin()/makeRemoteOrigin(srcAddr) by the kLocalSrcAddr
+			   sentinel, exactly as the aggregated-reply path does. */
+			auto makeOrigin = [this, srcAddr]() { return detail::makeOrigin(*this, srcAddr); };
 
-			/* sendOne is reused for each follow-up GET. perResponseCallback
-			   captures sendOne so it can recurse on Continue. To avoid a
-			   reference cycle (sendOne -> perResponseCallback -> sendOne)
-			   we clear *sendOne on every terminal path. */
-			auto sendOne = std::make_shared<std::function<void(uint8_t, uint8_t)>>();
-
-			auto makeOrigin = [this, srcAddr]() {
-				return srcAddr == kLocalSrcAddr ? makeLocalOrigin() : makeRemoteOrigin(srcAddr);
-			};
-
-			auto deliver = [state, sendOne,
-							makeOrigin](std::optional<SupportedPgnListResult> result, ErrorCode ec,
-										std::string_view errMsg) {
-				if (state->delivered) {
-					return;
-				}
-				state->delivered = true;
-				if (state->userCallback) {
-					state->userCallback(ec, errMsg, std::move(result), makeOrigin());
-				}
-				*sendOne = nullptr; /* break sendOne <-> callback cycle */
-			};
-
-			auto perResponseCallback = [state, sendOne,
-										deliver](const std::optional<BemResponse>& response,
-												 ErrorCode ec, std::string_view errMsg) {
-				if (state->delivered) {
-					return;
-				}
-				if (ec != ErrorCode::Ok || !response.has_value()) {
-					std::optional<SupportedPgnListResult> partial;
-					if (state->accumulator.initialised()) {
-						partial = state->accumulator.result();
-					}
-					deliver(std::move(partial), ec, errMsg);
-					return;
-				}
-
-				SupportedPgnListResponse decoded;
-				std::string decodeError;
-				if (!decodeSupportedPgnListResponse(
-						std::span<const uint8_t>(response->data.data(), response->data.size()),
-						decoded, decodeError)) {
-					deliver(std::nullopt, ErrorCode::InvalidArgument, decodeError);
-					return;
-				}
-
-				std::string feedError;
-				const auto status = state->accumulator.feed(decoded, feedError);
-				if (status == PgnListAccumulatorStatus::Mismatch) {
-					deliver(std::nullopt, ErrorCode::InvalidArgument, feedError);
-					return;
-				}
-				if (status == PgnListAccumulatorStatus::Done) {
-					deliver(state->accumulator.result(), ErrorCode::Ok, std::string_view{});
-					return;
-				}
-
-				/* Continue: issue next GET using device-set transferId and
-				   the next pgnIndex past the sub-list we just absorbed. */
-				const uint8_t nextIdx =
-					static_cast<uint8_t>(decoded.firstSubIdx + decoded.subCount);
-				(*sendOne)(nextIdx, decoded.transferId);
-			};
-
-			*sendOne = [state, perResponseCallback, this](uint8_t pgnIndex, uint8_t transferId) {
-				BemCommand cmd = makeBemA1(BemCommandId::GetSupportedPgnList);
-				encodeSupportedPgnListGetRequest(pgnIndex, transferId, cmd.data);
-
-				bem_.registerRequest(cmd.bemId, cmd.bstId, state->perGetTimeout,
-									 perResponseCallback, state->srcAddr);
-				state->submitFn(cmd);
-			};
-
-			/* Kick off the walk: device assigns transferId on reply #1 when
-			   the caller passes 0. */
-			(*sendOne)(0, 0);
+			auto walk = std::make_shared<SupportedPgnListWalk>(
+				bem_, perGetTimeout, srcAddr, std::move(callback), std::move(submitFn),
+				std::move(makeOrigin));
+			walk->start();
 		}
 
 		void Session::Impl::getSupportedPgnList_All(std::chrono::milliseconds perGetTimeout,

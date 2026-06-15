@@ -359,6 +359,145 @@ TEST_F(SessionPgnListManagementTest, GetSupportedPgnList_All_TimeoutMidWalkDeliv
 	EXPECT_EQ(capturedResult->entries[4].pgn, 0u);
 }
 
+/* GIT-117: SupportedPgnListWalk state-machine edge cases. The walk replaced a
+   shared_ptr<std::function> self-recursion; these cover the branches the old
+   three-chunk + timeout tests above did not exercise. */
+
+TEST_F(SessionPgnListManagementTest, GetSupportedPgnList_All_SingleChunkCompletesImmediately)
+{
+	std::optional<SupportedPgnListResult> capturedResult;
+	ErrorCode capturedCode = ErrorCode::UnsupportedOperation;
+	int callbackCount = 0;
+
+	session_->getSupportedPgnList_All(kTimeout,
+		[&](ErrorCode ec, std::string_view, std::optional<SupportedPgnListResult> r,
+			ResponseOrigin) {
+			capturedResult = std::move(r);
+			capturedCode = ec;
+			++callbackCount;
+		});
+
+	captureSentDatagram();  /* GET #1 */
+
+	/* Reply #1 is final: total=2, sub=2 -> supportedPgnListHasMore() == false. */
+	const std::array<SupportedPgnEntry, 2> chunk = {
+		SupportedPgnEntry{0, 0x1F101u},
+		SupportedPgnEntry{1, 0x1F102u}};
+	EXPECT_TRUE(session_->bem().correlateResponse(
+		makeSupportedPgnListResponse(0x42, 2100, /*total=*/2, /*first=*/0, /*sub=*/2, chunk)));
+
+	EXPECT_EQ(callbackCount, 1);
+	EXPECT_EQ(capturedCode, ErrorCode::Ok);
+	ASSERT_TRUE(capturedResult.has_value());
+	ASSERT_EQ(capturedResult->entries.size(), 2u);
+	EXPECT_EQ(capturedResult->entries[0].pgn, 0x1F101u);
+	EXPECT_EQ(capturedResult->entries[1].pgn, 0x1F102u);
+
+	/* The walk is done after one reply: no follow-up GET went on the wire. */
+	EXPECT_EQ(transport_->bytesAvailable(), 0u);
+}
+
+TEST_F(SessionPgnListManagementTest, GetSupportedPgnList_All_TransferIdMismatchFails)
+{
+	std::optional<SupportedPgnListResult> capturedResult;
+	ErrorCode capturedCode = ErrorCode::Ok;
+	int callbackCount = 0;
+
+	session_->getSupportedPgnList_All(kTimeout,
+		[&](ErrorCode ec, std::string_view, std::optional<SupportedPgnListResult> r,
+			ResponseOrigin) {
+			capturedResult = std::move(r);
+			capturedCode = ec;
+			++callbackCount;
+		});
+
+	captureSentDatagram();  /* GET #1 */
+
+	/* Reply #1 latches xid=0x42, total=4 and continues. */
+	const std::array<SupportedPgnEntry, 2> chunk1 = {
+		SupportedPgnEntry{0, 0x1F101u},
+		SupportedPgnEntry{1, 0x1F102u}};
+	EXPECT_TRUE(session_->bem().correlateResponse(
+		makeSupportedPgnListResponse(0x42, 2100, /*total=*/4, /*first=*/0, /*sub=*/2, chunk1)));
+
+	captureSentDatagram();  /* GET #2 */
+
+	/* Reply #2 carries a different transferId -> accumulator Mismatch. */
+	const std::array<SupportedPgnEntry, 2> chunk2 = {
+		SupportedPgnEntry{2, 0x1F103u},
+		SupportedPgnEntry{3, 0x1F104u}};
+	EXPECT_TRUE(session_->bem().correlateResponse(
+		makeSupportedPgnListResponse(/*xid=*/0x99, 2100, /*total=*/4, /*first=*/2, /*sub=*/2,
+									  chunk2)));
+
+	EXPECT_EQ(callbackCount, 1);
+	EXPECT_EQ(capturedCode, ErrorCode::InvalidArgument);
+	EXPECT_FALSE(capturedResult.has_value());
+}
+
+TEST_F(SessionPgnListManagementTest, GetSupportedPgnList_All_TruncatedReplyFails)
+{
+	std::optional<SupportedPgnListResult> capturedResult;
+	ErrorCode capturedCode = ErrorCode::Ok;
+	int callbackCount = 0;
+
+	session_->getSupportedPgnList_All(kTimeout,
+		[&](ErrorCode ec, std::string_view, std::optional<SupportedPgnListResult> r,
+			ResponseOrigin) {
+			capturedResult = std::move(r);
+			capturedCode = ec;
+			++callbackCount;
+		});
+
+	captureSentDatagram();  /* GET #1 */
+
+	/* Reply #1 claims sub=2 in the header but carries only one entry's bytes,
+	   so decodeSupportedPgnListResponse() rejects it as truncated. */
+	const std::array<SupportedPgnEntry, 1> partial = {SupportedPgnEntry{0, 0x1F101u}};
+	EXPECT_TRUE(session_->bem().correlateResponse(
+		makeSupportedPgnListResponse(0x42, 2100, /*total=*/4, /*first=*/0, /*sub=*/2, partial)));
+
+	EXPECT_EQ(callbackCount, 1);
+	EXPECT_EQ(capturedCode, ErrorCode::InvalidArgument);
+	EXPECT_FALSE(capturedResult.has_value());
+}
+
+TEST_F(SessionPgnListManagementTest, GetSupportedPgnList_AllRemote_DeliversWithRemoteOrigin)
+{
+	constexpr uint8_t kRemoteAddr = 0x05;
+	std::optional<SupportedPgnListResult> capturedResult;
+	ErrorCode capturedCode = ErrorCode::UnsupportedOperation;
+	ResponseOrigin capturedOrigin;
+	int callbackCount = 0;
+
+	session_->getSupportedPgnList_AllRemote(kRemoteAddr, kTimeout,
+		[&](ErrorCode ec, std::string_view, std::optional<SupportedPgnListResult> r,
+			ResponseOrigin origin) {
+			capturedResult = std::move(r);
+			capturedCode = ec;
+			capturedOrigin = std::move(origin);
+			++callbackCount;
+		});
+
+	/* The remote GET is wrapped in PGN 126720 and sent; drain it. */
+	captureSentDatagram();
+
+	/* Reply arrives keyed by the remote device's source address; single chunk. */
+	const std::array<SupportedPgnEntry, 1> chunk = {SupportedPgnEntry{0, 0x1F205u}};
+	EXPECT_TRUE(session_->bem().correlateResponse(
+		makeSupportedPgnListResponse(0x42, 2100, /*total=*/1, /*first=*/0, /*sub=*/1, chunk),
+		/*srcAddr=*/kRemoteAddr));
+
+	EXPECT_EQ(callbackCount, 1);
+	EXPECT_EQ(capturedCode, ErrorCode::Ok);
+	ASSERT_TRUE(capturedResult.has_value());
+	ASSERT_EQ(capturedResult->entries.size(), 1u);
+	EXPECT_EQ(capturedResult->entries[0].pgn, 0x1F205u);
+	/* Origin reflects the remote (PGN 126720) path, not the local gateway. */
+	EXPECT_EQ(capturedOrigin.path, TransportPath::Remote);
+	EXPECT_EQ(capturedOrigin.n2kSourceAddress, kRemoteAddr);
+}
+
 } /* namespace Test */
 } /* namespace Sdk */
 } /* namespace Actisense */

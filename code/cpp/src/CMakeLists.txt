@@ -45,6 +45,7 @@ set(SDK_SOURCES
     core/session_commands.cpp
     core/session_remote.cpp
     core/session_receive.cpp
+    core/supported_pgn_list_walk.cpp
     core/session_wire_trace.cpp
     core/remote_device.cpp
     core/remote_device_impl.cpp
