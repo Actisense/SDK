@@ -23,10 +23,22 @@ namespace Actisense
 
 		/**************************************************************************/ /**
 		 \brief      SDK error codes
-		 \details    Categorized errors for transport, protocol, and general SDK issues
+		 \details    The single, unified error space for the SDK. The first block
+					 (values 0-14) are the coarse, layer-agnostic codes that every
+					 transport, protocol and session callback emits. The appended
+					 blocks fold in the fine-grained transport and protocol
+					 diagnostics that previously lived in their own separate
+					 transport/protocol error categories, so consumers see one
+					 error enum + one std::error_category.
+
+					 APPEND-ONLY: never renumber or reorder. Existing values are part
+					 of the public ABI; new codes must be added immediately before
+					 Count. The message lookup in error_category.cpp is index-aligned
+					 with this enum and guarded by a static_assert against Count.
 		 *******************************************************************************/
 		enum class ErrorCode
 		{
+			/* Coarse, layer-agnostic codes (values 0-14, ABI-stable) ---------- */
 			Ok = 0,				  ///< No error
 			TransportOpenFailed,  ///< Failed to open transport (port busy, not found)
 			TransportIo,		  ///< I/O error during read/write
@@ -41,7 +53,51 @@ namespace Actisense
 			InvalidArgument,	  ///< Invalid argument passed to API
 			NotConnected,		  ///< Session not connected
 			AlreadyConnected,	  ///< Session already connected
-			Internal			  ///< Internal SDK error (bug)
+			Internal,			  ///< Internal SDK error (bug)
+
+			/* Transport diagnostics (appended) -------------------------------- */
+			TransportPortNotFound,		  ///< Serial port does not exist
+			TransportPortBusy,			  ///< Port in use by another process
+			TransportPermissionDenied,	  ///< Insufficient permissions to open port
+			TransportConfigurationFailed, ///< Failed to set baud/parity/stop bits/etc.
+			TransportBufferOverflow,	  ///< Internal buffer capacity exceeded
+			TransportReadFailed,		  ///< OS-level read error
+			TransportWriteFailed,		  ///< OS-level write error
+			TransportDisconnected,		  ///< Connection lost (cable unplugged, device reset)
+			TransportInvalidHandle,		  ///< Operation on closed/invalid handle
+			TransportHostNotFound,		  ///< DNS resolution failed (TCP/UDP)
+			TransportConnectionRefused,	  ///< Remote host refused connection (TCP)
+			TransportNetworkUnreachable,  ///< Network is unreachable
+			TransportAddressInUse,		  ///< Address/port already in use (server mode)
+			TransportInvalidAddress,	  ///< Invalid IP address or hostname format
+			TransportSocketError,		  ///< Generic socket error
+
+			/* Protocol diagnostics (appended) --------------------------------- */
+			BdtpFrameCorrupted,	   ///< DLE/STX/ETX framing error
+			BdtpBufferOverrun,	   ///< Frame exceeds maximum size
+			BdtpIncompleteFrame,   ///< Partial frame at end of stream
+			BdtpInvalidEscape,	   ///< Invalid DLE escape sequence
+			BdtpUnexpectedStart,   ///< STX found mid-frame
+			BstUnknownType,		   ///< Unrecognized BST ID
+			BstInvalidLength,	   ///< Length field doesn't match payload
+			BstChecksumMismatch,   ///< Checksum validation failed
+			BstPayloadTooShort,	   ///< Payload shorter than minimum required
+			BstPayloadTooLong,	   ///< Payload exceeds maximum allowed
+			BstInvalidHeader,	   ///< Required header fields missing or invalid
+			BemSequenceMismatch,   ///< Response sequence != request sequence
+			BemDeviceError,		   ///< Device returned error code (check ExtendedError)
+			BemTimeout,			   ///< No response within timeout
+			BemUnexpectedResponse, ///< Response type doesn't match request
+			BemUnknownCommand,	   ///< Unknown BEM command ID
+			BemInvalidPayload,	   ///< Command payload validation failed
+			BemResponseTruncated,  ///< Response data shorter than expected
+			BemNoRequestPending,   ///< Response received with no matching request
+			UnsupportedProtocol,   ///< Protocol not supported by this session
+			ProtocolDisabled,	   ///< Protocol is disabled in configuration
+
+			/* Keep last: sentinel giving the number of error codes. Not a valid
+			   error value - useful for table bounds and range checks. */
+			Count
 		};
 
 		/**************************************************************************/ /**

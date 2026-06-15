@@ -1,15 +1,17 @@
 /**************************************************************************//**
 \file       test_error_category.cpp
 \brief      Unit tests for SDK error category
-\details    Tests ErrorCode enum and std::error_category integration
+\details    Tests the single unified ErrorCode enum and its std::error_category
+            integration. The transport and protocol diagnostic codes were folded
+            into ErrorCode (GIT-113), so there is now exactly one error space and
+            one category - these tests guard the merge, the ABI stability of the
+            original coarse codes, and the index-aligned message lookup.
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
 #include <public/error.hpp>
-#include <protocols/protocol_error.hpp>
-#include <transport/transport_error.hpp>
 
 #include <gtest/gtest.h>
 
@@ -52,162 +54,101 @@ TEST_F(ErrorCategoryTest, ErrorCodesAreTruthy)
 	EXPECT_TRUE(static_cast<bool>(code));  /* Errors are true in boolean context */
 }
 
-TEST_F(ErrorCategoryTest, ErrorMessages)
+/*
+ * ABI guard: the coarse codes 0-14 are part of the public ABI. The merge
+ * (GIT-113) must APPEND new codes, never renumber these. If this fails, an
+ * external consumer's persisted/compiled error value has silently changed
+ * meaning.
+ */
+TEST_F(ErrorCategoryTest, CoarseCodeValuesAreStable)
 {
-	/* Test that all error codes have non-empty messages */
-	const ErrorCode codes[] = {
-		ErrorCode::Ok,
-		ErrorCode::TransportOpenFailed,
-		ErrorCode::TransportIo,
-		ErrorCode::TransportClosed,
-		ErrorCode::Timeout,
-		ErrorCode::ProtocolMismatch,
-		ErrorCode::MalformedFrame,
-		ErrorCode::ChecksumError,
-		ErrorCode::UnsupportedOperation,
-		ErrorCode::Canceled,
-		ErrorCode::RateLimited,
-		ErrorCode::InvalidArgument,
-		ErrorCode::NotConnected,
-		ErrorCode::AlreadyConnected,
-		ErrorCode::Internal
-	};
+	EXPECT_EQ(static_cast<int>(ErrorCode::Ok), 0);
+	EXPECT_EQ(static_cast<int>(ErrorCode::TransportOpenFailed), 1);
+	EXPECT_EQ(static_cast<int>(ErrorCode::TransportIo), 2);
+	EXPECT_EQ(static_cast<int>(ErrorCode::TransportClosed), 3);
+	EXPECT_EQ(static_cast<int>(ErrorCode::Timeout), 4);
+	EXPECT_EQ(static_cast<int>(ErrorCode::ProtocolMismatch), 5);
+	EXPECT_EQ(static_cast<int>(ErrorCode::MalformedFrame), 6);
+	EXPECT_EQ(static_cast<int>(ErrorCode::ChecksumError), 7);
+	EXPECT_EQ(static_cast<int>(ErrorCode::UnsupportedOperation), 8);
+	EXPECT_EQ(static_cast<int>(ErrorCode::Canceled), 9);
+	EXPECT_EQ(static_cast<int>(ErrorCode::RateLimited), 10);
+	EXPECT_EQ(static_cast<int>(ErrorCode::InvalidArgument), 11);
+	EXPECT_EQ(static_cast<int>(ErrorCode::NotConnected), 12);
+	EXPECT_EQ(static_cast<int>(ErrorCode::AlreadyConnected), 13);
+	EXPECT_EQ(static_cast<int>(ErrorCode::Internal), 14);
 
-	for (const auto code : codes)
+	/* The appended diagnostics come strictly after the coarse block. */
+	EXPECT_EQ(static_cast<int>(ErrorCode::TransportPortNotFound), 15);
+	EXPECT_GT(static_cast<int>(ErrorCode::BdtpFrameCorrupted),
+			  static_cast<int>(ErrorCode::TransportSocketError));
+	EXPECT_GT(static_cast<int>(ErrorCode::Count),
+			  static_cast<int>(ErrorCode::ProtocolDisabled));
+}
+
+TEST_F(ErrorCategoryTest, AllCodesHaveNonEmptyMessages)
+{
+	/* Walk every valid code 0..Count-1 - the index-aligned table must cover all. */
+	for (int value = 0; value < static_cast<int>(ErrorCode::Count); ++value)
 	{
-		const auto message = errorMessage(code);
-		EXPECT_FALSE(message.empty()) << "Empty message for code " << static_cast<int>(code);
+		const auto message = errorMessage(static_cast<ErrorCode>(value));
+		EXPECT_FALSE(message.empty()) << "Empty message for code " << value;
+		EXPECT_NE(message, "Unknown error") << "Missing message for code " << value;
 	}
 }
 
 TEST_F(ErrorCategoryTest, ErrorCategoryMessage)
 {
 	const auto& category = sdkErrorCategory();
-	
-	/* Test via category.message() */
+
+	/* Coarse codes */
 	EXPECT_EQ(category.message(static_cast<int>(ErrorCode::Ok)), "No error");
 	EXPECT_EQ(category.message(static_cast<int>(ErrorCode::TransportIo)), "Transport I/O error");
 	EXPECT_EQ(category.message(static_cast<int>(ErrorCode::Timeout)), "Operation timed out");
+}
+
+TEST_F(ErrorCategoryTest, TransportDiagnosticsShareSingleCategory)
+{
+	/* Folded-in transport codes resolve through the one SDK category. */
+	const auto code = makeErrorCode(ErrorCode::TransportPortBusy);
+	EXPECT_EQ(code.category(), sdkErrorCategory());
+	EXPECT_EQ(code.value(), static_cast<int>(ErrorCode::TransportPortBusy));
+	EXPECT_EQ(errorMessage(ErrorCode::TransportPortBusy), "Port in use by another process");
+	EXPECT_EQ(errorMessage(ErrorCode::TransportSocketError), "Socket error");
+}
+
+TEST_F(ErrorCategoryTest, ProtocolDiagnosticsShareSingleCategory)
+{
+	/* Folded-in protocol codes resolve through the one SDK category. */
+	const auto code = makeErrorCode(ErrorCode::BstChecksumMismatch);
+	EXPECT_EQ(code.category(), sdkErrorCategory());
+	EXPECT_EQ(code.value(), static_cast<int>(ErrorCode::BstChecksumMismatch));
+	EXPECT_EQ(errorMessage(ErrorCode::BstChecksumMismatch), "BST checksum verification failed");
+	EXPECT_EQ(errorMessage(ErrorCode::BemTimeout), "BEM command timed out waiting for response");
+	EXPECT_EQ(errorMessage(ErrorCode::ProtocolDisabled), "Protocol is disabled");
 }
 
 TEST_F(ErrorCategoryTest, StdErrorCodeIntegration)
 {
 	/* Test that ErrorCode can be implicitly converted to std::error_code */
 	std::error_code ec = makeErrorCode(ErrorCode::MalformedFrame);
-	
+
 	EXPECT_EQ(ec.value(), static_cast<int>(ErrorCode::MalformedFrame));
 	EXPECT_EQ(ec.category().name(), std::string("actisense_sdk"));
+
+	/* An appended diagnostic also integrates through the same category. */
+	std::error_code diag = ErrorCode::BdtpFrameCorrupted;
+	EXPECT_EQ(diag.value(), static_cast<int>(ErrorCode::BdtpFrameCorrupted));
+	EXPECT_EQ(diag.category().name(), std::string("actisense_sdk"));
 }
 
 TEST_F(ErrorCategoryTest, UnknownErrorCode)
 {
-	/* Test handling of invalid error code value */
-	const auto message = errorMessage(static_cast<ErrorCode>(999));
-	EXPECT_EQ(message, "Unknown error");
-}
+	/* Out-of-range values fall back to the generic message. */
+	EXPECT_EQ(errorMessage(static_cast<ErrorCode>(999)), "Unknown error");
 
-/* Transport Error Tests ---------------------------------------------------- */
-
-class TransportErrorTest : public ::testing::Test
-{
-};
-
-TEST_F(TransportErrorTest, CategoryName)
-{
-	const auto& category = transportErrorCategory();
-	EXPECT_STREQ(category.name(), "actisense_sdk_transport");
-}
-
-TEST_F(TransportErrorTest, AllCodesHaveMessages)
-{
-	const TransportErrorCode codes[] = {
-		TransportErrorCode::Ok,
-		TransportErrorCode::PortNotFound,
-		TransportErrorCode::PortBusy,
-		TransportErrorCode::PermissionDenied,
-		TransportErrorCode::ConfigurationFailed,
-		TransportErrorCode::BufferOverflow,
-		TransportErrorCode::ReadFailed,
-		TransportErrorCode::WriteFailed,
-		TransportErrorCode::Disconnected,
-		TransportErrorCode::InvalidHandle,
-		TransportErrorCode::Timeout,
-		TransportErrorCode::HostNotFound,
-		TransportErrorCode::ConnectionRefused,
-		TransportErrorCode::NetworkUnreachable,
-		TransportErrorCode::AddressInUse,
-		TransportErrorCode::InvalidAddress,
-		TransportErrorCode::SocketError
-	};
-
-	for (const auto code : codes) {
-		const auto message = transportErrorMessage(code);
-		EXPECT_FALSE(message.empty()) << "Empty message for code " << static_cast<int>(code);
-	}
-}
-
-TEST_F(TransportErrorTest, ConversionToErrorCode)
-{
-	EXPECT_EQ(toErrorCode(TransportErrorCode::Ok), ErrorCode::Ok);
-	EXPECT_EQ(toErrorCode(TransportErrorCode::PortNotFound), ErrorCode::TransportOpenFailed);
-	EXPECT_EQ(toErrorCode(TransportErrorCode::ReadFailed), ErrorCode::TransportIo);
-	EXPECT_EQ(toErrorCode(TransportErrorCode::Disconnected), ErrorCode::TransportClosed);
-	EXPECT_EQ(toErrorCode(TransportErrorCode::Timeout), ErrorCode::Timeout);
-	EXPECT_EQ(toErrorCode(TransportErrorCode::BufferOverflow), ErrorCode::RateLimited);
-}
-
-TEST_F(TransportErrorTest, StdErrorCodeIntegration)
-{
-	std::error_code ec = TransportErrorCode::PortBusy;
-	EXPECT_EQ(ec.value(), static_cast<int>(TransportErrorCode::PortBusy));
-	EXPECT_EQ(std::string(ec.category().name()), "actisense_sdk_transport");
-}
-
-/* Protocol Error Tests ----------------------------------------------------- */
-
-class ProtocolErrorTest : public ::testing::Test
-{
-};
-
-TEST_F(ProtocolErrorTest, CategoryName)
-{
-	const auto& category = protocolErrorCategory();
-	EXPECT_STREQ(category.name(), "actisense_sdk_protocol");
-}
-
-TEST_F(ProtocolErrorTest, BdtpErrorMessages)
-{
-	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BdtpFrameCorrupted).empty());
-	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BdtpBufferOverrun).empty());
-	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BdtpIncompleteFrame).empty());
-}
-
-TEST_F(ProtocolErrorTest, BstErrorMessages)
-{
-	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BstUnknownType).empty());
-	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BstChecksumMismatch).empty());
-}
-
-TEST_F(ProtocolErrorTest, BemErrorMessages)
-{
-	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BemSequenceMismatch).empty());
-	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BemDeviceError).empty());
-	EXPECT_FALSE(protocolErrorMessage(ProtocolErrorCode::BemTimeout).empty());
-}
-
-TEST_F(ProtocolErrorTest, ConversionToErrorCode)
-{
-	EXPECT_EQ(toErrorCode(ProtocolErrorCode::Ok), ErrorCode::Ok);
-	EXPECT_EQ(toErrorCode(ProtocolErrorCode::BdtpFrameCorrupted), ErrorCode::MalformedFrame);
-	EXPECT_EQ(toErrorCode(ProtocolErrorCode::BstChecksumMismatch), ErrorCode::ChecksumError);
-	EXPECT_EQ(toErrorCode(ProtocolErrorCode::BemTimeout), ErrorCode::Timeout);
-}
-
-TEST_F(ProtocolErrorTest, StdErrorCodeIntegration)
-{
-	std::error_code ec = ProtocolErrorCode::BstChecksumMismatch;
-	EXPECT_EQ(ec.value(), static_cast<int>(ProtocolErrorCode::BstChecksumMismatch));
-	EXPECT_EQ(std::string(ec.category().name()), "actisense_sdk_protocol");
+	/* The Count sentinel is not a valid code and has no message. */
+	EXPECT_EQ(errorMessage(ErrorCode::Count), "Unknown error");
 }
 
 /* Extended Error Tests ----------------------------------------------------- */
@@ -234,7 +175,7 @@ TEST_F(ExtendedErrorTest, ErrorCodeMakesItError)
 TEST_F(ExtendedErrorTest, DeviceErrorCode)
 {
 	ExtendedError err;
-	err.code = ErrorCode::UnsupportedOperation;
+	err.code = ErrorCode::BemDeviceError;
 	err.deviceErrorCode = -1077;
 	EXPECT_TRUE(err.isError());
 	EXPECT_TRUE(err.isDeviceError());

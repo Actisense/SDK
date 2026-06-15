@@ -21,24 +21,72 @@ namespace Actisense
 		{
 			/**************************************************************************/ /**
 			 \brief      Error messages indexed by ErrorCode
+			 \details    One entry per ErrorCode value, in enum order. The static_assert
+						 below ties the array length to ErrorCode::Count so a new code
+						 cannot be added without a matching message.
 			 *******************************************************************************/
-			constexpr std::array<std::string_view, 15> kErrorMessages = {{
-				"No error",						   // Ok
-				"Failed to open transport",		   // TransportOpenFailed
-				"Transport I/O error",			   // TransportIo
-				"Transport closed unexpectedly",   // TransportClosed
-				"Operation timed out",			   // Timeout
-				"Protocol mismatch",			   // ProtocolMismatch
-				"Malformed frame received",		   // MalformedFrame
-				"Checksum verification failed",	   // ChecksumError
-				"Operation not supported",		   // UnsupportedOperation
-				"Operation canceled",			   // Canceled
-				"Rate limited - write queue full", // RateLimited
-				"Invalid argument",				   // InvalidArgument
-				"Not connected",				   // NotConnected
-				"Already connected",			   // AlreadyConnected
-				"Internal SDK error"			   // Internal
-			}};
+			constexpr std::array<std::string_view, static_cast<std::size_t>(ErrorCode::Count)>
+				kErrorMessages = {{
+					/* Coarse codes (0-14) */
+					"No error",						   // Ok
+					"Failed to open transport",		   // TransportOpenFailed
+					"Transport I/O error",			   // TransportIo
+					"Transport closed unexpectedly",   // TransportClosed
+					"Operation timed out",			   // Timeout
+					"Protocol mismatch",			   // ProtocolMismatch
+					"Malformed frame received",		   // MalformedFrame
+					"Checksum verification failed",	   // ChecksumError
+					"Operation not supported",		   // UnsupportedOperation
+					"Operation canceled",			   // Canceled
+					"Rate limited - write queue full", // RateLimited
+					"Invalid argument",				   // InvalidArgument
+					"Not connected",				   // NotConnected
+					"Already connected",			   // AlreadyConnected
+					"Internal SDK error",			   // Internal
+
+					/* Transport diagnostics */
+					"Serial port not found",				  // TransportPortNotFound
+					"Port in use by another process",		  // TransportPortBusy
+					"Permission denied to access port",		  // TransportPermissionDenied
+					"Failed to configure port settings",	  // TransportConfigurationFailed
+					"Internal buffer overflow",				  // TransportBufferOverflow
+					"Read operation failed",				  // TransportReadFailed
+					"Write operation failed",				  // TransportWriteFailed
+					"Connection lost (device disconnected)",  // TransportDisconnected
+					"Invalid or closed handle",				  // TransportInvalidHandle
+					"Host not found (DNS resolution failed)", // TransportHostNotFound
+					"Connection refused by remote host",	  // TransportConnectionRefused
+					"Network is unreachable",				  // TransportNetworkUnreachable
+					"Address or port already in use",		  // TransportAddressInUse
+					"Invalid IP address or hostname",		  // TransportInvalidAddress
+					"Socket error",							  // TransportSocketError
+
+					/* Protocol diagnostics */
+					"BDTP frame corrupted (invalid DLE/STX/ETX framing)", // BdtpFrameCorrupted
+					"BDTP frame exceeds maximum buffer size",			  // BdtpBufferOverrun
+					"BDTP frame incomplete (missing ETX)",				  // BdtpIncompleteFrame
+					"BDTP invalid escape sequence",						  // BdtpInvalidEscape
+					"BDTP unexpected STX mid-frame",					  // BdtpUnexpectedStart
+					"Unknown BST message type",							  // BstUnknownType
+					"BST length field doesn't match payload",			  // BstInvalidLength
+					"BST checksum verification failed",					  // BstChecksumMismatch
+					"BST payload shorter than required minimum",		  // BstPayloadTooShort
+					"BST payload exceeds maximum allowed",				  // BstPayloadTooLong
+					"BST header fields invalid",						  // BstInvalidHeader
+					"BEM response sequence ID doesn't match request",	  // BemSequenceMismatch
+					"BEM device returned error (see extended error info)", // BemDeviceError
+					"BEM command timed out waiting for response",		  // BemTimeout
+					"BEM response type doesn't match request",			  // BemUnexpectedResponse
+					"Unknown BEM command ID",							  // BemUnknownCommand
+					"BEM command payload validation failed",			  // BemInvalidPayload
+					"BEM response data truncated",						  // BemResponseTruncated
+					"BEM response received with no matching request",	  // BemNoRequestPending
+					"Protocol not supported",							  // UnsupportedProtocol
+					"Protocol is disabled"								  // ProtocolDisabled
+				}};
+
+			static_assert(kErrorMessages.size() == static_cast<std::size_t>(ErrorCode::Count),
+						  "kErrorMessages must have exactly one entry per ErrorCode value");
 
 			/**************************************************************************/ /**
 			 \brief      SDK error category implementation

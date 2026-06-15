@@ -48,7 +48,6 @@ set(SDK_SOURCES
     # Transport layer (internal)
     transport/loopback/loopback_transport.cpp
     transport/serial/serial_transport.cpp
-    transport/transport_error.cpp
 
     # Protocols
     protocols/bdtp/bdtp_protocol.cpp
@@ -57,7 +56,6 @@ set(SDK_SOURCES
     protocols/bem/bem_protocol.cpp
     protocols/bem/bem_wrap_126720.cpp
     protocols/bem/bem_commands/operating_mode.cpp
-    protocols/protocol_error.cpp
 
     # Utilities
     util/bdtp_frame_assembler.cpp
