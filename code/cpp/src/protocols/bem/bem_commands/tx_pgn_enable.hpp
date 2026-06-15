@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include "public/bem_responses/tx_pgn_enable.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -44,19 +46,6 @@ namespace Actisense
 		/// Special Tx rate value: Event-driven only (no periodic transmission)
 		static constexpr uint32_t kTxRateEventDriven = 0;
 
-		/* Enumerations --------------------------------------------------------- */
-
-		/**************************************************************************/ /**
-		 \brief      Tx PGN Enable flag values
-		 \details    Controls PGN transmission behavior
-		 *******************************************************************************/
-		enum class TxPgnEnableFlag : uint8_t
-		{
-			Disabled = 0x00,   ///< PGN transmission disabled
-			Enabled = 0x01,	   ///< PGN transmission enabled at configured rate
-			RespondMode = 0x02 ///< Transmit only when requested (ISO Request)
-		};
-
 		/* Data Structures ------------------------------------------------------ */
 
 		/**************************************************************************/ /**
@@ -68,19 +57,6 @@ namespace Actisense
 			uint32_t pgn = 0;					   ///< 24-bit PGN ID (stored in 32-bit)
 			std::optional<TxPgnEnableFlag> enable; ///< Enable flag (omit for GET)
 			std::optional<uint32_t> txRate;		   ///< TX rate in ms (optional for SET)
-		};
-
-		/**************************************************************************/ /**
-		 \brief      Tx PGN Enable response structure
-		 \details    Decoded response from Tx PGN Enable command
-		 *******************************************************************************/
-		struct TxPgnEnableResponse
-		{
-			uint32_t pgn = 0;									///< PGN ID
-			TxPgnEnableFlag enable = TxPgnEnableFlag::Disabled; ///< Current enable state
-			uint32_t txRate = 0;								///< TX rate in milliseconds
-			uint32_t txTimeout = 0; ///< TX timeout (deprecated, usually 0)
-			uint8_t txPriority = 3; ///< CAN priority (0-7, default 3)
 		};
 
 		/* Helper Functions ----------------------------------------------------- */

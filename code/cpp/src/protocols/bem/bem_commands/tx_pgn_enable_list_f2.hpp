@@ -75,6 +75,7 @@
 #include <vector>
 
 #include "protocols/bem/bem_commands/rx_pgn_enable_list_f2.hpp"
+#include "public/bem_responses/pgn_enable_list_f2.hpp"
 
 namespace Actisense
 {
@@ -106,9 +107,6 @@ namespace Actisense
 		/// Max entries per standard-variant sub-list (firmware limit)
 		static constexpr std::size_t kTxPgnEnableListF2StdMaxEntriesPerSubList = 48;
 
-		/// Bitmap bytes per data page (32 → 256 PGNs per page)
-		static constexpr std::size_t kTxPgnEnableListF2PropBitmapBytes = 32;
-
 		/// Proprietary PGN base for DP0: PDU2 single-frame 0xFF00..0xFFFF.
 		/// PGN = kTxPgnPropDp0Base + (byteIndex * 8 + bitIndex).
 		static constexpr uint32_t kTxPgnPropDp0Base = 0x0000FF00;
@@ -121,16 +119,6 @@ namespace Actisense
 		static constexpr uint16_t kTxPgnRateDisabled = 0xFFFF;
 
 		/* Data Structures ------------------------------------------------------ */
-
-		/**************************************************************************/ /**
-		 \brief      One row in the standard-variant Tx Enable List.
-		 *******************************************************************************/
-		struct TxPgnEnableEntry
-		{
-			uint8_t pgnIndex = 0; ///< Device-local PGN index (see SupportedPgnList)
-			uint8_t priority = 0; ///< NMEA 2000 priority 0-7
-			uint16_t rateMs = 0;  ///< Transmit rate in ms (0xFFFF = disabled)
-		};
 
 		/**************************************************************************/ /**
 		 \brief      Which structure variant a 0x4F response carries.
@@ -279,36 +267,6 @@ namespace Actisense
 		   command 0x47 (TxPgnEnable) — see tx_pgn_enable.hpp. */
 
 		/* Multi-message aggregation --------------------------------------- */
-
-		/**************************************************************************/ /**
-		 \brief      Decoded proprietary bitmaps + expanded enabled-PGN list.
-		 \details    enabledPgns is sorted ascending (DP0 entries then DP1).
-					 The raw LUTs are retained alongside so callers that need
-					 to re-emit or compare against the wire bytes can do so
-					 without re-encoding from the expanded set.
-		 *******************************************************************************/
-		struct TxPgnEnableListF2ProprietaryEntries
-		{
-			std::array<uint8_t, kTxPgnEnableListF2PropBitmapBytes> dp0RawLut{};
-			std::array<uint8_t, kTxPgnEnableListF2PropBitmapBytes> dp1RawLut{};
-			std::vector<uint32_t> enabledPgns;
-		};
-
-		/**************************************************************************/ /**
-		 \brief      Aggregated Tx PGN Enable List F2 result.
-		 \details    Populated by TxPgnEnableListF2Accumulator once the
-					 standard-variant sub-list train and the trailing
-					 proprietary-variant message for one transfer have been
-					 received.
-		 *******************************************************************************/
-		struct TxPgnEnableListF2Result
-		{
-			uint8_t transferId = 0;
-			uint8_t totalListSize = 0;			   ///< standard PGN total
-			std::vector<TxPgnEnableEntry> entries; ///< standard PGNs
-			TxPgnEnableListF2ProprietaryEntries proprietary;
-			bool proprietaryReceived = false;
-		};
 
 		/**************************************************************************/ /**
 		 \brief      Expand DP0/DP1 bitmap bytes into a sorted ascending list

@@ -53,6 +53,8 @@
 #include <string>
 #include <vector>
 
+#include "public/bem_responses/pgn_enable_list_f2.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -87,9 +89,6 @@ namespace Actisense
 		/// Max total entries (totalListSize is u8 → 255)
 		static constexpr std::size_t kRxPgnEnableListF2MaxTotalEntries = 255;
 
-		/// Proprietary bitmap bytes per data page (32 → 256 PGNs per page).
-		static constexpr std::size_t kRxPgnEnableListF2PropBitmapBytes = 32;
-
 		/// Proprietary PGN base for DP0: PDU2 single-frame 0xFF00..0xFFFF.
 		/// PGN = kRxPgnPropDp0Base + (byteIndex * 8 + bitIndex).
 		static constexpr uint32_t kRxPgnPropDp0Base = 0x0000FF00;
@@ -102,15 +101,6 @@ namespace Actisense
 		static constexpr uint8_t kRxPgnMaskEnabled = 0x01;
 
 		/* Data Structures ------------------------------------------------------ */
-
-		/**************************************************************************/ /**
-		 \brief      One row in the standard-variant Rx Enable List.
-		 *******************************************************************************/
-		struct RxPgnEnableEntry
-		{
-			uint8_t pgnIndex = 0; ///< Device-local PGN index (see SupportedPgnList)
-			uint8_t rxMask = 0;	  ///< 0 = disabled, non-zero = enabled
-		};
 
 		/**************************************************************************/ /**
 		 \brief      Which structure variant a 0x4E response carries.
@@ -267,34 +257,6 @@ namespace Actisense
 			Continue, ///< Sub-list absorbed; more expected.
 			Done,	  ///< Last sub-list absorbed; result() is ready.
 			Mismatch  ///< Transfer-id changed mid-stream or msg malformed.
-		};
-
-		/**************************************************************************/ /**
-		 \brief      Decoded proprietary bitmaps + expanded enabled-PGN list.
-		 \details    enabledPgns is sorted ascending (DP0 entries then DP1).
-					 Layout mirrors the Tx-side equivalent.
-		 *******************************************************************************/
-		struct RxPgnEnableListF2ProprietaryEntries
-		{
-			std::array<uint8_t, kRxPgnEnableListF2PropBitmapBytes> dp0RawLut{};
-			std::array<uint8_t, kRxPgnEnableListF2PropBitmapBytes> dp1RawLut{};
-			std::vector<uint32_t> enabledPgns;
-		};
-
-		/**************************************************************************/ /**
-		 \brief      Aggregated Rx PGN Enable List F2 result.
-		 \details    Populated by RxPgnEnableListF2Accumulator. proprietary is
-					 valid when proprietaryReceived is true; otherwise the
-					 underlying firmware did not emit the proprietary message
-					 (e.g. NGT-class devices that pre-date NGXSW-3329).
-		 *******************************************************************************/
-		struct RxPgnEnableListF2Result
-		{
-			uint8_t transferId = 0;
-			uint8_t totalListSize = 0;
-			std::vector<RxPgnEnableEntry> entries; ///< sized totalListSize on Done
-			RxPgnEnableListF2ProprietaryEntries proprietary;
-			bool proprietaryReceived = false;
 		};
 
 		/**************************************************************************/ /**

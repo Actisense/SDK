@@ -27,6 +27,9 @@ add_sdk_test(test_port_pcode test_port_pcode.cpp)
 add_sdk_test(test_rx_pgn_enable test_rx_pgn_enable.cpp)
 add_sdk_test(test_tx_pgn_enable test_tx_pgn_enable.cpp)
 
+# Public BEM callbacks header standalone-compile check (GIT-112)
+add_sdk_test(test_bem_callbacks_standalone test_bem_callbacks_standalone.cpp)
+
 # Phase 2a/2b BEM Command tests
 add_sdk_test(test_device_control test_device_control.cpp)
 add_sdk_test(test_session_device_control test_session_device_control.cpp)

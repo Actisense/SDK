@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include "public/bem_responses/port_baudrate.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -40,49 +42,6 @@ namespace Actisense
 
 		/// Port Baudrate SET request data size (9 bytes)
 		static constexpr std::size_t kPortBaudrateSetRequestSize = 9;
-
-		/* Enumerations --------------------------------------------------------- */
-
-		/**************************************************************************/ /**
-		 \brief      Hardware protocol types
-		 \details    Identifies the communication protocol used on a port
-		 *******************************************************************************/
-		enum class HardwareProtocol : uint8_t
-		{
-			Bst = 0,	  ///< BST (Binary Standard Transport) protocol
-			Nmea0183 = 1, ///< NMEA 0183 protocol
-			Nmea2000 = 2, ///< NMEA 2000 protocol
-			Ipv4 = 3,	  ///< IPv4 (reserved)
-			Ipv6 = 4,	  ///< IPv6 (reserved)
-			RawAscii = 5, ///< Raw ASCII (reserved)
-			N2kAscii = 6  ///< N2K ASCII (reserved)
-		};
-
-		/* Data Structures ------------------------------------------------------ */
-
-		/**************************************************************************/ /**
-		 \brief      Port Baudrate request structure
-		 \details    Used for building Get/Set Port Baudrate commands
-		 *******************************************************************************/
-		struct PortBaudrateRequest
-		{
-			uint8_t portNumber = 0;				 ///< Port to configure (0-based)
-			std::optional<uint32_t> sessionBaud; ///< Immediate baudrate (omit for GET)
-			std::optional<uint32_t> storeBaud;	 ///< Persistent baudrate (omit for GET)
-		};
-
-		/**************************************************************************/ /**
-		 \brief      Port Baudrate response structure
-		 \details    Decoded response from Port Baudrate command
-		 *******************************************************************************/
-		struct PortBaudrateResponse
-		{
-			uint8_t totalPorts = 0;							   ///< Total ports on device
-			uint8_t portNumber = 0;							   ///< Queried/configured port
-			HardwareProtocol protocol = HardwareProtocol::Bst; ///< Protocol type on this port
-			uint32_t sessionBaud = 0;						   ///< Current session baudrate
-			uint32_t storeBaud = 0;							   ///< Stored (EEPROM) baudrate
-		};
 
 		/* Helper Functions ----------------------------------------------------- */
 

@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include "public/bem_responses/echo.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -43,15 +45,6 @@ namespace Actisense
 		struct EchoRequest
 		{
 			std::vector<uint8_t> data; ///< Data to echo (0-252 bytes)
-		};
-
-		/**************************************************************************/ /**
-		 \brief      Echo response structure
-		 \details    Decoded response from Echo command
-		 *******************************************************************************/
-		struct EchoResponse
-		{
-			std::vector<uint8_t> data; ///< Echoed data (should match request)
 		};
 
 		/* Helper Functions ----------------------------------------------------- */

@@ -19,6 +19,8 @@
 #include <string>
 #include <vector>
 
+#include "public/bem_responses/port_pcode.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -58,15 +60,6 @@ namespace Actisense
 		struct PortPCodeRequest
 		{
 			std::vector<uint8_t> pCodes; ///< P-Code per port (empty for GET)
-		};
-
-		/**************************************************************************/ /**
-		 \brief      Port P-Code response structure
-		 \details    Decoded response from Port P-Code command
-		 *******************************************************************************/
-		struct PortPCodeResponse
-		{
-			std::vector<uint8_t> pCodes; ///< P-Code per port
 		};
 
 		/* Helper Functions ----------------------------------------------------- */

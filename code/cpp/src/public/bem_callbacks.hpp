@@ -13,13 +13,14 @@
 			which session/transport, through what wrapping path, and
 			when it landed.
 
-			The decoded result types referenced here live alongside
-			their wire-format helpers in
-			src/protocols/bem/bem_commands/ headers. Those headers are
-			pure data + decoders in the Actisense::Sdk namespace with
-			no internal-only dependencies, and form part of the public
-			API contract — applications including this header will
-			transitively pull them in.
+			The decoded response/result types referenced here are
+			defined in the public src/public/bem_responses/ headers —
+			pure data structures in the Actisense::Sdk namespace. The
+			wire-format constants and decode/encode/format helpers that
+			operate on them remain internal under
+			src/protocols/bem/bem_commands/. Applications including this
+			header pull in only the public data structures, never the
+			internal protocol detail.
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 ==============================================================================*/
@@ -29,20 +30,18 @@
 #include <optional>
 #include <string_view>
 
-#include "protocols/bem/bem_commands/can_config.hpp"
-#include "protocols/bem/bem_commands/can_info_fields.hpp"
-#include "protocols/bem/bem_commands/delete_pgn_enable_lists.hpp"
-#include "protocols/bem/bem_commands/echo.hpp"
-#include "protocols/bem/bem_commands/params_pgn_enable_lists.hpp"
-#include "protocols/bem/bem_commands/port_baudrate.hpp"
-#include "protocols/bem/bem_commands/port_pcode.hpp"
-#include "protocols/bem/bem_commands/product_info.hpp"
-#include "protocols/bem/bem_commands/rx_pgn_enable.hpp"
-#include "protocols/bem/bem_commands/rx_pgn_enable_list_f2.hpp"
-#include "protocols/bem/bem_commands/supported_pgn_list.hpp"
-#include "protocols/bem/bem_commands/total_time.hpp"
-#include "protocols/bem/bem_commands/tx_pgn_enable.hpp"
-#include "protocols/bem/bem_commands/tx_pgn_enable_list_f2.hpp"
+#include "public/bem_responses/can_config.hpp"
+#include "public/bem_responses/can_info_fields.hpp"
+#include "public/bem_responses/echo.hpp"
+#include "public/bem_responses/params_pgn_enable_lists.hpp"
+#include "public/bem_responses/pgn_enable_list_f2.hpp"
+#include "public/bem_responses/port_baudrate.hpp"
+#include "public/bem_responses/port_pcode.hpp"
+#include "public/bem_responses/product_info.hpp"
+#include "public/bem_responses/rx_pgn_enable.hpp"
+#include "public/bem_responses/supported_pgn_list.hpp"
+#include "public/bem_responses/total_time.hpp"
+#include "public/bem_responses/tx_pgn_enable.hpp"
 #include "public/error.hpp"
 #include "public/hardware_info.hpp"
 #include "public/operating_mode.hpp"
