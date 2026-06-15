@@ -75,7 +75,11 @@ namespace Actisense
 				return false;
 			}
 
-			/* PGN ID: bytes 0-3, little-endian */
+			/* PGN ID: bytes 0-3, little-endian (full 32-bit field). NOTE: the
+			   Rx/Tx PGN Enable command wire format carries a 4-byte PGN, unlike
+			   the Supported PGN List response (supported_pgn_list.hpp), which
+			   packs each PGN into 3 bytes. Both are correct per their command
+			   specs — do not "reconcile" them to a common width. */
 			response.pgn = static_cast<uint32_t>(data[0]) | (static_cast<uint32_t>(data[1]) << 8) |
 						   (static_cast<uint32_t>(data[2]) << 16) |
 						   (static_cast<uint32_t>(data[3]) << 24);

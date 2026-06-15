@@ -67,6 +67,13 @@ namespace Actisense
 			/// open (e.g. "COM5", "tcp://host:port", "loopback"). Useful when a
 			/// single callback aggregates replies from multiple concurrent
 			/// Sessions. Empty if the session did not record a label.
+			///
+			/// DESIGN NOTE (GIT-104): deliberately an owning std::string rather
+			/// than a std::string_view into a session-owned label. ResponseOrigin
+			/// is passed by value into callbacks and consumers are free to copy it
+			/// out and inspect it after the originating Session has closed; a view
+			/// would dangle in that case. The per-callback string allocation is an
+			/// accepted cost for that lifetime safety.
 			std::string transportId;
 
 			/// Wrapping path: Local (direct BEM) vs Remote (PGN 126720 wrap).

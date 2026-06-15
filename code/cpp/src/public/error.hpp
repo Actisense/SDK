@@ -25,7 +25,7 @@ namespace Actisense
 		 \brief      SDK error codes
 		 \details    Categorized errors for transport, protocol, and general SDK issues
 		 *******************************************************************************/
-		enum class ErrorCode
+		enum class ErrorCode : int32_t
 		{
 			Ok = 0,				  ///< No error
 			TransportOpenFailed,  ///< Failed to open transport (port busy, not found)
@@ -41,7 +41,13 @@ namespace Actisense
 			InvalidArgument,	  ///< Invalid argument passed to API
 			NotConnected,		  ///< Session not connected
 			AlreadyConnected,	  ///< Session already connected
-			Internal			  ///< Internal SDK error (bug)
+			Internal,			  ///< Internal SDK error (bug)
+			BemDeviceError,		  ///< Device returned a BEM error response (see
+								  ///< ExtendedError::deviceErrorCode for the raw ARL code)
+
+			/* Keep last: sentinel giving the number of error codes. Not a valid
+			   error value — useful for table bounds and range checks. */
+			Count
 		};
 
 		/**************************************************************************/ /**
@@ -76,7 +82,7 @@ namespace Actisense
 		struct ExtendedError
 		{
 			ErrorCode code = ErrorCode::Ok; ///< SDK-level error code
-			int32_t deviceErrorCode = 0;	///< Original device error code (if BemDeviceError)
+			int32_t deviceErrorCode = 0;	///< Raw ARL device error code (set when code == ErrorCode::BemDeviceError)
 			std::string deviceMessage;		///< Device error description
 			std::string context;			///< Additional context (command name, etc.)
 

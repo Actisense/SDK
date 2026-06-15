@@ -66,8 +66,13 @@ namespace Actisense
 			 \brief      Resolve hostname to endpoints
 			 \param[in]  host      Hostname or IP address
 			 \param[in]  callback  Called with resolved endpoints or error
+			 \deprecated Not yet implemented — the current stub always reports
+						 ErrorCode::UnsupportedOperation. Marked deprecated rather
+						 than removed because the symbol is compiled by internal
+						 consumers (DeviceLib). Do not build new code on it.
 			 *******************************************************************************/
-			static void resolveHostAsync(const std::string& host, HostResolutionCallback callback);
+			[[deprecated("resolveHostAsync is an unimplemented stub; do not use")]] static void
+			resolveHostAsync(const std::string& host, HostResolutionCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Open a session to a device

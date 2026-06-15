@@ -22,7 +22,7 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Error messages indexed by ErrorCode
 			 *******************************************************************************/
-			constexpr std::array<std::string_view, 15> kErrorMessages = {{
+			constexpr std::array<std::string_view, 16> kErrorMessages = {{
 				"No error",						   // Ok
 				"Failed to open transport",		   // TransportOpenFailed
 				"Transport I/O error",			   // TransportIo
@@ -37,7 +37,8 @@ namespace Actisense
 				"Invalid argument",				   // InvalidArgument
 				"Not connected",				   // NotConnected
 				"Already connected",			   // AlreadyConnected
-				"Internal SDK error"			   // Internal
+				"Internal SDK error",			   // Internal
+				"Device returned an error response"	   // BemDeviceError
 			}};
 
 			/**************************************************************************/ /**

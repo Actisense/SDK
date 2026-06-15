@@ -61,7 +61,7 @@ namespace Actisense
 
 			/* Session interface ---------------------------------------------------- */
 
-			void asyncSend(const std::string& protocol, std::span<const uint8_t> payload,
+			void asyncSend(SendProtocol protocol, std::span<const uint8_t> payload,
 						   SendCompletion completion) override;
 
 			void sendPgn(uint32_t pgn, std::span<const uint8_t> payload, uint8_t destination = 0xFF,
@@ -83,6 +83,13 @@ namespace Actisense
 				return transport_label_;
 			}
 
+			/* THREADING: transport_label_ is read on the receive thread (via
+			   makeLocalOrigin/makeRemoteOrigin) and is intentionally NOT locked.
+			   The contract is single mutation before the receive thread starts:
+			   setTransportLabel() must be called during session setup (Api::open*
+			   sets it before startReceiving()), never concurrently with an active
+			   receive thread. The returned string_view is likewise only valid for
+			   as long as the label is not re-set. */
 			void setTransportLabel(std::string label) override {
 				transport_label_ = std::move(label);
 			}

@@ -76,6 +76,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sendBemCommand`). The generic path may return once a real correlator is
   implemented for non-BEM protocols.
 
+### Changed (breaking) — GIT-104 review cleanup
+
+- **`Session::asyncSend()` now takes a `Session::SendProtocol` enum
+  (`Bst`/`Raw`) instead of a `const std::string&` selector.** The stringly-typed
+  selector silently treated any unrecognised value as `"raw"`; the enum makes the
+  choice explicit and typo-proof. Replace `asyncSend("bst", …)` with
+  `asyncSend(Session::SendProtocol::Bst, …)` and `"raw"` with `SendProtocol::Raw`.
+- **`Version::toString()` now returns `std::string` (was `const char*`).** The
+  old form returned a pointer into a `thread_local` buffer that was overwritten
+  by the next call on the same thread — easy to alias by accident. The owning
+  string removes the hazard.
+- **`setLogger()` now takes `std::shared_ptr<ILogger>` (was `ILogger*`).** The SDK
+  shares ownership so an installed logger stays alive while active; callers no
+  longer have to manually outlive every logging thread. The lock-free `logger()`
+  read path is preserved.
+- **`ErrorCode` gained an explicit `int32_t` underlying type, a new
+  `BemDeviceError` enumerator (device-reported BEM error), and a trailing `Count`
+  sentinel.** `BemDeviceError` was referenced in docs but missing from the enum.
+- **`Api::resolveHostAsync()` is now `[[deprecated]]`.** It is an unimplemented
+  stub that always reports `ErrorCode::UnsupportedOperation`; kept (not removed)
+  because the symbol is compiled by internal consumers.
+
+### Fixed — GIT-104 review cleanup
+
+- **`Session::metrics()` now reflects real activity.** The `MetricsCollector`
+  `record*` methods were never called, so the public metrics surface always read
+  zero. Bytes/calls sent and received, frames parsed/dropped, BEM
+  commands/responses/timeouts/device-errors, latency and framing/checksum errors
+  are now recorded along the live data path (covered by `test_session_metrics`).
+- **`framesReceived()` no longer under-reports.** It now counts BEM-response
+  frames as well as plain BST frames.
+- **Serial transport robustness.** Added a mutex around the shared Windows write
+  `OVERLAPPED`; the Windows recv `WAIT_FAILED` path now cancels I/O and stops
+  rather than busy-spinning; the POSIX read path now stops on peer-close
+  (`read()==0`) and hard I/O errors instead of spinning; POSIX `VTIME` no longer
+  truncates a sub-100 ms read timeout to 0.
+- **Frame encoders reject oversized payloads** instead of silently truncating:
+  `BstFrame::create93/94/95` bound the 8-bit store length and `createD0` bounds
+  its 16-bit length; the BDTP Type 2 decoder sanity-bounds the 16-bit length
+  field against `kBdtpMaxFrameSize`.
+- **Echo response decode** rewritten to avoid a latent unsigned underflow.
+- **Windows serial enumeration** pinned to the ANSI registry/SetupAPI calls so it
+  compiles regardless of the project's UNICODE/MBCS setting.
+- Removed a dead BEM sequence counter; documented the BEM correlator's
+  single-Rx-thread invariant and the destructor's callback reentrancy contract;
+  added a `Session::close()` self-join guard for callback-initiated close.
+
 ## [0.4.0] - 2026-04-19
 
 ### Changed (potentially breaking)

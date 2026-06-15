@@ -161,8 +161,14 @@ namespace Actisense
 				return false;
 			}
 
-			if (payload.size() > 255) {
-				outError = "Payload exceeds maximum BST length (255 bytes)";
+			/* Bound by the BDTP frame size the assembler is willing to receive
+			   (kBdtpMaxFrameSize), not the 8-bit Type 1 length: BST Type 2 frames
+			   carry a 16-bit length and legitimately exceed 255 bytes. The caller
+			   embeds the BST ID + length header in `payload`; this entry only adds
+			   the zero-sum checksum and DLE framing. */
+			if (payload.size() > kBdtpMaxFrameSize) {
+				outError = "Payload exceeds maximum BDTP frame size (" +
+						   std::to_string(kBdtpMaxFrameSize) + " bytes)";
 				return false;
 			}
 
@@ -225,7 +231,13 @@ namespace Actisense
 		}
 
 		uint8_t BdtpProtocol::calculateChecksum(ConstByteSpan data) noexcept {
-			/* Simple sum of all bytes, truncated to 8 bits */
+			/* Simple 8-bit zero-sum checksum: the sum of all frame bytes including
+			   the checksum is 0 (mod 256). This matches the Actisense gateway wire
+			   format. Note the weakness: an 8-bit checksum has a ~1/256 undetected
+			   collision rate, which is fine for a short, framed serial link but
+			   would be inadequate if BDTP is ever tunnelled over a lossy or
+			   adversarial channel (e.g. raw TCP) — add a stronger integrity check
+			   (CRC/HMAC) at that layer if so. */
 			uint8_t sum = 0;
 			for (const uint8_t byte : data) {
 				sum = static_cast<uint8_t>(sum + byte);
@@ -315,6 +327,14 @@ namespace Actisense
 				totalLen = static_cast<std::size_t>(frameData[1]) |
 						   (static_cast<std::size_t>(frameData[2]) << 8);
 				headerSize = 3; /* ID + L0 + L1 */
+
+				/* Sanity-bound the 16-bit length before trusting it: a corrupt or
+				   malicious L0/L1 could claim up to 0xFFFF bytes. Reject anything
+				   beyond the frame size we actually accept. */
+				if (totalLen > kBdtpMaxFrameSize) {
+					outError = "BST Type 2 length exceeds maximum frame size";
+					return false;
+				}
 			} else {
 				/* Type 1: 8-bit length field, length is payload only */
 				totalLen = static_cast<std::size_t>(frameData[1]) + 2; /* Add ID + length byte */

@@ -11,6 +11,7 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include <cstdint>
+#include <string>
 
 namespace Actisense
 {
@@ -36,9 +37,9 @@ namespace Actisense
 
 			/**************************************************************************/ /**
 			 \brief      Convert version to string (e.g., "0.1.0")
-			 \return     Version string
+			 \return     Version string (owns its storage; no aliasing between calls)
 			 *******************************************************************************/
-			[[nodiscard]] const char* toString() const noexcept;
+			[[nodiscard]] std::string toString() const;
 		};
 
 		/**************************************************************************/ /**

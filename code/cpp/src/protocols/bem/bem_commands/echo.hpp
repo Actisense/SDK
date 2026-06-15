@@ -68,7 +68,9 @@ namespace Actisense
 			}
 
 			const std::size_t arraySize = data[0];
-			if (arraySize > data.size() - 1) {
+			/* Written as an addition (not data.size() - 1) so it stays correct for
+			   any size without risking an unsigned underflow. */
+			if (1 + arraySize > data.size()) {
 				outError = "Echo response truncated: header reports " + std::to_string(arraySize) +
 						   " bytes, only " + std::to_string(data.size() - 1) + " present";
 				return false;

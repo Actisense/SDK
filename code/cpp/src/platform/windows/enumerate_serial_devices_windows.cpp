@@ -54,7 +54,7 @@ namespace Actisense
 			/* Get the device information set handle. */
 			GUID guid = GUID_DEVINTERFACE_COMPORT;
 			HDEVINFO devInfoHandle =
-				SetupDiGetClassDevs(&guid, NULL, NULL, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+				SetupDiGetClassDevsA(&guid, NULL, NULL, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
 			if (devInfoHandle == INVALID_HANDLE_VALUE) {
 				return enumeration;
 			}
@@ -68,12 +68,14 @@ namespace Actisense
 				HKEY devKeyHandle = SetupDiOpenDevRegKey(devInfoHandle, &devInfo, DICS_FLAG_GLOBAL,
 														 0, DIREG_DEV, KEY_QUERY_VALUE);
 				if (devKeyHandle && devKeyHandle != INVALID_HANDLE_VALUE) {
-					/* Read in the name of the port. */
-					TCHAR name[100];
+					/* Read in the name of the port. Pinned to the ANSI registry API
+					   (RegQueryValueExA + char buffer) so this compiles regardless of
+					   the project's UNICODE/MBCS setting; port_name is a std::string. */
+					char name[100];
 					DWORD size = sizeof(name);
 					DWORD type;
-					if ((ERROR_SUCCESS == RegQueryValueEx(devKeyHandle, _T("PortName"), NULL, &type,
-														  reinterpret_cast<LPBYTE>(name), &size)) &&
+					if ((ERROR_SUCCESS == RegQueryValueExA(devKeyHandle, "PortName", NULL, &type,
+														   reinterpret_cast<LPBYTE>(name), &size)) &&
 						(REG_SZ == type)) {
 						/* Check for duplicates using hash set for O(1) lookup */
 						if (seen_ports.find(name) == seen_ports.end()) {
@@ -83,10 +85,10 @@ namespace Actisense
 							SerialDeviceInfo device_info;
 							device_info.port_name = name;
 
-							TCHAR fr_name[100];
+							char fr_name[100];
 							DWORD fr_size = sizeof(fr_name);
 							DWORD fr_type = 0;
-							if (SetupDiGetDeviceRegistryProperty(
+							if (SetupDiGetDeviceRegistryPropertyA(
 									devInfoHandle, &devInfo, SPDRP_FRIENDLYNAME, &fr_type,
 									reinterpret_cast<PBYTE>(fr_name), static_cast<DWORD>(fr_size),
 									reinterpret_cast<LPDWORD>(&fr_size)) &&

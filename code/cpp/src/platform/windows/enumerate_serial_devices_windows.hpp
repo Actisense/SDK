@@ -1,5 +1,5 @@
-#if defined(_WIN32) && !defined(__ENUMERATE_SERIAL_DEVICES_WINDOWS_H)
-#define __ENUMERATE_SERIAL_DEVICES_WINDOWS_H
+#if defined(_WIN32) && !defined(__ACTISENSE_SDK_PLATFORM_WINDOWS_ENUMERATE_SERIAL_DEVICES)
+#define __ACTISENSE_SDK_PLATFORM_WINDOWS_ENUMERATE_SERIAL_DEVICES
 
 /**************************************************************************/ /**
  \file     	enumerate_serial_devices_windows.hpp
@@ -31,4 +31,4 @@ namespace Actisense
 	} // namespace Sdk
 } // namespace Actisense
 
-#endif /* HEADER_GUARD */
+#endif /* _WIN32 && __ACTISENSE_SDK_PLATFORM_WINDOWS_ENUMERATE_SERIAL_DEVICES */

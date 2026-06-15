@@ -501,15 +501,14 @@ namespace Actisense
 									remote device via PGN 126720 wrapping
 									(GIT-88), pass the target device's address so
 									replies from different remotes do not collide.
-			 \return     Sequence ID assigned to this request
 			 \note       One-shot: the entry is released after the first matching
 						 response. For commands whose firmware emits a train of
 						 responses for a single GET (e.g. F2 PGN-list 0x4E/0x4F)
 						 use registerMultiReplyRequest() instead.
 			 *******************************************************************************/
-			uint8_t registerRequest(BemCommandId commandId, BstId bstId,
-									std::chrono::milliseconds timeout, BemResponseCallback callback,
-									uint8_t srcAddr = kLocalSrcAddr);
+			void registerRequest(BemCommandId commandId, BstId bstId,
+								  std::chrono::milliseconds timeout, BemResponseCallback callback,
+								  uint8_t srcAddr = kLocalSrcAddr);
 
 			/**************************************************************************/ /**
 			 \brief      Register a pending request that may receive several
@@ -525,13 +524,12 @@ namespace Actisense
 			 \param[in]  inactivityTimeout   Max gap between successive responses
 			 \param[in]  isComplete          Predicate: response → true if done
 			 \param[in]  callback            Callback invoked per response and on timeout
-			 \return     Sequence ID assigned to this request
 			 *******************************************************************************/
-			uint8_t registerMultiReplyRequest(BemCommandId commandId, BstId bstId,
-											  std::chrono::milliseconds inactivityTimeout,
-											  std::function<bool(const BemResponse&)> isComplete,
-											  BemResponseCallback callback,
-											  uint8_t srcAddr = kLocalSrcAddr);
+			void registerMultiReplyRequest(BemCommandId commandId, BstId bstId,
+										   std::chrono::milliseconds inactivityTimeout,
+										   std::function<bool(const BemResponse&)> isComplete,
+										   BemResponseCallback callback,
+										   uint8_t srcAddr = kLocalSrcAddr);
 
 			/**************************************************************************/ /**
 			 \brief      Try to correlate a response with a pending request
@@ -542,9 +540,15 @@ namespace Actisense
 									gateway. For replies unwrapped from a
 									PGN 126720 envelope (GIT-88), pass the N2K
 									source address of the remote device.
+			 \param[out] outLatencyMs   Optional. When non-null and the response
+										correlates a one-shot request (or completes a
+										multi-reply request), receives the round-trip
+										latency in milliseconds measured from sentAt.
+										Left untouched otherwise.
 			 \return     True if response was correlated and callback invoked
 			 *******************************************************************************/
-			bool correlateResponse(const BemResponse& response, uint8_t srcAddr = kLocalSrcAddr);
+			bool correlateResponse(const BemResponse& response, uint8_t srcAddr = kLocalSrcAddr,
+								   uint32_t* outLatencyMs = nullptr);
 
 			/**************************************************************************/ /**
 			 \brief      Check for timed-out requests and invoke callbacks
@@ -619,13 +623,7 @@ namespace Actisense
 			buildResponseKey(BstId bstId, BemCommandId bemId,
 							 uint8_t srcAddr = kLocalSrcAddr) noexcept;
 
-			/**************************************************************************/ /**
-			 \brief      Get next sequence ID (thread-safe)
-			 *******************************************************************************/
-			uint8_t nextSequenceId();
-
 			mutable std::mutex mutex_;
-			uint8_t sequence_counter_ = 0;
 			/* map of requests pending by key composed of request details */
 			std::map<uint64_t, PendingRequest> pending_requests_;
 

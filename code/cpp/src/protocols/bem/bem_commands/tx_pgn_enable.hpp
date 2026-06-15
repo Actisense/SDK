@@ -78,7 +78,9 @@ namespace Actisense
 				return false;
 			}
 
-			/* PGN ID: bytes 0-3, little-endian */
+			/* PGN ID: bytes 0-3, little-endian (full 32-bit field). The Tx/Rx PGN
+			   Enable wire format uses a 4-byte PGN; the Supported PGN List response
+			   uses a 3-byte PGN. Both are correct per spec — see rx_pgn_enable.hpp. */
 			response.pgn = static_cast<uint32_t>(data[0]) | (static_cast<uint32_t>(data[1]) << 8) |
 						   (static_cast<uint32_t>(data[2]) << 16) |
 						   (static_cast<uint32_t>(data[3]) << 24);

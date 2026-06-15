@@ -105,6 +105,9 @@ namespace Actisense
 				return;
 			}
 
+			/* Safe to read openResult on the next line: ITransport::asyncOpen is
+			   contractually required to invoke its completion synchronously
+			   (see transport.hpp). */
 			ErrorCode openResult = ErrorCode::Internal;
 			transport->asyncOpen(options.transport,
 								 [&openResult](ErrorCode code) { openResult = code; });
@@ -132,6 +135,8 @@ namespace Actisense
 			transportConfig.kind = TransportKind::Serial;
 			transportConfig.serial = config;
 
+			/* Safe to read openResult synchronously — see the asyncOpen contract
+			   note in transport.hpp. */
 			ErrorCode openResult = ErrorCode::Internal;
 			transport->asyncOpen(transportConfig,
 								 [&openResult](ErrorCode code) { openResult = code; });
