@@ -19,7 +19,11 @@ add_sdk_test(test_debug_log test_debug_log.cpp)
 add_sdk_test(test_loopback_transport test_loopback_transport.cpp)
 # POSIX serial transport: custom baud + prompt-close wakeup (GIT-119).
 # Real tests are gated to POSIX; on Windows the exe contains a single skip.
-add_sdk_test(test_serial_transport_posix test_serial_transport_posix.cpp)
+# posix_baud_readback.cpp is an isolated TU (<asm/termbits.h> vs <termios.h>
+# clash) providing the TCGETS2 readback for the GIT-125 hardware-gated test.
+add_sdk_test(test_serial_transport_posix
+    test_serial_transport_posix.cpp
+    posix_baud_readback.cpp)
 
 # Protocol tests
 add_sdk_test(test_bdtp_protocol test_bdtp_protocol.cpp)
