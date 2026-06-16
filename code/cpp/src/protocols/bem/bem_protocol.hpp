@@ -551,6 +551,36 @@ namespace Actisense
 								   uint32_t* outLatencyMs = nullptr);
 
 			/**************************************************************************/ /**
+			 \brief      Fail the in-flight request that a Negative Ack rejects
+			 \details    A Negative Ack (BEM id 0xF4) carries 0xF4 in place of the
+						 original command id, so it can never match a pending
+						 request through correlateResponse(). Instead the rejected
+						 command's BEM id is echoed in the NACK's 4-byte payload
+						 (rejectedCmdId). This reconstructs the pending-request key
+						 from (NACK response BST group, that id, srcAddr); failing
+						 an exact match it falls back to the sole request in flight
+						 on that BST group + source address (refusing to guess when
+						 several match). The matched request's callback fires once
+						 with ErrorCode::BemNegativeAck so the caller fails fast
+						 instead of waiting out the timeout (GIT-100).
+			 \param[in]  responseBstId   BST group of the Negative Ack (its
+										 header.bstId, e.g. A0 for a Core NACK)
+			 \param[in]  srcAddr         Source address that delivered the NACK
+										 (kLocalSrcAddr for the local gateway, the
+										 remote device address for a 126720-wrapped
+										 reply)
+			 \param[in]  rejectedCmdId   Rejected command's BEM id (low byte of the
+										 NACK payload's unique-id field). Pass 0 when
+										 the payload could not be decoded — the
+										 sole-in-flight fallback still applies.
+			 \param[in]  deviceErrorCode ARL error code from the NACK response
+										 header, surfaced in the failure message
+			 \return     True if a matching request was found and failed
+			 *******************************************************************************/
+			bool failRequestForNegativeAck(BstId responseBstId, uint8_t srcAddr,
+										   uint8_t rejectedCmdId, int32_t deviceErrorCode);
+
+			/**************************************************************************/ /**
 			 \brief      Check for timed-out requests and invoke callbacks
 			 \return     Number of requests that timed out
 			 *******************************************************************************/

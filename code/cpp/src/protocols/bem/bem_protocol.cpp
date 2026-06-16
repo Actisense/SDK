@@ -674,6 +674,65 @@ namespace Actisense
 			return true;
 		}
 
+		bool BemProtocol::failRequestForNegativeAck(BstId responseBstId, uint8_t srcAddr,
+													uint8_t rejectedCmdId, int32_t deviceErrorCode) {
+			BemResponseCallback callbackToFire;
+
+			{
+				std::lock_guard<std::mutex> lock(mutex_);
+
+				/* Precise match: the rejected command id is echoed in the NACK
+				   payload, so reconstruct the exact key the request was filed
+				   under. */
+				const uint64_t exactKey =
+					buildResponseKey(responseBstId, static_cast<BemCommandId>(rejectedCmdId), srcAddr);
+				auto it = pending_requests_.find(exactKey);
+
+				/* Fallback: the payload id did not pin a request (e.g. firmware
+				   sent a zero/garbled unique-id). Fail the request iff exactly
+				   one is in flight on this BST group + source address; refuse to
+				   guess when several match. The key layout (buildResponseKey) is
+				   srcAddr<<32 | bstId<<16 | bemId, so mask off the bemId byte. */
+				if (it == pending_requests_.end()) {
+					const uint64_t groupKey =
+						(static_cast<uint64_t>(srcAddr) << 32) |
+						(static_cast<uint64_t>(static_cast<uint16_t>(responseBstId)) << 16);
+					const uint64_t groupMask =
+						(static_cast<uint64_t>(0xFF) << 32) | (static_cast<uint64_t>(0xFFFF) << 16);
+
+					auto sole = pending_requests_.end();
+					std::size_t matches = 0;
+					for (auto cand = pending_requests_.begin(); cand != pending_requests_.end();
+						 ++cand) {
+						if ((cand->first & groupMask) == groupKey) {
+							sole = cand;
+							++matches;
+						}
+					}
+					if (matches == 1) {
+						it = sole;
+					}
+				}
+
+				if (it == pending_requests_.end()) {
+					return false;
+				}
+
+				callbackToFire = std::move(it->second.callback);
+				pending_requests_.erase(it);
+				++responses_correlated_;
+			}
+
+			if (callbackToFire) {
+				std::string msg = "Device rejected the command (Negative Ack)";
+				if (deviceErrorCode != 0) {
+					msg += "; device error " + std::to_string(deviceErrorCode);
+				}
+				callbackToFire(std::nullopt, ErrorCode::BemNegativeAck, msg);
+			}
+			return true;
+		}
+
 		std::size_t BemProtocol::processTimeouts() {
 			std::vector<std::pair<uint64_t, BemResponseCallback>> timedOut;
 			const auto now = std::chrono::steady_clock::now();

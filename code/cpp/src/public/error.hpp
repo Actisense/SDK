@@ -97,6 +97,9 @@ namespace Actisense
 			BemNoRequestPending,   ///< Response received with no matching request
 			UnsupportedProtocol,   ///< Protocol not supported by this session
 			ProtocolDisabled,	   ///< Protocol is disabled in configuration
+			BemNegativeAck,		   ///< Device rejected the command with a Negative
+								   ///< Ack (0xF4); see ExtendedError.deviceErrorCode
+								   ///< for the ARL rejection reason (GIT-100)
 
 			/* Keep last: sentinel giving the number of error codes. Not a valid
 			   error value - useful for table bounds and range checks. */

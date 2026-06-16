@@ -82,7 +82,8 @@ namespace Actisense
 					"BEM response data truncated",						  // BemResponseTruncated
 					"BEM response received with no matching request",	  // BemNoRequestPending
 					"Protocol not supported",							  // UnsupportedProtocol
-					"Protocol is disabled"								  // ProtocolDisabled
+					"Protocol is disabled",								  // ProtocolDisabled
+					"Device rejected the command (Negative Ack)"		  // BemNegativeAck
 				}};
 
 			static_assert(kErrorMessages.size() == static_cast<std::size_t>(ErrorCode::Count),

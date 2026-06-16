@@ -705,6 +705,23 @@ namespace Actisense
 			void emitUncorrelatedBemResponse(const BemResponse& response);
 
 			/**************************************************************************/ /**
+			 \brief      If the response is a Negative Ack, fail the request it rejects
+			 \details    A Negative Ack (BEM id 0xF4) never correlates through the
+						 normal (bstId, bemId, srcAddr) key because 0xF4 replaces the
+						 original command id. This decodes the NACK, recovers the
+						 rejected command id from its payload, and asks the BEM
+						 correlator to fail the matching in-flight request fast with
+						 ErrorCode::BemNegativeAck instead of letting it time out
+						 (GIT-100). Called on the correlation-miss path of both the
+						 local A0H and remote 126720-unwrap receive routes.
+			 \param[in]  response  Decoded BEM response that did not correlate
+			 \param[in]  srcAddr   Source address that delivered the response
+			 \return     True if the response was a NACK that failed a pending
+						 request (caller should stop processing it as unsolicited)
+			 *******************************************************************************/
+			bool tryFailRequestForNegativeAck(const BemResponse& response, uint8_t srcAddr);
+
+			/**************************************************************************/ /**
 			 \brief      Emit a wire-trace event for the given direction/data
 			 \details    Fast-path no-op when no sink has been registered.
 			 *******************************************************************************/

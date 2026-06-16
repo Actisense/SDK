@@ -510,6 +510,11 @@ namespace Actisense
 							metricsCollector_.recordBemResponse(latencyMs);
 							return;
 						}
+						/* GIT-100: fail the request a remote Negative Ack rejects
+						   before falling through to unsolicited dispatch. */
+						if (tryFailRequestForNegativeAck(*response, frame.source())) {
+							return;
+						}
 						emitUncorrelatedBemResponse(*response);
 						return;
 					}
@@ -542,7 +547,36 @@ namespace Actisense
 				return; /* Callback was invoked by correlator */
 			}
 
+			/* GIT-100: a Negative Ack rejects an in-flight command but never
+			   correlates through the normal key (0xF4 replaces the command id),
+			   so fail the matching request fast before treating it as unsolicited. */
+			if (tryFailRequestForNegativeAck(response, kLocalSrcAddr)) {
+				return;
+			}
+
 			emitUncorrelatedBemResponse(response);
+		}
+
+		bool Session::Impl::tryFailRequestForNegativeAck(const BemResponse& response,
+														 uint8_t srcAddr) {
+			if (static_cast<BemCommandId>(response.header.bemId) != BemCommandId::NegativeAck) {
+				return false;
+			}
+
+			/* Recover the rejected command's BEM id from the NACK payload (low
+			   byte of the 4-byte unique-id field). A malformed/short payload
+			   leaves it 0; failRequestForNegativeAck then falls back to the sole
+			   in-flight request on the group + source address. */
+			uint8_t rejectedCmdId = 0;
+			NegativeAckData data;
+			std::string decodeError;
+			if (decodeNegativeAck(response.data, data, decodeError)) {
+				rejectedCmdId = static_cast<uint8_t>(data.uniqueId & 0xFF);
+			}
+
+			return bem_.failRequestForNegativeAck(
+				static_cast<BstId>(response.header.bstId), srcAddr, rejectedCmdId,
+				static_cast<int32_t>(response.header.errorCode));
 		}
 
 		void Session::Impl::emitUncorrelatedBemResponse(const BemResponse& response) {
