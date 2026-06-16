@@ -70,7 +70,8 @@ namespace Actisense
 			void sendPgn(uint32_t pgn, std::span<const uint8_t> payload, uint8_t destination = 0xFF,
 						 uint8_t priority = 6, SendCompletion completion = {});
 
-			void getOperatingMode(std::chrono::milliseconds timeout, OperatingModeCallback callback);
+			void getOperatingMode(std::chrono::milliseconds timeout,
+								  OperatingModeCallback callback);
 
 			void setOperatingMode(OperatingMode mode, std::chrono::milliseconds timeout,
 								  BemResultCallback callback);
@@ -90,9 +91,7 @@ namespace Actisense
 			   sets it before startReceiving()), never concurrently with an active
 			   receive thread. The returned string_view is likewise only valid for
 			   as long as the label is not re-set. */
-			void setTransportLabel(std::string label) {
-				transport_label_ = std::move(label);
-			}
+			void setTransportLabel(std::string label) { transport_label_ = std::move(label); }
 
 			/**************************************************************************/ /**
 			 \brief      Build a ResponseOrigin for a reply that came back over

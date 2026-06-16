@@ -138,9 +138,10 @@ namespace Actisense
 		struct ExtendedError
 		{
 			ErrorCode code = ErrorCode::Ok; ///< SDK-level error code
-			int32_t deviceErrorCode = 0;	///< Raw ARL device error code (set when code == ErrorCode::BemDeviceError)
-			std::string deviceMessage;		///< Device error description
-			std::string context;			///< Additional context (command name, etc.)
+			int32_t deviceErrorCode =
+				0; ///< Raw ARL device error code (set when code == ErrorCode::BemDeviceError)
+			std::string deviceMessage; ///< Device error description
+			std::string context;	   ///< Additional context (command name, etc.)
 
 			/**************************************************************************/ /**
 			 \brief      Check if this represents an error condition

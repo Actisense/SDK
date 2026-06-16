@@ -146,8 +146,7 @@ namespace Actisense
 				convertPaddedString(data.subspan(40, kProductInfoStringMaxLen));
 
 			/* Model Version: bytes 72-103 (32 bytes) */
-			response.modelVersion =
-				convertPaddedString(data.subspan(72, kProductInfoStringMaxLen));
+			response.modelVersion = convertPaddedString(data.subspan(72, kProductInfoStringMaxLen));
 
 			/* Model Serial Code: bytes 104-135 (32 bytes) */
 			response.modelSerialCode =

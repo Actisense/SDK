@@ -507,8 +507,8 @@ namespace Actisense
 						 use registerMultiReplyRequest() instead.
 			 *******************************************************************************/
 			void registerRequest(BemCommandId commandId, BstId bstId,
-								  std::chrono::milliseconds timeout, BemResponseCallback callback,
-								  uint8_t srcAddr = kLocalSrcAddr);
+								 std::chrono::milliseconds timeout, BemResponseCallback callback,
+								 uint8_t srcAddr = kLocalSrcAddr);
 
 			/**************************************************************************/ /**
 			 \brief      Register a pending request that may receive several

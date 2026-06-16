@@ -45,7 +45,19 @@ public:
 		}
 	}
 
-	void close() override { is_open_ = false; }
+	void close() override
+	{
+		is_open_ = false;
+		/* Honour the ITransport contract the session relies on: close() must
+		   complete any parked asyncRecv so the receive loop's wait ends and the
+		   thread can be joined. Without this the receive thread blocks forever
+		   on a completion that never fires and session->close() deadlocks. */
+		if (pending_recv_) {
+			auto completion = std::move(pending_recv_);
+			pending_recv_ = nullptr;
+			completion(ErrorCode::Canceled, {});
+		}
+	}
 
 	[[nodiscard]] bool isOpen() const noexcept override { return is_open_; }
 

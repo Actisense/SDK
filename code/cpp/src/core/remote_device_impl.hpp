@@ -41,26 +41,20 @@ namespace Actisense
 			void setOperatingMode(OperatingMode mode, std::chrono::milliseconds timeout,
 								  BemResultCallback callback);
 
-			void getHardwareInfo(std::chrono::milliseconds timeout,
-								 HardwareInfoCallback callback);
+			void getHardwareInfo(std::chrono::milliseconds timeout, HardwareInfoCallback callback);
 
-			void reInitMainApp(std::chrono::milliseconds timeout,
-							   BemResultCallback callback);
+			void reInitMainApp(std::chrono::milliseconds timeout, BemResultCallback callback);
 
-			void commitToEeprom(std::chrono::milliseconds timeout,
-								BemResultCallback callback);
+			void commitToEeprom(std::chrono::milliseconds timeout, BemResultCallback callback);
 
-			void commitToFlash(std::chrono::milliseconds timeout,
-							   BemResultCallback callback);
+			void commitToFlash(std::chrono::milliseconds timeout, BemResultCallback callback);
 
 			void getPortBaudrate(uint8_t portNumber, std::chrono::milliseconds timeout,
 								 PortBaudrateCallback callback);
 			void setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud, uint32_t storeBaud,
-								 std::chrono::milliseconds timeout,
-								 BemResultCallback callback);
+								 std::chrono::milliseconds timeout, BemResultCallback callback);
 
-			void getPortPCode(std::chrono::milliseconds timeout,
-							  PortPCodeCallback callback);
+			void getPortPCode(std::chrono::milliseconds timeout, PortPCodeCallback callback);
 			void setPortPCode(std::span<const uint8_t> pCodes, std::chrono::milliseconds timeout,
 							  BemResultCallback callback);
 
@@ -85,39 +79,30 @@ namespace Actisense
 			void getTxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
 									  TxPgnEnableListF2ResultCallback callback);
 			void getSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
-									 std::chrono::milliseconds timeout,
-									 BemResultCallback callback);
+									 std::chrono::milliseconds timeout, BemResultCallback callback);
 			void getSupportedPgnList_All(std::chrono::milliseconds perGetTimeout,
 										 SupportedPgnListResultCallback callback);
 
-			void getTotalTime(std::chrono::milliseconds timeout,
-							  TotalTimeCallback callback);
+			void getTotalTime(std::chrono::milliseconds timeout, TotalTimeCallback callback);
 			void setTotalTime(uint32_t totalTime, uint32_t passkey,
-							  std::chrono::milliseconds timeout,
-							  BemResultCallback callback);
+							  std::chrono::milliseconds timeout, BemResultCallback callback);
 
 			void echo(std::span<const uint8_t> data, std::chrono::milliseconds timeout,
 					  EchoCallback callback);
 
-			void getProductInfo(std::chrono::milliseconds timeout,
-								ProductInfoCallback callback);
+			void getProductInfo(std::chrono::milliseconds timeout, ProductInfoCallback callback);
 
-			void getCanConfig(std::chrono::milliseconds timeout,
-							  CanConfigCallback callback);
+			void getCanConfig(std::chrono::milliseconds timeout, CanConfigCallback callback);
 			void setCanConfig(uint64_t name, uint8_t sourceAddress,
-							  std::chrono::milliseconds timeout,
-							  BemResultCallback callback);
+							  std::chrono::milliseconds timeout, BemResultCallback callback);
 
-			void getCanInfoField1(std::chrono::milliseconds timeout,
-								  CanInfoFieldCallback callback);
+			void getCanInfoField1(std::chrono::milliseconds timeout, CanInfoFieldCallback callback);
 			void setCanInfoField1(const std::string& text, std::chrono::milliseconds timeout,
 								  BemResultCallback callback);
-			void getCanInfoField2(std::chrono::milliseconds timeout,
-								  CanInfoFieldCallback callback);
+			void getCanInfoField2(std::chrono::milliseconds timeout, CanInfoFieldCallback callback);
 			void setCanInfoField2(const std::string& text, std::chrono::milliseconds timeout,
 								  BemResultCallback callback);
-			void getCanInfoField3(std::chrono::milliseconds timeout,
-								  CanInfoFieldCallback callback);
+			void getCanInfoField3(std::chrono::milliseconds timeout, CanInfoFieldCallback callback);
 
 			void deletePgnEnableLists(uint8_t selector, std::chrono::milliseconds timeout,
 									  BemResultCallback callback);

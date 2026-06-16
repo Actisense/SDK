@@ -43,7 +43,7 @@ namespace Actisense
 			[[nodiscard]] bool setCustomBaudLinux(int fd, unsigned baud) noexcept;
 
 		} /* namespace detail */
-	} /* namespace Sdk */
+	}	  /* namespace Sdk */
 } /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_POSIX_CUSTOM_BAUD */

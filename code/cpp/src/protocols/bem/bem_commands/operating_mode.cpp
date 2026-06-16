@@ -103,8 +103,7 @@ namespace Actisense
 					if (modeValue >= static_cast<uint16_t>(OperatingMode::UserStart) &&
 						modeValue <= static_cast<uint16_t>(OperatingMode::UserEnd)) {
 						return "User Mode";
-					} else if (modeValue >=
-								   static_cast<uint16_t>(OperatingMode::PredefinedMode1) &&
+					} else if (modeValue >= static_cast<uint16_t>(OperatingMode::PredefinedMode1) &&
 							   modeValue <=
 								   static_cast<uint16_t>(OperatingMode::PredefinedModeEnd)) {
 						return "Predefined Mode";

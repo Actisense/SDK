@@ -34,11 +34,10 @@ namespace Actisense
 
 		template <typename Accumulator, typename DecodedResponse, typename Result,
 				  typename ResultCallback>
-		void Session::Impl::registerAggregatedReply(BemCommandId cmdId, BstId bstId,
-												  std::chrono::milliseconds inactivityTimeout,
-												  bool (*decodeFn)(std::span<const uint8_t>,
-																   DecodedResponse&, std::string&),
-												  ResultCallback userCallback, uint8_t srcAddr) {
+		void Session::Impl::registerAggregatedReply(
+			BemCommandId cmdId, BstId bstId, std::chrono::milliseconds inactivityTimeout,
+			bool (*decodeFn)(std::span<const uint8_t>, DecodedResponse&, std::string&),
+			ResultCallback userCallback, uint8_t srcAddr) {
 			struct State
 			{
 				Accumulator accumulator;
@@ -134,16 +133,19 @@ namespace Actisense
 										   std::move(perResponseCallback), srcAddr);
 		}
 
-		void Session::Impl::runSupportedPgnListWalk(uint8_t srcAddr,
-												  std::chrono::milliseconds perGetTimeout,
-												  SupportedPgnListResultCallback callback,
-												  std::function<void(const BemCommand&)> submitFn) {
+		void
+		Session::Impl::runSupportedPgnListWalk(uint8_t srcAddr,
+											   std::chrono::milliseconds perGetTimeout,
+											   SupportedPgnListResultCallback callback,
+											   std::function<void(const BemCommand&)> submitFn) {
 			/* Thin factory: build a self-owning state machine (GIT-117) and
 			   start it. The walk keeps itself alive via shared_from_this for as
 			   long as a BEM request is in flight; the origin selector picks
 			   makeLocalOrigin()/makeRemoteOrigin(srcAddr) by the kLocalSrcAddr
 			   sentinel, exactly as the aggregated-reply path does. */
-			auto makeOrigin = [this, srcAddr]() { return detail::makeOrigin(*this, srcAddr); };
+			auto makeOrigin = [this, srcAddr]() {
+				return detail::makeOrigin(*this, srcAddr);
+			};
 
 			auto walk = std::make_shared<SupportedPgnListWalk>(
 				bem_, perGetTimeout, srcAddr, std::move(callback), std::move(submitFn),
@@ -152,7 +154,7 @@ namespace Actisense
 		}
 
 		void Session::Impl::getSupportedPgnList_All(std::chrono::milliseconds perGetTimeout,
-												  SupportedPgnListResultCallback callback) {
+													SupportedPgnListResultCallback callback) {
 			auto submit = [this](const BemCommand& cmd) {
 				std::string encodeError;
 				std::vector<uint8_t> frame;
@@ -174,7 +176,7 @@ namespace Actisense
 		}
 
 		void Session::Impl::getRxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
-											   RxPgnEnableListF2ResultCallback callback) {
+												 RxPgnEnableListF2ResultCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnableListF2);
 
 			std::string encodeError;
@@ -200,7 +202,7 @@ namespace Actisense
 		}
 
 		void Session::Impl::getTxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
-											   TxPgnEnableListF2ResultCallback callback) {
+												 TxPgnEnableListF2ResultCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnableListF2);
 
 			std::string encodeError;
@@ -226,8 +228,8 @@ namespace Actisense
 		}
 
 		void Session::Impl::getRxPgnEnableListF2Remote(uint8_t targetN2kSourceAddress,
-													 std::chrono::milliseconds inactivityTimeout,
-													 RxPgnEnableListF2ResultCallback callback) {
+													   std::chrono::milliseconds inactivityTimeout,
+													   RxPgnEnableListF2ResultCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnableListF2);
 
 			std::string encodeError;
@@ -253,8 +255,8 @@ namespace Actisense
 		}
 
 		void Session::Impl::getTxPgnEnableListF2Remote(uint8_t targetN2kSourceAddress,
-													 std::chrono::milliseconds inactivityTimeout,
-													 TxPgnEnableListF2ResultCallback callback) {
+													   std::chrono::milliseconds inactivityTimeout,
+													   TxPgnEnableListF2ResultCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnableListF2);
 
 			std::string encodeError;
@@ -280,8 +282,8 @@ namespace Actisense
 		}
 
 		void Session::Impl::getSupportedPgnList_AllRemote(uint8_t targetN2kSourceAddress,
-														std::chrono::milliseconds perGetTimeout,
-														SupportedPgnListResultCallback callback) {
+														  std::chrono::milliseconds perGetTimeout,
+														  SupportedPgnListResultCallback callback) {
 			auto submit = [this, targetN2kSourceAddress](const BemCommand& cmd) {
 				std::string encodeError;
 				auto frame = buildRemoteBemFrame(targetN2kSourceAddress, cmd, encodeError);
@@ -574,9 +576,9 @@ namespace Actisense
 				rejectedCmdId = static_cast<uint8_t>(data.uniqueId & 0xFF);
 			}
 
-			return bem_.failRequestForNegativeAck(
-				static_cast<BstId>(response.header.bstId), srcAddr, rejectedCmdId,
-				static_cast<int32_t>(response.header.errorCode));
+			return bem_.failRequestForNegativeAck(static_cast<BstId>(response.header.bstId),
+												  srcAddr, rejectedCmdId,
+												  static_cast<int32_t>(response.header.errorCode));
 		}
 
 		void Session::Impl::emitUncorrelatedBemResponse(const BemResponse& response) {

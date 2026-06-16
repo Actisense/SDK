@@ -25,7 +25,6 @@
 #include <fstream>
 #include <functional>
 #include <mutex>
-#include <stop_token>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -173,7 +172,7 @@ namespace Actisense
 			void startWorker();
 
 			/* Background worker body: drains the queue to file until stopped. */
-			void worker(std::stop_token stop_token);
+			void worker();
 
 			/* Level gates — lock-free fast path. */
 			std::atomic<uint8_t> consoleLevel_;
@@ -196,15 +195,21 @@ namespace Actisense
 			   or swap out a batch — never across disk I/O. pushed_/written_ count
 			   total lines enqueued / written so flush() can wait deterministically. */
 			std::mutex queue_mutex_;
-			std::condition_variable_any queue_cv_; ///< worker wake-up (+ stop)
-			std::condition_variable flush_cv_;	   ///< flush() completion
+			std::condition_variable queue_cv_; ///< worker wake-up (+ stop)
+			std::condition_variable flush_cv_; ///< flush() completion
 			std::deque<std::string> queue_;
 			std::uint64_t pushed_ = 0;
 			std::uint64_t written_ = 0;
 
+			/* Signals the worker to drain and exit. Guarded by queue_mutex_ and
+			   read under it in the worker's wait predicate; std::jthread/
+			   std::stop_token are avoided because libc++ (AppleClang) does not
+			   provide them. */
+			bool stop_worker_ = false;
+
 			/* Declared last so it is destroyed (and joined) before the queue and
 			   file it touches. */
-			std::jthread worker_;
+			std::thread worker_;
 		};
 
 		/* Convenience macros --------------------------------------------------- */

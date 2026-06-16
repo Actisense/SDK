@@ -69,7 +69,7 @@ namespace Actisense
 						 BEM reply header.
 			 *******************************************************************************/
 			inline void stampOriginFromResponse(ResponseOrigin& origin,
-												 const BemResponse& response) noexcept {
+												const BemResponse& response) noexcept {
 				origin.modelId = response.header.modelId;
 				origin.serialNumber = response.header.serialNumber;
 			}
@@ -129,8 +129,8 @@ namespace Actisense
 						return;
 					}
 					if (response->header.errorCode != 0) {
-						cb(ErrorCode::MalformedFrame, "Device returned BEM error code", std::nullopt,
-						   std::move(origin));
+						cb(ErrorCode::MalformedFrame, "Device returned BEM error code",
+						   std::nullopt, std::move(origin));
 						return;
 					}
 					DecodedT decoded;
@@ -139,12 +139,13 @@ namespace Actisense
 						cb(ErrorCode::MalformedFrame, decodeError, std::nullopt, std::move(origin));
 						return;
 					}
-					cb(ErrorCode::Ok, {}, std::make_optional(std::move(decoded)), std::move(origin));
+					cb(ErrorCode::Ok, {}, std::make_optional(std::move(decoded)),
+					   std::move(origin));
 				}};
 			}
 
 		} /* namespace detail */
-	} /* namespace Sdk */
+	}	  /* namespace Sdk */
 } /* namespace Actisense */
 
 #endif /* __ACTISENSE_SDK_CORE_BEM_HELPERS */

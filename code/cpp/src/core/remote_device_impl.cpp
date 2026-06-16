@@ -45,33 +45,33 @@ namespace Actisense
 			: session_(session), src_addr_(n2kSourceAddress) {}
 
 		void RemoteDevice::Impl::getOperatingMode(std::chrono::milliseconds timeout,
-												OperatingModeCallback callback) {
+												  OperatingModeCallback callback) {
 			getOperatingMode(timeout, wrapTyped<OperatingMode>(session_, src_addr_,
 															   &decodeOperatingModeResponse,
 															   std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::setOperatingMode(OperatingMode mode,
-												std::chrono::milliseconds timeout,
-												BemResultCallback callback) {
+												  std::chrono::milliseconds timeout,
+												  BemResultCallback callback) {
 			setOperatingMode(static_cast<uint16_t>(mode), timeout,
 							 wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::reInitMainApp(std::chrono::milliseconds timeout,
-											 BemResultCallback callback) {
+											   BemResultCallback callback) {
 			sendBemCommand(makeBemA1(BemCommandId::ReInitMainApp), timeout,
 						   wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::commitToEeprom(std::chrono::milliseconds timeout,
-											  BemResultCallback callback) {
+												BemResultCallback callback) {
 			sendBemCommand(makeBemA1(BemCommandId::CommitToEeprom), timeout,
 						   wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::commitToFlash(std::chrono::milliseconds timeout,
-											 BemResultCallback callback) {
+											   BemResultCallback callback) {
 			sendBemCommand(makeBemA1(BemCommandId::CommitToFlash), timeout,
 						   wrapAck(session_, src_addr_, std::move(callback)));
 		}
@@ -79,36 +79,36 @@ namespace Actisense
 		/* Concrete-only BemResponseCallback verbs ------------------------------ */
 
 		void RemoteDevice::Impl::sendBemCommand(const BemCommand& command,
-											  std::chrono::milliseconds timeout,
-											  BemResponseCallback callback) {
+												std::chrono::milliseconds timeout,
+												BemResponseCallback callback) {
 			session_.sendBemCommandRemote(src_addr_, command, timeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::getOperatingMode(std::chrono::milliseconds timeout,
-												BemResponseCallback callback) {
+												  BemResponseCallback callback) {
 			sendBemCommand(makeBemA1(BemCommandId::GetSetOperatingMode), timeout,
 						   std::move(callback));
 		}
 
 		void RemoteDevice::Impl::setOperatingMode(uint16_t mode, std::chrono::milliseconds timeout,
-												BemResponseCallback callback) {
+												  BemResponseCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetOperatingMode);
 			encodeOperatingModeSetRequest(mode, cmd.data);
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::getPortBaudrate(uint8_t portNumber,
-											   std::chrono::milliseconds timeout,
-											   BemResponseCallback callback) {
+												 std::chrono::milliseconds timeout,
+												 BemResponseCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetPortBaudrate);
 			cmd.data.push_back(portNumber);
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud,
-											   uint32_t storeBaud,
-											   std::chrono::milliseconds timeout,
-											   BemResponseCallback callback) {
+												 uint32_t storeBaud,
+												 std::chrono::milliseconds timeout,
+												 BemResponseCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetPortBaudrate);
 			cmd.data.reserve(9);
 			cmd.data.push_back(portNumber);
@@ -118,13 +118,13 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::getPortPCode(std::chrono::milliseconds timeout,
-											BemResponseCallback callback) {
+											  BemResponseCallback callback) {
 			sendBemCommand(makeBemA1(BemCommandId::GetSetPortPCode), timeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::setPortPCode(std::span<const uint8_t> pCodes,
-											std::chrono::milliseconds timeout,
-											BemResponseCallback callback) {
+											  std::chrono::milliseconds timeout,
+											  BemResponseCallback callback) {
 			if (pCodes.empty()) {
 				if (callback) {
 					callback(std::nullopt, ErrorCode::InvalidArgument,
@@ -139,15 +139,15 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
-											  BemResponseCallback callback) {
+												BemResponseCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnable);
 			appendLe<uint32_t>(cmd.data, pgn);
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::setRxPgnEnable(uint32_t pgn, uint8_t enable,
-											  std::chrono::milliseconds timeout,
-											  BemResponseCallback callback) {
+												std::chrono::milliseconds timeout,
+												BemResponseCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnable);
 			cmd.data.reserve(5);
 			appendLe<uint32_t>(cmd.data, pgn);
@@ -156,8 +156,8 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
-													  std::chrono::milliseconds timeout,
-													  BemResponseCallback callback) {
+														std::chrono::milliseconds timeout,
+														BemResponseCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetRxPgnEnable);
 			cmd.data.reserve(9);
 			appendLe<uint32_t>(cmd.data, pgn);
@@ -167,15 +167,15 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
-											  BemResponseCallback callback) {
+												BemResponseCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnable);
 			appendLe<uint32_t>(cmd.data, pgn);
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::setTxPgnEnable(uint32_t pgn, uint8_t enable,
-											  std::chrono::milliseconds timeout,
-											  BemResponseCallback callback) {
+												std::chrono::milliseconds timeout,
+												BemResponseCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnable);
 			cmd.data.reserve(5);
 			appendLe<uint32_t>(cmd.data, pgn);
@@ -183,9 +183,10 @@ namespace Actisense
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
-		void RemoteDevice::Impl::setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
-													  std::chrono::milliseconds timeout,
-													  BemResponseCallback callback) {
+		void RemoteDevice::Impl::setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable,
+														uint32_t txRate,
+														std::chrono::milliseconds timeout,
+														BemResponseCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetTxPgnEnable);
 			cmd.data.reserve(9);
 			appendLe<uint32_t>(cmd.data, pgn);
@@ -195,13 +196,13 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::getTotalTime(std::chrono::milliseconds timeout,
-											BemResponseCallback callback) {
+											  BemResponseCallback callback) {
 			sendBemCommand(makeBemA1(BemCommandId::GetSetTotalTime), timeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::setTotalTime(uint32_t totalTime, uint32_t passkey,
-											std::chrono::milliseconds timeout,
-											BemResponseCallback callback) {
+											  std::chrono::milliseconds timeout,
+											  BemResponseCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetTotalTime);
 			cmd.data.reserve(8);
 			appendLe<uint32_t>(cmd.data, totalTime);
@@ -210,8 +211,8 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::echo(std::span<const uint8_t> data,
-									std::chrono::milliseconds timeout,
-									BemResponseCallback callback) {
+									  std::chrono::milliseconds timeout,
+									  BemResponseCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::Echo);
 			std::string encodeError;
 			if (!encodeEchoRequest(data, cmd.data, encodeError)) {
@@ -224,8 +225,8 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::getSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
-												   std::chrono::milliseconds timeout,
-												   BemResponseCallback callback) {
+													 std::chrono::milliseconds timeout,
+													 BemResponseCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSupportedPgnList);
 			cmd.data.reserve(2);
 			cmd.data.push_back(pgnIndex);
@@ -236,33 +237,33 @@ namespace Actisense
 		/* Aggregated PGN-list verbs (GIT-90) ------------------------------- */
 
 		void RemoteDevice::Impl::getRxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
-													RxPgnEnableListF2ResultCallback callback) {
+													  RxPgnEnableListF2ResultCallback callback) {
 			session_.getRxPgnEnableListF2Remote(src_addr_, inactivityTimeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::getTxPgnEnableListF2(std::chrono::milliseconds inactivityTimeout,
-													TxPgnEnableListF2ResultCallback callback) {
+													  TxPgnEnableListF2ResultCallback callback) {
 			session_.getTxPgnEnableListF2Remote(src_addr_, inactivityTimeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::getSupportedPgnList_All(std::chrono::milliseconds perGetTimeout,
-													   SupportedPgnListResultCallback callback) {
+														 SupportedPgnListResultCallback callback) {
 			session_.getSupportedPgnList_AllRemote(src_addr_, perGetTimeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::getProductInfo(std::chrono::milliseconds timeout,
-											  BemResponseCallback callback) {
+												BemResponseCallback callback) {
 			sendBemCommand(makeBemA1(BemCommandId::GetProductInfo), timeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::getCanConfig(std::chrono::milliseconds timeout,
-											BemResponseCallback callback) {
+											  BemResponseCallback callback) {
 			sendBemCommand(makeBemA1(BemCommandId::GetSetCanConfig), timeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::setCanConfig(uint64_t name, uint8_t sourceAddress,
-											std::chrono::milliseconds timeout,
-											BemResponseCallback callback) {
+											  std::chrono::milliseconds timeout,
+											  BemResponseCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::GetSetCanConfig);
 			cmd.data.reserve(9);
 			appendLe<uint64_t>(cmd.data, name);
@@ -271,14 +272,14 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::getCanInfoField1(std::chrono::milliseconds timeout,
-												BemResponseCallback callback) {
+												  BemResponseCallback callback) {
 			sendBemCommand(makeBemA1(BemCommandId::GetSetCanInfoField1), timeout,
 						   std::move(callback));
 		}
 
 		void RemoteDevice::Impl::setCanInfoField1(const std::string& text,
-												std::chrono::milliseconds timeout,
-												BemResponseCallback callback) {
+												  std::chrono::milliseconds timeout,
+												  BemResponseCallback callback) {
 			if (text.length() > kCanInfoFieldMaxLen) {
 				if (callback) {
 					callback(std::nullopt, ErrorCode::InvalidArgument,
@@ -296,14 +297,14 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::getCanInfoField2(std::chrono::milliseconds timeout,
-												BemResponseCallback callback) {
+												  BemResponseCallback callback) {
 			sendBemCommand(makeBemA1(BemCommandId::GetSetCanInfoField2), timeout,
 						   std::move(callback));
 		}
 
 		void RemoteDevice::Impl::setCanInfoField2(const std::string& text,
-												std::chrono::milliseconds timeout,
-												BemResponseCallback callback) {
+												  std::chrono::milliseconds timeout,
+												  BemResponseCallback callback) {
 			if (text.length() > kCanInfoFieldMaxLen) {
 				if (callback) {
 					callback(std::nullopt, ErrorCode::InvalidArgument,
@@ -321,13 +322,13 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::getCanInfoField3(std::chrono::milliseconds timeout,
-												BemResponseCallback callback) {
+												  BemResponseCallback callback) {
 			sendBemCommand(makeBemA1(BemCommandId::GetCanInfoField3), timeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::deletePgnEnableLists(uint8_t selector,
-													std::chrono::milliseconds timeout,
-													BemResponseCallback callback) {
+													  std::chrono::milliseconds timeout,
+													  BemResponseCallback callback) {
 			if (selector > 2) {
 				if (callback) {
 					callback(std::nullopt, ErrorCode::InvalidArgument,
@@ -342,27 +343,27 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::activatePgnEnableLists(std::chrono::milliseconds timeout,
-													  BemResponseCallback callback) {
+														BemResponseCallback callback) {
 			sendBemCommand(makeBemA1(BemCommandId::ActivatePgnEnableLists), timeout,
 						   std::move(callback));
 		}
 
 		void RemoteDevice::Impl::defaultPgnEnableList(DeletePgnListSelector selector,
-													std::chrono::milliseconds timeout,
-													BemResponseCallback callback) {
+													  std::chrono::milliseconds timeout,
+													  BemResponseCallback callback) {
 			BemCommand cmd = makeBemA1(BemCommandId::DefaultPgnEnableList);
 			cmd.data.push_back(static_cast<uint8_t>(selector));
 			sendBemCommand(cmd, timeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::getParamsPgnEnableLists(std::chrono::milliseconds timeout,
-													   BemResponseCallback callback) {
+														 BemResponseCallback callback) {
 			sendBemCommand(makeBemA1(BemCommandId::ParamsPgnEnableLists), timeout,
 						   std::move(callback));
 		}
 
 		void RemoteDevice::Impl::getHardwareInfo(std::chrono::milliseconds timeout,
-											   HardwareInfoCallback callback) {
+												 HardwareInfoCallback callback) {
 			getProductInfo(
 				timeout, BemResponseCallback{[&session = session_, srcAddr = src_addr_,
 											  cb = std::move(callback)](
@@ -407,8 +408,8 @@ namespace Actisense
 		   transportId from owning Session). */
 
 		void RemoteDevice::Impl::getPortBaudrate(uint8_t portNumber,
-											   std::chrono::milliseconds timeout,
-											   PortBaudrateCallback callback) {
+												 std::chrono::milliseconds timeout,
+												 PortBaudrateCallback callback) {
 			getPortBaudrate(portNumber, timeout,
 							wrapTyped<PortBaudrateResponse>(session_, src_addr_,
 															&decodePortBaudrateResponse,
@@ -416,28 +417,28 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud,
-											   uint32_t storeBaud,
-											   std::chrono::milliseconds timeout,
-											   BemResultCallback callback) {
+												 uint32_t storeBaud,
+												 std::chrono::milliseconds timeout,
+												 BemResultCallback callback) {
 			setPortBaudrate(portNumber, sessionBaud, storeBaud, timeout,
 							wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::getPortPCode(std::chrono::milliseconds timeout,
-											PortPCodeCallback callback) {
+											  PortPCodeCallback callback) {
 			getPortPCode(timeout,
 						 wrapTyped<PortPCodeResponse>(session_, src_addr_, &decodePortPCodeResponse,
 													  std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::setPortPCode(std::span<const uint8_t> pCodes,
-											std::chrono::milliseconds timeout,
-											BemResultCallback callback) {
+											  std::chrono::milliseconds timeout,
+											  BemResultCallback callback) {
 			setPortPCode(pCodes, timeout, wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
-											  RxPgnEnableCallback callback) {
+												RxPgnEnableCallback callback) {
 			getRxPgnEnable(pgn, timeout,
 						   wrapTyped<RxPgnEnableResponse>(session_, src_addr_,
 														  &decodeRxPgnEnableResponse,
@@ -445,20 +446,20 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::setRxPgnEnable(uint32_t pgn, uint8_t enable,
-											  std::chrono::milliseconds timeout,
-											  BemResultCallback callback) {
+												std::chrono::milliseconds timeout,
+												BemResultCallback callback) {
 			setRxPgnEnable(pgn, enable, timeout, wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
-													  std::chrono::milliseconds timeout,
-													  BemResultCallback callback) {
+														std::chrono::milliseconds timeout,
+														BemResultCallback callback) {
 			setRxPgnEnableWithMask(pgn, enable, mask, timeout,
 								   wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
-											  TxPgnEnableCallback callback) {
+												TxPgnEnableCallback callback) {
 			getTxPgnEnable(pgn, timeout,
 						   wrapTyped<TxPgnEnableResponse>(session_, src_addr_,
 														  &decodeTxPgnEnableResponse,
@@ -466,21 +467,22 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::setTxPgnEnable(uint32_t pgn, uint8_t enable,
-											  std::chrono::milliseconds timeout,
-											  BemResultCallback callback) {
+												std::chrono::milliseconds timeout,
+												BemResultCallback callback) {
 			setTxPgnEnable(pgn, enable, timeout, wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
-		void RemoteDevice::Impl::setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
-													  std::chrono::milliseconds timeout,
-													  BemResultCallback callback) {
+		void RemoteDevice::Impl::setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable,
+														uint32_t txRate,
+														std::chrono::milliseconds timeout,
+														BemResultCallback callback) {
 			setTxPgnEnableWithRate(pgn, enable, txRate, timeout,
 								   wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::getSupportedPgnList(uint8_t pgnIndex, uint8_t transferId,
-												   std::chrono::milliseconds timeout,
-												   BemResultCallback callback) {
+													 std::chrono::milliseconds timeout,
+													 BemResultCallback callback) {
 			/* Single-chunk getter: device may return a useful per-chunk payload,
 			   but for the public ack-shape verb we just surface success/error
 			   semantics — callers wanting the merged result should use
@@ -490,49 +492,49 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::getTotalTime(std::chrono::milliseconds timeout,
-											TotalTimeCallback callback) {
+											  TotalTimeCallback callback) {
 			getTotalTime(timeout,
 						 wrapTyped<TotalTimeResponse>(session_, src_addr_, &decodeTotalTimeResponse,
 													  std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::setTotalTime(uint32_t totalTime, uint32_t passkey,
-											std::chrono::milliseconds timeout,
-											BemResultCallback callback) {
+											  std::chrono::milliseconds timeout,
+											  BemResultCallback callback) {
 			setTotalTime(totalTime, passkey, timeout,
 						 wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::echo(std::span<const uint8_t> data,
-									std::chrono::milliseconds timeout, EchoCallback callback) {
+									  std::chrono::milliseconds timeout, EchoCallback callback) {
 			echo(data, timeout,
 				 wrapTyped<EchoResponse>(session_, src_addr_, &decodeEchoResponse,
 										 std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::getProductInfo(std::chrono::milliseconds timeout,
-											  ProductInfoCallback callback) {
+												ProductInfoCallback callback) {
 			getProductInfo(timeout, wrapTyped<ProductInfoResponse>(session_, src_addr_,
 																   &decodeProductInfoResponse,
 																   std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::getCanConfig(std::chrono::milliseconds timeout,
-											CanConfigCallback callback) {
+											  CanConfigCallback callback) {
 			getCanConfig(timeout,
 						 wrapTyped<CanConfigResponse>(session_, src_addr_, &decodeCanConfigResponse,
 													  std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::setCanConfig(uint64_t name, uint8_t sourceAddress,
-											std::chrono::milliseconds timeout,
-											BemResultCallback callback) {
+											  std::chrono::milliseconds timeout,
+											  BemResultCallback callback) {
 			setCanConfig(name, sourceAddress, timeout,
 						 wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::getCanInfoField1(std::chrono::milliseconds timeout,
-												CanInfoFieldCallback callback) {
+												  CanInfoFieldCallback callback) {
 			getCanInfoField1(
 				timeout,
 				wrapTyped<CanInfoFieldResponse>(
@@ -544,13 +546,13 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::setCanInfoField1(const std::string& text,
-												std::chrono::milliseconds timeout,
-												BemResultCallback callback) {
+												  std::chrono::milliseconds timeout,
+												  BemResultCallback callback) {
 			setCanInfoField1(text, timeout, wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::getCanInfoField2(std::chrono::milliseconds timeout,
-												CanInfoFieldCallback callback) {
+												  CanInfoFieldCallback callback) {
 			getCanInfoField2(
 				timeout,
 				wrapTyped<CanInfoFieldResponse>(
@@ -562,13 +564,13 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::setCanInfoField2(const std::string& text,
-												std::chrono::milliseconds timeout,
-												BemResultCallback callback) {
+												  std::chrono::milliseconds timeout,
+												  BemResultCallback callback) {
 			setCanInfoField2(text, timeout, wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::getCanInfoField3(std::chrono::milliseconds timeout,
-												CanInfoFieldCallback callback) {
+												  CanInfoFieldCallback callback) {
 			getCanInfoField3(
 				timeout,
 				wrapTyped<CanInfoFieldResponse>(
@@ -580,26 +582,26 @@ namespace Actisense
 		}
 
 		void RemoteDevice::Impl::deletePgnEnableLists(uint8_t selector,
-													std::chrono::milliseconds timeout,
-													BemResultCallback callback) {
+													  std::chrono::milliseconds timeout,
+													  BemResultCallback callback) {
 			deletePgnEnableLists(selector, timeout,
 								 wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::activatePgnEnableLists(std::chrono::milliseconds timeout,
-													  BemResultCallback callback) {
+														BemResultCallback callback) {
 			activatePgnEnableLists(timeout, wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::defaultPgnEnableList(DeletePgnListSelector selector,
-													std::chrono::milliseconds timeout,
-													BemResultCallback callback) {
+													  std::chrono::milliseconds timeout,
+													  BemResultCallback callback) {
 			defaultPgnEnableList(selector, timeout,
 								 wrapAck(session_, src_addr_, std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::getParamsPgnEnableLists(std::chrono::milliseconds timeout,
-													   ParamsPgnEnableListsCallback callback) {
+														 ParamsPgnEnableListsCallback callback) {
 			getParamsPgnEnableLists(
 				timeout,
 				wrapTyped<ParamsPgnEnableListsResponse>(

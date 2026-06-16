@@ -75,7 +75,8 @@ namespace Actisense
 		void RemoteDevice::setPortBaudrate(uint8_t portNumber, uint32_t sessionBaud,
 										   uint32_t storeBaud, std::chrono::milliseconds timeout,
 										   BemResultCallback callback) {
-			impl_->setPortBaudrate(portNumber, sessionBaud, storeBaud, timeout, std::move(callback));
+			impl_->setPortBaudrate(portNumber, sessionBaud, storeBaud, timeout,
+								   std::move(callback));
 		}
 
 		void RemoteDevice::getPortPCode(std::chrono::milliseconds timeout,
@@ -84,7 +85,8 @@ namespace Actisense
 		}
 
 		void RemoteDevice::setPortPCode(std::span<const uint8_t> pCodes,
-										std::chrono::milliseconds timeout, BemResultCallback callback) {
+										std::chrono::milliseconds timeout,
+										BemResultCallback callback) {
 			impl_->setPortPCode(pCodes, timeout, std::move(callback));
 		}
 
@@ -149,7 +151,8 @@ namespace Actisense
 		}
 
 		void RemoteDevice::setTotalTime(uint32_t totalTime, uint32_t passkey,
-										std::chrono::milliseconds timeout, BemResultCallback callback) {
+										std::chrono::milliseconds timeout,
+										BemResultCallback callback) {
 			impl_->setTotalTime(totalTime, passkey, timeout, std::move(callback));
 		}
 
@@ -169,7 +172,8 @@ namespace Actisense
 		}
 
 		void RemoteDevice::setCanConfig(uint64_t name, uint8_t sourceAddress,
-										std::chrono::milliseconds timeout, BemResultCallback callback) {
+										std::chrono::milliseconds timeout,
+										BemResultCallback callback) {
 			impl_->setCanConfig(name, sourceAddress, timeout, std::move(callback));
 		}
 

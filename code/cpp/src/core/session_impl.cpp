@@ -13,12 +13,13 @@
  *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
+#include "core/session_impl.hpp"
+
 #include <memory>
 #include <thread>
 #include <utility>
 
 #include "core/remote_device_impl.hpp"
-#include "core/session_impl.hpp"
 #include "transport/serial/serial_transport.hpp"
 #include "util/debug_log.hpp"
 
@@ -29,7 +30,7 @@ namespace Actisense
 		/* Public Function Definitions ------------------------------------------ */
 
 		Session::Impl::Impl(TransportPtr transport, EventCallback eventCallback,
-								 ErrorCallback errorCallback)
+							ErrorCallback errorCallback)
 			: transport_(std::move(transport)), eventCallback_(std::move(eventCallback)),
 			  errorCallback_(std::move(errorCallback)) {}
 
@@ -56,7 +57,7 @@ namespace Actisense
 		}
 
 		void Session::Impl::asyncSend(SendProtocol protocol, std::span<const uint8_t> payload,
-									SendCompletion completion) {
+									  SendCompletion completion) {
 			if (!isConnected()) {
 				if (completion)
 					completion(ErrorCode::NotConnected);
@@ -139,7 +140,7 @@ namespace Actisense
 
 
 		void Session::Impl::asyncSendRaw(std::span<const uint8_t> frame,
-									   SendCompletionHandler completion) {
+										 SendCompletionHandler completion) {
 			traceWire(WireTraceDirection::Tx, frame);
 			metricsCollector_.recordWriteCall();
 			metricsCollector_.recordBytesSent(frame.size());

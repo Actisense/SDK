@@ -4,7 +4,7 @@
  \details    Implements DebugLog: synchronous console output plus an
 			 asynchronous, single-consumer file path (GIT-118). The log()
 			 producer formats a line, writes it to the console, and enqueues a
-			 finished string; a background std::jthread worker owns all file
+			 finished string; a background std::thread worker owns all file
 			 writes and flushes so no caller is stalled on disk I/O.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
@@ -57,11 +57,13 @@ namespace Actisense
 
 		DebugLog::~DebugLog() {
 			/* Ask the worker to stop, wake it, and let it drain the queue before
-			   we join. The condition_variable_any wait below is stop-aware, so
-			   request_stop() alone wakes it; notify_all() is belt-and-braces for
-			   the non-stop wake path. Joining before logFile_ is torn down keeps
-			   the worker's file access valid. */
-			worker_.request_stop();
+			   we join. The stop flag is set under queue_mutex_ so the worker's
+			   wait predicate observes it; notify_all() wakes the wait. Joining
+			   before logFile_ is torn down keeps the worker's file access valid. */
+			{
+				std::lock_guard<std::mutex> lock(queue_mutex_);
+				stop_worker_ = true;
+			}
 			queue_cv_.notify_all();
 			if (worker_.joinable()) {
 				worker_.join();
@@ -158,8 +160,8 @@ namespace Actisense
 			if (size <= kBytesPerLine) {
 				ss << " ";
 				for (std::size_t i = 0; i < size; ++i) {
-					ss << std::hex << std::setw(2) << std::setfill('0')
-					   << static_cast<int>(data[i]) << " ";
+					ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(data[i])
+					   << " ";
 				}
 				log(level, tag, ss.str());
 				return;
@@ -170,8 +172,7 @@ namespace Actisense
 
 			for (std::size_t offset = 0; offset < size; offset += kBytesPerLine) {
 				std::ostringstream line;
-				line << "  [" << std::setw(4) << std::setfill('0') << std::dec << offset
-					 << "] ";
+				line << "  [" << std::setw(4) << std::setfill('0') << std::dec << offset << "] ";
 
 				const std::size_t remaining = size - offset;
 				const std::size_t chunkSize =
@@ -215,18 +216,17 @@ namespace Actisense
 		void DebugLog::startWorker() {
 			std::lock_guard<std::mutex> lock(queue_mutex_);
 			if (!worker_.joinable()) {
-				worker_ = std::jthread([this](std::stop_token stop_token) {
-					worker(std::move(stop_token));
-				});
+				worker_ = std::thread([this] { worker(); });
 			}
 		}
 
-		void DebugLog::worker(std::stop_token stop_token) {
+		void DebugLog::worker() {
 			std::unique_lock<std::mutex> lock(queue_mutex_);
 			while (true) {
-				/* Stop-aware wait: returns true with work to do, or false once stop
-				   is requested and the queue is empty. */
-				queue_cv_.wait(lock, stop_token, [this] { return !queue_.empty(); });
+				/* Wait for work or a stop request. When woken with an empty queue
+				   it can only be because a stop was requested, so drain whatever
+				   is queued and exit. */
+				queue_cv_.wait(lock, [this] { return !queue_.empty() || stop_worker_; });
 				if (queue_.empty()) {
 					break; /* stop requested, nothing left to drain */
 				}

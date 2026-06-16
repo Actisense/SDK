@@ -28,21 +28,21 @@ namespace Actisense
 			constexpr std::array<std::string_view, static_cast<std::size_t>(ErrorCode::Count)>
 				kErrorMessages = {{
 					/* Coarse codes (0-15) */
-					"No error",						   // Ok
-					"Failed to open transport",		   // TransportOpenFailed
-					"Transport I/O error",			   // TransportIo
-					"Transport closed unexpectedly",   // TransportClosed
-					"Operation timed out",			   // Timeout
-					"Protocol mismatch",			   // ProtocolMismatch
-					"Malformed frame received",		   // MalformedFrame
-					"Checksum verification failed",	   // ChecksumError
-					"Operation not supported",		   // UnsupportedOperation
-					"Operation canceled",			   // Canceled
-					"Rate limited - write queue full", // RateLimited
-					"Invalid argument",				   // InvalidArgument
-					"Not connected",				   // NotConnected
-					"Already connected",			   // AlreadyConnected
-					"Internal SDK error",			   // Internal
+					"No error",							 // Ok
+					"Failed to open transport",			 // TransportOpenFailed
+					"Transport I/O error",				 // TransportIo
+					"Transport closed unexpectedly",	 // TransportClosed
+					"Operation timed out",				 // Timeout
+					"Protocol mismatch",				 // ProtocolMismatch
+					"Malformed frame received",			 // MalformedFrame
+					"Checksum verification failed",		 // ChecksumError
+					"Operation not supported",			 // UnsupportedOperation
+					"Operation canceled",				 // Canceled
+					"Rate limited - write queue full",	 // RateLimited
+					"Invalid argument",					 // InvalidArgument
+					"Not connected",					 // NotConnected
+					"Already connected",				 // AlreadyConnected
+					"Internal SDK error",				 // Internal
 					"Device returned an error response", // BemDeviceError
 
 					/* Transport diagnostics */

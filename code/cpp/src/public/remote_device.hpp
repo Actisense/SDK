@@ -95,7 +95,8 @@ namespace Actisense
 			 \param[in]  timeout   Response timeout
 			 \param[in]  callback  Invoked with the decoded mode (or an error)
 			 *******************************************************************************/
-			void getOperatingMode(std::chrono::milliseconds timeout, OperatingModeCallback callback);
+			void getOperatingMode(std::chrono::milliseconds timeout,
+								  OperatingModeCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set the remote device's operating mode
@@ -193,7 +194,8 @@ namespace Actisense
 			 \brief      Set Rx-enable for a PGN with an explicit instance/group mask.
 			 *******************************************************************************/
 			void setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
-										std::chrono::milliseconds timeout, BemResultCallback callback);
+										std::chrono::milliseconds timeout,
+										BemResultCallback callback);
 
 			/* Tx PGN Enable ----------------------------------------------------- */
 
@@ -213,7 +215,8 @@ namespace Actisense
 			 \brief      Set Tx-enable for a PGN with an explicit transmit rate (ms).
 			 *******************************************************************************/
 			void setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
-										std::chrono::milliseconds timeout, BemResultCallback callback);
+										std::chrono::milliseconds timeout,
+										BemResultCallback callback);
 
 			/* Aggregated PGN-list verbs ---------------------------------------- */
 
@@ -258,8 +261,8 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Set the device's total operating time (requires passkey).
 			 *******************************************************************************/
-			void setTotalTime(uint32_t totalTime, uint32_t passkey, std::chrono::milliseconds timeout,
-							  BemResultCallback callback);
+			void setTotalTime(uint32_t totalTime, uint32_t passkey,
+							  std::chrono::milliseconds timeout, BemResultCallback callback);
 
 			/* Echo -------------------------------------------------------------- */
 
@@ -331,13 +334,15 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Activate the device's session PGN-enable lists.
 			 *******************************************************************************/
-			void activatePgnEnableLists(std::chrono::milliseconds timeout, BemResultCallback callback);
+			void activatePgnEnableLists(std::chrono::milliseconds timeout,
+										BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Restore the operating-mode default Rx/Tx enable list(s).
 			 *******************************************************************************/
 			void defaultPgnEnableList(DeletePgnListSelector selector,
-									  std::chrono::milliseconds timeout, BemResultCallback callback);
+									  std::chrono::milliseconds timeout,
+									  BemResultCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Query the parameters / status of the device's PGN enable

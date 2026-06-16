@@ -592,7 +592,8 @@ namespace Actisense
 
 			/* Helper: latency from a request's sentAt to now, clamped to uint32. */
 			const auto now = std::chrono::steady_clock::now();
-			const auto latencyFrom = [&now](std::chrono::steady_clock::time_point sentAt) -> uint32_t {
+			const auto latencyFrom =
+				[&now](std::chrono::steady_clock::time_point sentAt) -> uint32_t {
 				const auto ms =
 					std::chrono::duration_cast<std::chrono::milliseconds>(now - sentAt).count();
 				return ms < 0 ? 0u : static_cast<uint32_t>(ms);
@@ -675,7 +676,8 @@ namespace Actisense
 		}
 
 		bool BemProtocol::failRequestForNegativeAck(BstId responseBstId, uint8_t srcAddr,
-													uint8_t rejectedCmdId, int32_t deviceErrorCode) {
+													uint8_t rejectedCmdId,
+													int32_t deviceErrorCode) {
 			BemResponseCallback callbackToFire;
 
 			{
@@ -684,8 +686,8 @@ namespace Actisense
 				/* Precise match: the rejected command id is echoed in the NACK
 				   payload, so reconstruct the exact key the request was filed
 				   under. */
-				const uint64_t exactKey =
-					buildResponseKey(responseBstId, static_cast<BemCommandId>(rejectedCmdId), srcAddr);
+				const uint64_t exactKey = buildResponseKey(
+					responseBstId, static_cast<BemCommandId>(rejectedCmdId), srcAddr);
 				auto it = pending_requests_.find(exactKey);
 
 				/* Fallback: the payload id did not pin a request (e.g. firmware

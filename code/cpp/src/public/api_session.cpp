@@ -68,8 +68,8 @@ namespace Actisense
 				}
 			}
 
-			openWithTransport(options, std::move(transport), std::move(onEvent),
-							   std::move(onError), std::move(onOpened));
+			openWithTransport(options, std::move(transport), std::move(onEvent), std::move(onError),
+							  std::move(onOpened));
 		}
 
 		/**************************************************************************/ /**

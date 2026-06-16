@@ -638,13 +638,13 @@ namespace Actisense
 		}
 
 #if defined(_WIN32)
-/**************************************************************************/ /**
- \brief     readThreadFunc (Windows)
- \details	Read thread function for Windows using overlapped I/O. Issues an
-			overlapped read, then waits on both the completion event and the
-			thread-terminate handle so close() can unblock it promptly. Keeps
-			running until the stop flag is set.
- *******************************************************************************/
+		/**************************************************************************/ /**
+		 \brief     readThreadFunc (Windows)
+		 \details	Read thread function for Windows using overlapped I/O. Issues an
+					overlapped read, then waits on both the completion event and the
+					thread-terminate handle so close() can unblock it promptly. Keeps
+					running until the stop flag is set.
+		 *******************************************************************************/
 		void SerialTransport::readThreadFunc() {
 			OVERLAPPED readOverlapped{};
 			readOverlapped.hEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
@@ -721,8 +721,9 @@ namespace Actisense
 									problem with the OVERLAPPED structure's event handle.
 									Treat it as a fatal I/O error: cancel the in-flight
 									read and stop the thread rather than busy-spinning. */
-								ACTISENSE_LOG_ERROR("Serial",
-													"WaitForMultipleObjects failed; aborting read thread");
+								ACTISENSE_LOG_ERROR(
+									"Serial",
+									"WaitForMultipleObjects failed; aborting read thread");
 								CancelIo(handle_);
 								stopRequested_ = true;
 								break;
@@ -811,7 +812,8 @@ namespace Actisense
 							}
 						}
 					} else if (selectResult < 0 && errno != EINTR) {
-						ACTISENSE_LOG_ERROR("Serial", "Serial select() error; stopping read thread");
+						ACTISENSE_LOG_ERROR("Serial",
+											"Serial select() error; stopping read thread");
 						stopRequested_ = true;
 					}
 					totalBytesReceived_ += bytes_read;

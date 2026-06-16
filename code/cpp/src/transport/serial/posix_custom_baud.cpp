@@ -64,7 +64,7 @@ namespace Actisense
 #endif
 
 		} /* namespace detail */
-	} /* namespace Sdk */
+	}	  /* namespace Sdk */
 } /* namespace Actisense */
 
 /**************** (C) COPYRIGHT Active Research Limited  ** END OF FILE **/

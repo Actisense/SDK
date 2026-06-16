@@ -34,14 +34,9 @@ namespace Actisense
 												   uint8_t srcAddr,
 												   SupportedPgnListResultCallback callback,
 												   SubmitFn submitFn, OriginFn makeOrigin)
-			: bem_(bem)
-			, user_callback_(std::move(callback))
-			, submit_fn_(std::move(submitFn))
-			, make_origin_(std::move(makeOrigin))
-			, per_get_timeout_(perGetTimeout)
-			, src_addr_(srcAddr)
-		{
-		}
+			: bem_(bem), user_callback_(std::move(callback)), submit_fn_(std::move(submitFn)),
+			  make_origin_(std::move(makeOrigin)), per_get_timeout_(perGetTimeout),
+			  src_addr_(srcAddr) {}
 
 		void SupportedPgnListWalk::start() {
 			if (state_ != WalkState::Idle) {
@@ -121,8 +116,8 @@ namespace Actisense
 			sendGet(nextIdx, decoded.transferId);
 		}
 
-		void SupportedPgnListWalk::finish(std::optional<SupportedPgnListResult> result, ErrorCode ec,
-										  std::string_view msg) {
+		void SupportedPgnListWalk::finish(std::optional<SupportedPgnListResult> result,
+										  ErrorCode ec, std::string_view msg) {
 			if (delivered_) {
 				return;
 			}

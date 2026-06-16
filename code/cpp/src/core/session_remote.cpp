@@ -25,8 +25,8 @@ namespace Actisense
 	namespace Sdk
 	{
 		std::optional<BstFrame> Session::Impl::buildRemoteBemFrame(uint8_t targetN2kSourceAddress,
-																 const BemCommand& command,
-																 std::string& outEncodeError) {
+																   const BemCommand& command,
+																   std::string& outEncodeError) {
 			std::vector<uint8_t> innerBst;
 			if (!bem_.encodeCommandInnerBst(command, innerBst, outEncodeError)) {
 				return std::nullopt;
@@ -41,9 +41,9 @@ namespace Actisense
 		}
 
 		void Session::Impl::sendBemCommandRemote(uint8_t targetN2kSourceAddress,
-											   const BemCommand& command,
-											   std::chrono::milliseconds timeout,
-											   BemResponseCallback callback) {
+												 const BemCommand& command,
+												 std::chrono::milliseconds timeout,
+												 BemResponseCallback callback) {
 			std::string encodeError;
 			auto frame = buildRemoteBemFrame(targetN2kSourceAddress, command, encodeError);
 			if (!frame) {

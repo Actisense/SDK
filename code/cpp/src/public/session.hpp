@@ -99,7 +99,7 @@ namespace Actisense
 				Bst, ///< payload is raw BST bytes (BST_ID + length + data); the SDK
 					 ///< appends the zero-sum BST checksum and applies DLE+STX/DLE+ETX
 					 ///< framing.
-				Raw  ///< payload is sent verbatim — no checksum, no framing (caller
+				Raw	 ///< payload is sent verbatim — no checksum, no framing (caller
 					 ///< owns whatever wire format the remote end expects).
 			};
 
@@ -132,7 +132,8 @@ namespace Actisense
 			 \param[in]  timeout   Response timeout
 			 \param[in]  callback  Invoked with the decoded mode (or an error)
 			 *******************************************************************************/
-			void getOperatingMode(std::chrono::milliseconds timeout, OperatingModeCallback callback);
+			void getOperatingMode(std::chrono::milliseconds timeout,
+								  OperatingModeCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set the device's operating mode

@@ -75,7 +75,8 @@ namespace Actisense
 					DWORD size = sizeof(name);
 					DWORD type;
 					if ((ERROR_SUCCESS == RegQueryValueExA(devKeyHandle, "PortName", NULL, &type,
-														   reinterpret_cast<LPBYTE>(name), &size)) &&
+														   reinterpret_cast<LPBYTE>(name),
+														   &size)) &&
 						(REG_SZ == type)) {
 						/* RegQueryValueExA does not guarantee the returned REG_SZ is
 						   NUL-terminated; bound by the returned byte count and trim
