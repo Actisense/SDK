@@ -2811,6 +2811,39 @@ TEST_F(BemDeviceTest, ReInitMainApp_RebootsDevice)
 	          << " [" << startupStatusFormatToString(data.format) << "]" << std::endl;
 }
 
+/* End-to-end Negative Ack (NGXSW-4267 + GIT-100). Sending a BEM command id
+   that the device has no handler for must make the firmware emit a canonical
+   0xA?F4 Negative Ack carrying the rejected command id, which the SDK matches
+   to the in-flight request and fails FAST with BemNegativeAck — rather than
+   letting it time out.
+
+   Before NGXSW-4267 a real device never delivered a recognisable NACK for an
+   unknown command (Core echoed the original id; ProgDB/Boot emitted 0xFF), so
+   this would surface as a Timeout. 0x50 in the Core (A1) group is a deliberately
+   unregistered id — the same example the NGXSW-4267 analysis used. */
+TEST_F(BemDeviceTest, UnknownCommandReturnsFastNegativeAck)
+{
+	/* Core-group command id with no registered handler on any product. */
+	BemCommand cmd = makeGetCommand(static_cast<BemCommandId>(0x50), BstId::Bem_PG_A1);
+
+	const auto start = std::chrono::steady_clock::now();
+	const BemResult result = sendSync(cmd);
+	const auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(
+		std::chrono::steady_clock::now() - start);
+
+	EXPECT_EQ(result.errorCode, ErrorCode::BemNegativeAck)
+		<< "Expected the device to reject the unknown command with a Negative Ack, got "
+		<< static_cast<int>(result.errorCode) << " (" << result.errorMsg << ")";
+	EXPECT_NE(result.errorCode, ErrorCode::Timeout)
+		<< "Unknown command timed out — firmware did not emit a recognisable 0xF4 NACK";
+	EXPECT_LT(latency, kDefaultTimeout)
+		<< "Request resolved only at the timeout boundary — not a fast-fail NACK";
+
+	std::cout << "  Unknown command 0xA150 rejected in " << latency.count()
+	          << "ms with BemNegativeAck (model 0x" << std::hex << modelId_ << std::dec
+	          << ")" << std::endl;
+}
+
 }; /* namespace Test */
 }; /* namespace Sdk */
 }; /* namespace Actisense */
