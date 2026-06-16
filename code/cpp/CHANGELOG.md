@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - <release date — set with GIT-123>
+
+First public, SemVer-stable release. From 1.0.0 the `src/public/` API is
+covered by Semantic Versioning; this release consolidates all accumulated
+pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
+
 ### Added
 
 - **`Api::openWithTransport()` lets callers supply their own transport
@@ -18,22 +24,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   delegates to it. A null transport or null `onOpened` reports
   `ErrorCode::InvalidArgument`; a failed transport open propagates the failure
   code. The change is additive — existing `Api::open()` behaviour is unchanged.
-- **`OM_CanPacket` (5) and `OM_CanPacketASCII` (6) added to the public
+- **`CanPacket` (5) and `CanPacketAscii` (6) added to the public
   `OperatingMode` enum (NGXSW-4207).** These let an SDK client request the NGX
   raw-CAN modes the firmware implements (NGXSW-4206), in which the device
-  bridges `SystemNames::CAN` ↔ the serial host link as BST-95 (`OM_CanPacket`)
-  or CAN-ASCII (`OM_CanPacketASCII`). The values match firmware
+  bridges `SystemNames::CAN` ↔ the serial host link as BST-95 (`CanPacket`)
+  or CAN-ASCII (`CanPacketAscii`). The values match firmware
   `OperatingModeCodes.h`, and `OperatingModeName()` now returns
   `"CAN Packet Mode"` / `"CAN Packet ASCII Mode"`. The change is additive —
   existing modes are unaffected.
-- **`OM_NGTransferRawMode = 3` redocumented.** Mode 3 is no longer raw CAN
+- **`NgTransferRawMode = 3` redocumented.** Mode 3 is no longer raw CAN
   (firmware now treats it as a spare/legacy slot, `OM_NGTransferSpareMode`);
-  raw CAN transfer moved to `OM_CanPacket` (5) / `OM_CanPacketASCII` (6). The
+  raw CAN transfer moved to `CanPacket` (5) / `CanPacketAscii` (6). The
   enum value is **retained** for public-API stability, but its documentation
-  now marks it legacy — new code should target `OM_CanPacket`.
+  now marks it legacy — new code should target `CanPacket`.
 
-### Changed
+### Changed (breaking)
 
+- **BEM response data structures relocated to `public/bem_responses/`
+  (GIT-112).** The public header `public/bem_callbacks.hpp` no longer pulls in
+  any internal `protocols/bem/bem_commands/*` headers. The decoded
+  response/result structs it references (`ProductInfoResponse`,
+  `PortBaudrateResponse`, `RxPgnEnableListF2Result`, `EchoResponse`, …) now
+  live in dedicated public headers under `public/bem_responses/`. **Type names
+  and namespaces are unchanged — only the include path moves.** Code that
+  includes `public/bem_callbacks.hpp`, `public/session.hpp` or
+  `public/remote_device.hpp` is unaffected; only code that reached directly
+  into the internal `protocols/bem/bem_commands/*` headers for those structs
+  needs to switch to the matching `public/bem_responses/*` header. See the
+  Upgrading guide below.
+- **`OperatingMode` enumerators renamed `OM_*` → PascalCase (GIT-114).** Clean
+  break — the old `OM_*` names are removed outright, with no deprecation
+  aliases. The enum type (`OperatingMode`), its scoping, and every numeric
+  value are unchanged, so this is a pure compile-time rename with no wire or
+  ABI impact (persisted/wire numeric mode codes stay valid). The full old→new
+  mapping is in the Upgrading guide below.
+- **Single unified `ErrorCode` surface (GIT-113).** The separate
+  `TransportErrorCode` and `ProtocolErrorCode` enums — each with its own
+  `std::error_category` — have been removed. Their fine-grained diagnostics are
+  appended to the single public `ErrorCode` enum in `public/error.hpp`, behind
+  one `std::error_category` (`sdkErrorCategory()`). The coarse codes
+  (values 0–15) keep their values; transport (`Transport*`) and protocol
+  (`Bdtp*`/`Bst*`/`Bem*`) diagnostics follow, terminated by a `Count` sentinel.
+  `ErrorCode` is append-only from here. Public callbacks already delivered
+  `ErrorCode`, so consumers using only public headers are unaffected.
 - **ABI hardening: `Session` and `RemoteDevice` are now `final`, non-polymorphic
   pimpl handles (GIT-115).** Both classes were pure-abstract interfaces (14 and
   36 pure virtuals); they are now move-only `final` classes whose only data
@@ -46,35 +79,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one-time intentional ABI break (binary version bumped to 0.5.0). A
   compile-time `static_assert` guard (`tests/unit/test_abi_layout.cpp`) locks the
   final / non-polymorphic / one-pointer / move-only properties in place.
-
-### Tests
-
-- **Black-box NGX CAN Packet routing integration test (NGXSW-4207).** New
-  `tests/integration/test_can_packet_mode.cpp` drives a real NGX into each CAN
-  Packet mode via the SDK and proves the device behaviour as a black box: GET
-  baseline → scope-guarded SET → GET-verify → CAN→serial (await a BST-95
-  `ParsedMessageEvent` via the event callback) → serial→CAN (emit a BST-95
-  frame via `asyncSend("bst", …)`) → BEM Echo (0x18) in-mode → restore the
-  baseline, for both `OM_CanPacket` and `OM_CanPacketASCII`. Opt-in via
-  `ACTISENSE_TEST_PORT` (a real NGX on a live N2K bus); skips cleanly headless
-  so CI stays green. A no-hardware run against the Product Emulator is tracked
-  as a DESKTOP-160 follow-up. Unit coverage for the two new modes (encode +
-  `OperatingModeName`) added to `tests/unit/test_operating_mode.cpp`.
-
-- **Remote BEM sweep: re-enabled NGX-only cases against an NGX-as-remote rig
-  (GIT-94).** `test_bem_remote_device.cpp` now ports the two NGX-gated
-  cases that GIT-92 deliberately deferred — `OperatingMode_NGConvertNormalMode_RoundTrip`
-  (NGW-style 2000→0183 conversion-mode round-trip) and
-  `SetOperatingMode_RejectsBuffer1OnNgx` (firmware must reject buffer/combiner
-  modes on NGX-class hardware). The fixture gains
-  `expectedRemoteHardwarePortCount()` so `GetPortBaudrate` now checks the
-  remote's reported port count against the model's canonical hardware
-  count (NGXSW-3623 contract); currently emits a diagnostic rather than
-  asserting because NGX-as-remote hits a wrap-path mismatch tracked under
-  NGXSW-4193. Both new NGX-only tests skip-gate on `remoteIsNgx()` so the
-  GIT-92 baseline rig (NGT-as-remote) is unaffected. Default `ACTISENSE_TEST_PORT` is now `COM5` (the dev bench's
-  local-NGX); override as before for other rigs. File-header rig
-  documentation rewritten to enumerate both supported topologies.
 
 ### Removed (breaking)
 
@@ -137,6 +141,114 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed a dead BEM sequence counter; documented the BEM correlator's
   single-Rx-thread invariant and the destructor's callback reentrancy contract;
   added a `Session::close()` self-join guard for callback-initiated close.
+
+### Tests
+
+- **Black-box NGX CAN Packet routing integration test (NGXSW-4207).** New
+  `tests/integration/test_can_packet_mode.cpp` drives a real NGX into each CAN
+  Packet mode via the SDK and proves the device behaviour as a black box: GET
+  baseline → scope-guarded SET → GET-verify → CAN→serial (await a BST-95
+  `ParsedMessageEvent` via the event callback) → serial→CAN (emit a BST-95
+  frame via `asyncSend("bst", …)`) → BEM Echo (0x18) in-mode → restore the
+  baseline, for both `CanPacket` and `CanPacketAscii`. Opt-in via
+  `ACTISENSE_TEST_PORT` (a real NGX on a live N2K bus); skips cleanly headless
+  so CI stays green. A no-hardware run against the Product Emulator is tracked
+  as a DESKTOP-160 follow-up. Unit coverage for the two new modes (encode +
+  `OperatingModeName`) added to `tests/unit/test_operating_mode.cpp`.
+
+- **Remote BEM sweep: re-enabled NGX-only cases against an NGX-as-remote rig
+  (GIT-94).** `test_bem_remote_device.cpp` now ports the two NGX-gated
+  cases that GIT-92 deliberately deferred — `OperatingMode_NGConvertNormalMode_RoundTrip`
+  (NGW-style 2000→0183 conversion-mode round-trip) and
+  `SetOperatingMode_RejectsBuffer1OnNgx` (firmware must reject buffer/combiner
+  modes on NGX-class hardware). The fixture gains
+  `expectedRemoteHardwarePortCount()` so `GetPortBaudrate` now checks the
+  remote's reported port count against the model's canonical hardware
+  count (NGXSW-3623 contract); currently emits a diagnostic rather than
+  asserting because NGX-as-remote hits a wrap-path mismatch tracked under
+  NGXSW-4193. Both new NGX-only tests skip-gate on `remoteIsNgx()` so the
+  GIT-92 baseline rig (NGT-as-remote) is unaffected. Default `ACTISENSE_TEST_PORT` is now `COM5` (the dev bench's
+  local-NGX); override as before for other rigs. File-header rig
+  documentation rewritten to enumerate both supported topologies.
+
+### Upgrading to 1.0.0
+
+This is the SemVer baseline. If you were building against a pre-1.0 beta SDK,
+apply these one-time source changes; after that the public API is stable under
+SemVer.
+
+**1. BEM response struct includes (GIT-112)** — only if you `#include`d the
+internal command headers directly:
+
+```cpp
+// Before
+#include "protocols/bem/bem_commands/product_info.hpp"
+// After
+#include "public/bem_responses/product_info.hpp"
+```
+
+Type names are unchanged (`ProductInfoResponse`, etc.). If you only include
+`public/bem_callbacks.hpp` (or `session.hpp` / `remote_device.hpp`), no change
+is needed.
+
+**2. `OperatingMode` enumerator rename (GIT-114)** — replace every
+`OperatingMode::OM_*` with its PascalCase name. Values are unchanged.
+
+| Old (`OM_*`)             | New (PascalCase)       | Value      |
+|--------------------------|------------------------|------------|
+| `OM_UndefinedMode`       | `UndefinedMode`        | 0          |
+| `OM_NGTransferNormalMode`| `NgTransferNormalMode` | 1          |
+| `OM_NGTransferRxAllMode` | `NgTransferRxAllMode`  | 2          |
+| `OM_NGTransferRawMode`   | `NgTransferRawMode`    | 3 (legacy) |
+| `OM_NGConvertNormalMode` | `NgConvertNormalMode`  | 4          |
+| `OM_CanPacket`           | `CanPacket`            | 5          |
+| `OM_CanPacketASCII`      | `CanPacketAscii`       | 6          |
+| `OM_BUFFER_1`            | `Buffer1`              | 16         |
+| `OM_BUFFER_2`            | `Buffer2`              | 17         |
+| `OM_BUFFER_3`            | `Buffer3`              | 18         |
+| `OM_AUTOSWITCH_DIRECT`   | `AutoswitchDirect`     | 19         |
+| `OM_AUTOSWITCH_SMART`    | `AutoswitchSmart`      | 20         |
+| `OM_COMBINE_1`           | `Combine1`             | 21         |
+| `OM_COMBINE_2`           | `Combine2`             | 22         |
+| `OM_TEST_1`              | `Test1`                | 23         |
+| `OM_NSI_MODE_1`          | `NsiMode1`             | 24         |
+| `OM_LAST`                | `LastStandard`         | 253        |
+| `OM_NORMAL`              | `Normal`               | 512        |
+| `OM_PREDEFINED_MODE_1`   | `PredefinedMode1`      | 40000      |
+| `OM_PREDEFINED_MODE_2`   | `PredefinedMode2`      | 40001      |
+| `OM_PREDEFINED_MODE_END` | `PredefinedModeEnd`    | 40255      |
+| `OM_USER_START`          | `UserStart`            | 50000      |
+| `OM_USER_1`              | `User1`                | 50000      |
+| `OM_USER_2`              | `User2`                | 50001      |
+| `OM_USER_3`              | `User3`                | 50002      |
+| `OM_USER_4`              | `User4`                | 50003      |
+| `OM_USER_5`              | `User5`                | 50004      |
+| `OM_USER_LAST_DEFINED`   | `UserLastDefined`      | 50005      |
+| `OM_USER_END`            | `UserEnd`              | 59999      |
+| `OM_NULL`                | `Null`                 | 65535      |
+
+Note: `NgTransferRawMode` (3) is retained but legacy — mode 3 is no longer raw
+CAN; use `CanPacket` (5) / `CanPacketAscii` (6) for raw CAN transfer.
+
+**3. Error codes (GIT-113)** — only if you referenced the removed
+`TransportErrorCode` / `ProtocolErrorCode` enums or their categories; switch to
+`ErrorCode` and `sdkErrorCategory()`:
+
+```cpp
+// Before
+TransportErrorCode::PortBusy
+ProtocolErrorCode::BdtpFrameCorrupted
+// After
+ErrorCode::TransportPortBusy
+ErrorCode::BdtpFrameCorrupted
+```
+
+All callbacks already deliver `ErrorCode`; no signature changes.
+
+**4. Session / RemoteDevice ABI (GIT-115)** — rebuild your application against
+the 1.0.0 headers (one-time ABI break). Idiomatic use via
+`std::unique_ptr<Session>` and `->` needs no source change; do not attempt to
+subclass `Session` / `RemoteDevice` (now `final`).
 
 ## [0.4.0] - 2026-04-19
 
