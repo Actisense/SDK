@@ -77,13 +77,22 @@ namespace Actisense
 					if ((ERROR_SUCCESS == RegQueryValueExA(devKeyHandle, "PortName", NULL, &type,
 														   reinterpret_cast<LPBYTE>(name), &size)) &&
 						(REG_SZ == type)) {
+						/* RegQueryValueExA does not guarantee the returned REG_SZ is
+						   NUL-terminated; bound by the returned byte count and trim
+						   any trailing NULs rather than treating it as a C-string. */
+						std::size_t name_len = (size < sizeof(name)) ? size : sizeof(name);
+						while (name_len > 0 && name[name_len - 1] == '\0') {
+							--name_len;
+						}
+						std::string port_name(name, name_len);
+
 						/* Check for duplicates using hash set for O(1) lookup */
-						if (seen_ports.find(name) == seen_ports.end()) {
-							seen_ports.insert(name);
+						if (seen_ports.find(port_name) == seen_ports.end()) {
+							seen_ports.insert(port_name);
 
 							/* Get the friendly name for this device */
 							SerialDeviceInfo device_info;
-							device_info.port_name = name;
+							device_info.port_name = port_name;
 
 							char fr_name[100];
 							DWORD fr_size = sizeof(fr_name);
@@ -93,7 +102,10 @@ namespace Actisense
 									reinterpret_cast<PBYTE>(fr_name), static_cast<DWORD>(fr_size),
 									reinterpret_cast<LPDWORD>(&fr_size)) &&
 								(REG_SZ == fr_type)) {
-								device_info.friendly_name = fr_name;
+								/* Likewise bound the friendly name by its returned size. */
+								std::size_t fr_len =
+									(fr_size < sizeof(fr_name)) ? fr_size : sizeof(fr_name);
+								device_info.friendly_name.assign(fr_name, fr_len);
 								/* Remove any trailing null characters or control characters */
 								device_info.friendly_name.erase(
 									std::find_if(device_info.friendly_name.rbegin(),

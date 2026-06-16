@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       product_info.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      Product Info BEM command types and helpers
  \details    Structures and functions for encoding/decoding Product Info

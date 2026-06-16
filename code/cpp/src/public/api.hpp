@@ -70,8 +70,8 @@ namespace Actisense
 			 \param[in]  callback  Called with resolved endpoints or error
 			 \deprecated Not yet implemented — the current stub always reports
 						 ErrorCode::UnsupportedOperation. Marked deprecated rather
-						 than removed because the symbol is compiled by internal
-						 consumers (DeviceLib). Do not build new code on it.
+						 than removed to preserve binary compatibility for existing
+						 consumers. Do not build new code on it.
 			 *******************************************************************************/
 			[[deprecated("resolveHostAsync is an unimplemented stub; do not use")]] static void
 			resolveHostAsync(const std::string& host, HostResolutionCallback callback);

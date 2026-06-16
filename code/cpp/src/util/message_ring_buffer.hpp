@@ -3,10 +3,12 @@
 
 /**************************************************************************/ /**
  \file       message_ring_buffer.hpp
- \brief      Message-oriented ring buffer implementation
- \details    Thread-safe ring buffer storing complete message blocks as vectors.
-			 Designed for efficient zero-copy message passing between transport
-			 threads and async consumers.
+ \brief      Bounded, thread-safe message queue
+ \details    A capacity-bounded FIFO that stores complete message blocks (each a
+			 separately allocated container). All operations are serialised by an
+			 internal mutex, so it is safe for multiple producers and consumers.
+			 It is not a lock-free ring buffer; messages are moved (not copied)
+			 where the API allows, but there is no fixed backing store.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -26,11 +28,12 @@ namespace Actisense
 	namespace Sdk
 	{
 		/**************************************************************************/ /**
-		 \brief      Message-oriented ring buffer
+		 \brief      Bounded, thread-safe message queue
 		 \tparam     T  Message container type (default: std::vector<uint8_t>)
-		 \details    Thread-safe buffer storing complete messages rather than individual
-					 bytes. Supports efficient move semantics for zero-copy message
-					 transfer. Single producer / single consumer pattern.
+		 \details    A capacity-bounded FIFO storing complete messages rather than
+					 individual bytes. Every operation locks an internal mutex, so it
+					 is safe for concurrent producers and consumers (it is not a
+					 lock-free ring buffer). Messages are moved where the API allows.
 
 		 Key advantages over byte-oriented buffers:
 		 - Eliminates byte-at-a-time copying
@@ -109,9 +112,10 @@ namespace Actisense
 			 \brief      Enqueue a message (move semantics)
 			 \param[in]  message  Message to enqueue (will be moved)
 			 \return     True if message was enqueued, false if buffer full
-			 \details    Zero-copy enqueue via std::move
+			 \details    Moves the message into the queue. Not noexcept: the
+						 underlying container append may allocate and throw.
 			 *******************************************************************************/
-			bool enqueue(T&& message) noexcept {
+			bool enqueue(T&& message) {
 				{
 					std::lock_guard<std::mutex> lock(mutex_);
 					if (messages_.size() >= maxMessages_) {
@@ -160,9 +164,10 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Dequeue a message (move semantics)
 			 \return     Message if available, std::nullopt if buffer empty
-			 \details    Zero-copy dequeue - message is moved out of buffer
+			 \details    Moves the front message out of the queue. Not noexcept:
+						 moving T into the optional may throw for a throwing-move T.
 			 *******************************************************************************/
-			[[nodiscard]] std::optional<T> dequeue() noexcept {
+			[[nodiscard]] std::optional<T> dequeue() {
 				std::lock_guard<std::mutex> lock(mutex_);
 				if (messages_.empty()) {
 					return std::nullopt;

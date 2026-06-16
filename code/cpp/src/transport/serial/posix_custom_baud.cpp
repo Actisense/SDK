@@ -1,6 +1,6 @@
 /**************************************************************************/ /**
  \file       posix_custom_baud.cpp
- \author     (Created) Claude
+ \author     (Created) Phil Whitehurst
  \date       (Created) 15/06/2026
  \brief      Linux non-standard (custom) serial baud-rate helper implementation.
  \details    Isolated translation unit: it includes the Linux kernel header

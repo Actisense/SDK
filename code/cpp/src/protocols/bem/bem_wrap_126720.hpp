@@ -14,9 +14,8 @@
 				[1]    0x99   ManufacturerByte2  ((4<<5)|(3<<3)|(273>>8))
 				[2..]  inner BST bytes (BST ID + storeLength + payload)
 
-			The reference implementation lives in ACCompLib
-			(BstD0_wrapBstActisenseProprietary /
-			BstD0_extractProprietaryMessage). GIT-88 adds the SDK-side mirror.
+			This mirrors the gateway firmware's proprietary wrap/extract
+			helpers on the SDK side. (GIT-88)
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 ==============================================================================*/

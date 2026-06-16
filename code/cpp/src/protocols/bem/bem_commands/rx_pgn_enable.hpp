@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       rx_pgn_enable.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 27/01/2026
  \brief      Rx PGN Enable BEM command types and helpers
  \details    Structures and functions for encoding/decoding Rx PGN Enable

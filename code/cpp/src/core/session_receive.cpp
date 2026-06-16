@@ -111,7 +111,12 @@ namespace Actisense
 				if (state->delivered) {
 					return;
 				}
-				if (ec == ErrorCode::Timeout || !response.has_value()) {
+				/* Any non-Ok outcome is terminal: a timeout, or a correlated
+				   device error (mapped to a non-Ok code with a response value
+				   present). Without this, a device-error reply on a multi-reply
+				   request would satisfy neither isComplete nor this branch and
+				   the request would hang until the inactivity timeout fired. */
+				if (ec != ErrorCode::Ok || !response.has_value()) {
 					if (state->userCallback) {
 						const auto& acc = state->accumulator;
 						std::optional<Result> partial;

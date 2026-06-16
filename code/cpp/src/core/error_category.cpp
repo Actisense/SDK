@@ -131,7 +131,7 @@ namespace Actisense
 		}
 
 		std::string_view bemDeviceErrorMessage(int32_t deviceErrorCode) noexcept {
-			// Common ARL device error codes from ARLErrorCodes.h
+			// Common Actisense device error codes.
 			// Note: This is a subset of the most common errors; the full list is extensive
 			switch (deviceErrorCode) {
 				case 0:

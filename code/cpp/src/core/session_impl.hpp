@@ -556,7 +556,7 @@ namespace Actisense
 			 \param[in]  timeout   Timeout for response
 			 \param[in]  callback  Callback invoked on response or timeout
 			 \details    Firmware requires the selector payload; an empty payload
-						 returns ES10_BST_INVALID_PARAMETER_LEN.
+						 is rejected with an invalid-parameter-length error.
 			 *******************************************************************************/
 			void defaultPgnEnableList(DeletePgnListSelector selector,
 									  std::chrono::milliseconds timeout,

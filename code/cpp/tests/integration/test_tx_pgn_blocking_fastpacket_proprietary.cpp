@@ -31,8 +31,8 @@
             Deltas from GIT-97 (proprietary single-frame) and GIT-98 (standard fast-packet)
             ----------------------------------------------------------------
             * Iteration set shifted to the DP1 range 0x1FF00..0x1FFFF. Same
-              16-PGN byte-boundary sampling shape as GIT-97 — firmware's
-              LibN2K collapses the proprietary range to a single library
+              16-PGN byte-boundary sampling shape as GIT-97 — the firmware's
+              N2K library collapses the proprietary range to a single library
               entry, so SupportedPgnList cannot enumerate the 256 sub-PGNs.
             * Payload length varies across the sample: kPayloadLengths =
               {9, 16, 32, 64}, cycled by PGN index. Exercises the just-

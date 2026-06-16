@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       supported_pgn_list.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      Supported PGN List BEM command types and helpers (BEM 0x40)
  \details    Structures and functions for encoding/decoding the Supported PGN
@@ -20,8 +20,7 @@
 			 - bytes 10+: [pgnIndex(u8), pgn(u24 LE)] × subCount
 
 			 Wire format reverse-engineered against live NGT-1 / NGX-1 hardware
-			 under GIT-74 and confirmed against the legacy ACComps decoder at
-			 LibDev/ACCompLib/Codec-M/DecodeBEMCoreCmdResp.cpp DecodeSupportedPGNList.
+			 under GIT-74 and confirmed against the gateway firmware decoder.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/

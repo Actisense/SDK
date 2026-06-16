@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       rx_pgn_enable_list_f2.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      Rx PGN Enable List Format 2 (BEM 0x4E) types and helpers
  \details    Format 2 Rx enable list. Each entry is a device-local pgnIndex
@@ -36,10 +36,7 @@
 			 decodeRxPgnEnableListF2Response remains available for callers that
 			 want to drive aggregation themselves.
 
-			 Wire format matches the firmware-side implementation at
-			 LibDev/AMKLib/AMKLib/Command/NMEACommands/BemCommandRxPGNEnableListF2.cpp
-			 and the legacy ACComps decoder at
-			 LibDev/ACCompLib/Codec-M/DecodeBEMCoreCmdResp.cpp DecodeRxPGNEnableList.
+			 The wire format matches the gateway firmware's read-path encoding.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -239,9 +236,9 @@ namespace Actisense
 			outData.clear();
 		}
 
-		/* Note: 0x4E has no SET handler in the firmware (AMKLib BemCommandRxPGNEnableListF2
-		   only implements the read path). To change Rx enable state for a PGN, use
-		   the per-PGN BEM command 0x46 (RxPgnEnable) — see rx_pgn_enable.hpp. */
+		/* Note: 0x4E has no SET handler in the firmware (it only implements the read
+		   path). To change Rx enable state for a PGN, use the per-PGN BEM command
+		   0x46 (RxPgnEnable) — see rx_pgn_enable.hpp. */
 
 		/**************************************************************************/ /**
 		 \brief      Format helper.

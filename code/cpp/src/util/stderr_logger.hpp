@@ -79,6 +79,8 @@ namespace Actisense
 			mutable std::mutex mutex_;
 			std::atomic<LogLevel> threshold_;
 			std::array<std::atomic<LogLevel>, 6> categoryThresholds_;
+			static_assert(static_cast<std::size_t>(LogCategory::Metrics) + 1 == 6,
+						  "categoryThresholds_ size must match the LogCategory enumerator count");
 			std::atomic<bool> showLocation_{false};
 			std::chrono::steady_clock::time_point startTime_;
 		};

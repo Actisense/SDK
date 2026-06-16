@@ -1,6 +1,6 @@
 /**************************************************************************/ /**
 \file       test_session_device_control.cpp
-\author     (Created) Claude Code
+\author     (Created) Phil Whitehurst
 \date       (Created) 29/04/2026
 \brief      Session-level smoke tests for Device Control BEM commands
 \details    Verifies SessionImpl::reInitMainApp encodes the correct BEM

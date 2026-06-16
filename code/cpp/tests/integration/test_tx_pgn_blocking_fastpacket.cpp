@@ -156,9 +156,9 @@ static constexpr auto kModeChangeSettle = std::chrono::milliseconds(1500);
 /* Curated map of fast-packet standard PGNs and their N2K-defined fixed
    payload lengths. Each entry's length is the *exact* on-wire payload size
    the firmware expects when host-Tx hands it a BST-94 for this PGN — passing
-   a different length triggers a fast-packet length mismatch in LibN2K and
-   the firmware silently drops the send. Sourced from the NMEA 2000 PGN
-   table (StandardsLib N2K v3.003); fixed-length PGNs only — variable-length
+   a different length triggers a fast-packet length mismatch in the firmware
+   and the send is silently dropped. Sourced from the NMEA 2000 PGN
+   table (N2K v3.003); fixed-length PGNs only — variable-length
    PGNs (e.g. 129285 Route/WP Info, 129540 GNSS Sats in View, 126464 PGN
    List) are deliberately out of scope here. */
 static const std::map<uint32_t, std::size_t> kFastPacketPgnLength = {
@@ -200,8 +200,8 @@ static const std::unordered_map<uint32_t, const char*> kSkipPgns = {
    not match are silently dropped. Forcing the instance byte to 0 makes the
    sweep deterministic on every gateway, including NGT.
 
-   PGNs not in this map either have no Data Instance field (i_instance_ ==
-   255 in LibN2K) or the firmware doesn't gate on it. Indices below are
+   PGNs not in this map either have no Data Instance field or the firmware
+   doesn't gate on it. Indices below are
    sourced from the NMEA 2000 message definitions for each PGN. */
 static const std::unordered_map<uint32_t, uint8_t> kInstanceByteByPgn = {
 	{127489, 0}, /* Engine Parameters, Dynamic — Engine Instance at byte 0 */

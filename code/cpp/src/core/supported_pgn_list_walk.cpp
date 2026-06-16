@@ -105,9 +105,19 @@ namespace Actisense
 			}
 
 			/* Continue: issue next GET using the device-set transferId and the
-			   next pgnIndex past the sub-list we just absorbed. */
+			   next pgnIndex past the sub-list we just absorbed. Guard against a
+			   non-advancing index (subCount == 0) or an 8-bit overflow of
+			   firstSubIdx + subCount: either would re-request an index the device
+			   keeps answering, looping until the inactivity timeout. */
+			const unsigned nextIdxWide =
+				static_cast<unsigned>(decoded.firstSubIdx) + decoded.subCount;
+			if (nextIdxWide <= decoded.firstSubIdx || nextIdxWide > 0xFF) {
+				finish(std::nullopt, ErrorCode::MalformedFrame,
+					   "Supported PGN list walk made no progress (subCount=0 or index overflow)");
+				return;
+			}
 			state_ = WalkState::AwaitingReply;
-			const uint8_t nextIdx = static_cast<uint8_t>(decoded.firstSubIdx + decoded.subCount);
+			const uint8_t nextIdx = static_cast<uint8_t>(nextIdxWide);
 			sendGet(nextIdx, decoded.transferId);
 		}
 

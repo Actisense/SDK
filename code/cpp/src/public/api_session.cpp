@@ -3,10 +3,9 @@
  \brief      Implementation of Api::open() session entry point
  \details    Kept separate from api.cpp so that consumers compiling api.cpp
 			 directly (without linking the rest of the SDK) are not forced to
-			 pull in SessionImpl and the transport library. Actisense
-			 DeviceLib is one such consumer: it embeds api.cpp to expose
-			 enumerateSerialDevices() but does not need a working
-			 Api::open().
+			 pull in SessionImpl and the transport library — for example a
+			 consumer that embeds api.cpp only to expose
+			 enumerateSerialDevices() and does not need a working Api::open().
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/

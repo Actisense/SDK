@@ -25,6 +25,7 @@
 #else
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -127,7 +128,10 @@ namespace Actisense
 			/* Close platform handle */
 #if defined(_WIN32)
 			if (handle_ != INVALID_HANDLE_VALUE) {
-				CloseHandle(writeOverlapped_.hEvent);
+				if (writeOverlapped_.hEvent != nullptr) {
+					CloseHandle(writeOverlapped_.hEvent);
+					writeOverlapped_.hEvent = nullptr;
+				}
 				CloseHandle(handle_);
 				handle_ = INVALID_HANDLE_VALUE;
 			}
@@ -354,6 +358,13 @@ namespace Actisense
 				if (GetLastError() == ERROR_IO_PENDING) {
 					if (WaitForSingleObject(writeOverlapped_.hEvent, 5000) == WAIT_OBJECT_0) {
 						GetOverlappedResult(handle_, &writeOverlapped_, &bytesWritten, FALSE);
+					} else {
+						/* Timed out or the wait failed: cancel the queued write and
+						   block until the kernel has released the caller's buffer.
+						   Returning early would leave an in-flight write referencing
+						   memory the caller is free to reuse. */
+						CancelIo(handle_);
+						GetOverlappedResult(handle_, &writeOverlapped_, &bytesWritten, TRUE);
 					}
 				}
 			}
@@ -362,12 +373,37 @@ namespace Actisense
 			return static_cast<std::size_t>(bytesWritten);
 
 #else /* POSIX */
-			const ssize_t result = ::write(fd_, data, size);
-			if (result > 0) {
-				totalBytesSent_ += result;
-				return static_cast<std::size_t>(result);
+			/* The fd is opened O_NONBLOCK, so a single ::write may transfer fewer
+			   bytes than requested (or none). Loop until everything is sent,
+			   retrying EINTR and waiting for writability on EAGAIN, so callers
+			   never silently lose the tail of a frame. */
+			std::size_t totalWritten = 0;
+			while (totalWritten < size) {
+				const ssize_t result = ::write(fd_, data + totalWritten, size - totalWritten);
+				if (result > 0) {
+					totalWritten += static_cast<std::size_t>(result);
+					continue;
+				}
+				if (result < 0) {
+					if (errno == EINTR) {
+						continue; /* interrupted before any byte moved — retry */
+					}
+					if (errno == EAGAIN || errno == EWOULDBLOCK) {
+						struct pollfd pfd;
+						pfd.fd = fd_;
+						pfd.events = POLLOUT;
+						pfd.revents = 0;
+						if (::poll(&pfd, 1, 5000 /* ms */) > 0) {
+							continue; /* port writable again — retry */
+						}
+						break; /* timeout or poll error — return what we managed */
+					}
+					break; /* hard error */
+				}
+				break; /* result == 0: nothing written, avoid a busy spin */
 			}
-			return 0;
+			totalBytesSent_ += totalWritten;
+			return totalWritten;
 #endif
 		}
 
@@ -435,21 +471,15 @@ namespace Actisense
 				return ErrorCode::TransportOpenFailed;
 			}
 
-			/* Set timeouts */
+			/* Set timeouts: return immediately with whatever bytes are already
+			   buffered (ReadIntervalTimeout = MAXDWORD with both totals 0 would
+			   poll; here a read total timeout bounds blocking reads). */
 			COMMTIMEOUTS timeouts{};
-#if 1
 			timeouts.ReadIntervalTimeout = MAXDWORD;
 			timeouts.ReadTotalTimeoutConstant = config.readTimeoutMs;
 			timeouts.ReadTotalTimeoutMultiplier = 0;
 			timeouts.WriteTotalTimeoutConstant = 5000;
 			timeouts.WriteTotalTimeoutMultiplier = 0;
-#else
-			timeouts.ReadIntervalTimeout = 5;
-			timeouts.ReadTotalTimeoutMultiplier = 0;
-			timeouts.ReadTotalTimeoutConstant = 0;
-			timeouts.WriteTotalTimeoutMultiplier = 0;
-			timeouts.WriteTotalTimeoutConstant = 0;
-#endif
 			if (!SetCommTimeouts(handle_, &timeouts)) {
 				return ErrorCode::TransportOpenFailed;
 			}
@@ -610,11 +640,11 @@ namespace Actisense
 #if defined(_WIN32)
 /**************************************************************************/ /**
  \brief     readThreadFunc (Windows)
- \details	Read thread function for Windows using overlapped I/O
-			Keeps running until flag is set to stop
- \return     .
+ \details	Read thread function for Windows using overlapped I/O. Issues an
+			overlapped read, then waits on both the completion event and the
+			thread-terminate handle so close() can unblock it promptly. Keeps
+			running until the stop flag is set.
  *******************************************************************************/
-#define METHOD_IS_WaitForMultipleObjects
 		void SerialTransport::readThreadFunc() {
 			OVERLAPPED readOverlapped{};
 			readOverlapped.hEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
@@ -622,17 +652,10 @@ namespace Actisense
 				ACTISENSE_LOG_ERROR("Serial", "Failed to create read event");
 				return;
 			}
-#ifdef METHOD_IS_WaitForMultipleObjects
-			// Handle array used in WaitForMultipleObjects in comms thread
-			HANDLE rxThreadWaitHandles[2] = {0, 0};
-			/* Set up handles for required (waiting for) data. Will be thread
-			   terminate handle and the overlapped handle that will signal when
-			   data arrives */
-			rxThreadWaitHandles[0] = readOverlapped.hEvent;
-			rxThreadWaitHandles[1] = rx_terminate_handle_;
+			/* Handle array used in WaitForMultipleObjects: the overlapped read
+			   completion event and the thread-terminate handle. */
+			HANDLE rxThreadWaitHandles[2] = {readOverlapped.hEvent, rx_terminate_handle_};
 			bool fWaitingOnRead = false;
-			bool data_read_this_loop = false;
-#endif
 			const DWORD waitTime = (readTimeoutMs_ == 0) ? INFINITE : readTimeoutMs_;
 			std::vector<uint8_t> tempBuffer(tempBufferSize_);
 			uint8_t* read_buffer = tempBuffer.data();
@@ -641,8 +664,6 @@ namespace Actisense
 				/* Read from port into temp buffer */
 				std::size_t bytes_read = 0;
 
-#ifdef METHOD_IS_WaitForMultipleObjects
-				/* Alternative method using WaitForMultipleObjects */
 				{
 					DWORD dwBytesRead = 0;
 					if (!fWaitingOnRead) {
@@ -656,16 +677,11 @@ namespace Actisense
 							} else {
 								fWaitingOnRead = true;
 							}
-						} else {
-							if (dwBytesRead) {
-								/* Read completed - set flag to indicate it should be processed */
-								data_read_this_loop = true;
-							} else {
-								/* No data in buffer - let thread sleep for 1 millisec
-									(about 12 chars at 115200) -	this code should in
-									theory never be executed due to the Comms timeout */
-								std::this_thread::sleep_for(std::chrono::milliseconds(1));
-							}
+						} else if (dwBytesRead == 0) {
+							/* No data in buffer - sleep briefly (about 12 chars at
+							   115200). In practice this is rarely hit because of the
+							   configured comms read timeout. */
+							std::this_thread::sleep_for(std::chrono::milliseconds(1));
 						}
 					}
 					/* Are we waiting for an overlapped read operation to finish? */
@@ -682,10 +698,8 @@ namespace Actisense
 									/* Error in communications; Stop the thread */
 									stopRequested_ = true;
 								} else {
-									/* Read completed - set flag to indicate it should be processed
-									 */
-									data_read_this_loop = true;
-									/* Reset flag so that another operation can be issued */
+									/* Read completed; reset flag so another operation
+									   can be issued. */
 									fWaitingOnRead = false;
 								}
 								break;
@@ -716,40 +730,11 @@ namespace Actisense
 					}
 					bytes_read = static_cast<std::size_t>(dwBytesRead);
 				}
-#else
-				{
-					DWORD dwBytesRead = 0;
-					ResetEvent(readOverlapped.hEvent);
-					BOOL readResult =
-						ReadFile(handle_, read_buffer, static_cast<DWORD>(tempBufferSize_), nullptr,
-								 &readOverlapped);
-					if (!readResult) {
-						if (GetLastError() == ERROR_IO_PENDING) {
-							DWORD waitResult = WaitForSingleObject(readOverlapped.hEvent, waitTime);
-							if (waitResult != WAIT_OBJECT_0) {
-								/* Timeout or error - cancel the I/O */
-								CancelIo(handle_);
-								bytes_read = 0;
-							}
-						} else {
-							/* Immediate error */
-							bytes_read = 0;
-						}
-					}
-
-					/* Always use GetOverlappedResult to get the actual byte count */
-					if (!GetOverlappedResult(handle_, &readOverlapped, &dwBytesRead, FALSE)) {
-						bytes_read = 0;
-					}
-					bytes_read = static_cast<std::size_t>(dwBytesRead);
-				}
-#endif
 				totalBytesReceived_ += bytes_read;
 				/* Process async operations */
 				processAsyncOperations(read_buffer, bytes_read);
 			}
 
-#ifdef METHOD_IS_WaitForMultipleObjects
 			/* If we exit the loop with a read still in flight (e.g. close() was
 			   called during WAIT_TIMEOUT), cancel it and wait for the kernel to
 			   release its references to the OVERLAPPED + buffer before tearing
@@ -759,7 +744,6 @@ namespace Actisense
 				DWORD dwBytesRead = 0;
 				GetOverlappedResult(handle_, &readOverlapped, &dwBytesRead, TRUE);
 			}
-#endif
 			CloseHandle(readOverlapped.hEvent);
 
 			ACTISENSE_LOG_INFO("Serial", "Read thread exiting");

@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       error_report.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      Error Report unsolicited message types and helpers
  \details    Structures and functions for decoding Error Report (0xF1)

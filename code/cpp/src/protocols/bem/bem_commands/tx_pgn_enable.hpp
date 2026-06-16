@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       tx_pgn_enable.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 27/01/2026
  \brief      Tx PGN Enable BEM command types and helpers
  \details    Structures and functions for encoding/decoding Tx PGN Enable

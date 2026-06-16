@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       startup_status.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      Startup Status unsolicited message types and helpers
  \details    Structures and functions for decoding Startup Status (0xF0)

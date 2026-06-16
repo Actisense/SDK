@@ -106,8 +106,8 @@ namespace Actisense
 						   The assembler hands us the inner DLE-unescaped frame
 						   payload `BST_ID..checksum`. EBLT_BSTRawFrame must
 						   carry only the BST message itself (no DLE framing
-						   AND no BDTP checksum) per CommonLib's
-						   EblEmbedded::writeBstRawArray contract — the BST 93
+						   AND no BDTP checksum) per the embedded EBL writer
+						   contract — the BST 93
 						   / 94 / D0 length fields encode message size without
 						   the trailing checksum, so leaving it in causes EBL
 						   Reader's MapBST93MsgToN2KMsg size check to fail and

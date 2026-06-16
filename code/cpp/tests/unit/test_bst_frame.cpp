@@ -747,8 +747,7 @@ TEST_F(BstFrameTest, RawDataRoundTrip)
    contract: the destination address lives ONLY in byte 6 (kBst94OffDest);
    PDUS always carries the raw PGN low byte (0 for valid PDU1 PGNs).
    Sending the destination in PDUS causes NGT firmware to reply with
-   ES6_LIBRARY_MATCH_SEARCH_FAILED (-697). Reference: GIT-95 and
-   LibDev/ACCompLib/Codec/WrapBSTN2K.cpp::BSTWrapBSTN2K. */
+   a library-match-search-failed error (-697). (GIT-95) */
 
 TEST_F(BstFrameTest, Create94Pdu1KeepsPdusZeroAndDestInByte6)
 {

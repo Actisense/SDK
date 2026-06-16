@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       posix_custom_baud.hpp
- \author     (Created) Claude
+ \author     (Created) Phil Whitehurst
  \date       (Created) 15/06/2026
  \brief      Linux non-standard (custom) serial baud-rate helper.
  \details    Declares a thin wrapper around the Linux BOTHER / termios2 /

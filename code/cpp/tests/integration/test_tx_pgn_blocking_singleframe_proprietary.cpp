@@ -27,7 +27,7 @@
             Deltas from GIT-89
             ----------------------------------------------------------------
             * Iteration set is a hard-coded 16-PGN sample, not derived from
-              SupportedPgnList. Firmware's LibN2K library collapses the
+              SupportedPgnList. The firmware's N2K library collapses the
               0xFF00..0xFFFF proprietary range onto a single library entry,
               so SupportedPgnList reports the base PGN once — not the 256
               sub-PGNs. The sample covers every DP0 bitmap byte boundary

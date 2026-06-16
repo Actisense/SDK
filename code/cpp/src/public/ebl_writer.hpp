@@ -12,10 +12,9 @@
 			files written by this class are readable by the EBL Reader tool
 			and any other consumer of the Actisense EBL format.
 
-			This is a port of the embedded-side EBL writer (CommonLib's
-			EblEmbedded and DesktopLib's EBLDocExportEBL) into the modern
-			C++20 SDK so that customers no longer need to reference the
-			private internal libraries to capture or replay traffic.
+			This is a port of Actisense's embedded- and desktop-side EBL
+			writers into the modern C++20 SDK so that customers no longer
+			need any additional libraries to capture or replay traffic.
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 ==============================================================================*/
@@ -26,6 +25,8 @@
 #include <cstdint>
 #include <functional>
 #include <span>
+#include <string_view>
+#include <vector>
 
 #include "public/wire_trace.hpp"
 

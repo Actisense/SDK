@@ -151,13 +151,12 @@ namespace Actisense
 
 			/* PDUS always carries the raw PGN low byte (0 for valid PDU1 PGNs),
 			   never the destination. The NGT firmware does its PGN-library lookup
-			   directly on the PDUS field and rejects the frame with
-			   ES6_LIBRARY_MATCH_SEARCH_FAILED (-697) if PDUS != the PGN low byte.
+			   directly on the PDUS field and rejects the frame with a
+			   library-match-search-failed error (-697) if PDUS != the PGN low byte.
 			   The destination always lives in byte 6 (kBst94OffDest) below,
 			   regardless of PDU class. The NGX is tolerant because it converts
 			   incoming BST-94 to BST-D0 and masks PDUS before the lookup, but
-			   the host-Tx wire format the gateways expect is uniform. Reference:
-			   LibDev/ACCompLib/Codec/WrapBSTN2K.cpp::BSTWrapBSTN2K. (GIT-95) */
+			   the host-Tx wire format the gateways expect is uniform. (GIT-95) */
 
 			/* Reject payloads that would overflow the 8-bit store-length byte. */
 			if (payload.size() > 255 - kBst94OffData) {

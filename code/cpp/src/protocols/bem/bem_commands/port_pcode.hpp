@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       port_pcode.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 27/01/2026
  \brief      Port P-Code BEM command types and helpers
  \details    Structures and functions for encoding/decoding Port P-Code

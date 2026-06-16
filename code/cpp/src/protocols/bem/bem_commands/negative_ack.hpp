@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       negative_ack.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      Negative Ack unsolicited message types and helpers
  \details    Structures and functions for decoding Negative Ack (0xF4)

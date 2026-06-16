@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       echo.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      Echo BEM command types and helpers
  \details    Structures and functions for encoding/decoding Echo (0x18) BEM

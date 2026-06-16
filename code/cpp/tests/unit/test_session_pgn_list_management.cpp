@@ -1,6 +1,6 @@
 /**************************************************************************/ /**
 \file       test_session_pgn_list_management.cpp
-\author     (Created) Claude Code
+\author     (Created) Phil Whitehurst
 \date       (Created) 28/04/2026
 \brief      Session-level smoke tests for PGN List Management helpers
 \details    Verifies SessionImpl::{getRx/TxPgnEnableListF2,

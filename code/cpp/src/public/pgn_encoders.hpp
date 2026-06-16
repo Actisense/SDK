@@ -13,8 +13,7 @@
 
 			 The set of PGNs supported here is intentionally small and matches
 			 the PGNs demonstrated by the pgn_transmitter example. The full
-			 NMEA 2000 PGN catalogue lives in Actisense StandardsLib and is
-			 not part of the public SDK.
+			 NMEA 2000 PGN catalogue is not part of the public SDK.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/

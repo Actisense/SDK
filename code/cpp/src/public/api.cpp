@@ -85,9 +85,9 @@ namespace Actisense
 
 		/* Api::open() is implemented in api_session.cpp so that this translation
 		 * unit stays free of dependencies on SessionImpl and the transport
-		 * library. Some downstream consumers (notably Actisense DeviceLib)
-		 * compile api.cpp directly without linking the rest of the SDK, and
-		 * only need version()/enumerateSerialDevices()/resolveHostAsync(). */
+		 * library. Some downstream consumers compile api.cpp directly without
+		 * linking the rest of the SDK, and only need
+		 * version()/enumerateSerialDevices()/resolveHostAsync(). */
 
 	} /* namespace Sdk */
 } /* namespace Actisense */

@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       commit_to_flash.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      Commit To FLASH BEM command types and helpers
  \details    Structures and functions for encoding/decoding Commit To FLASH

@@ -78,6 +78,12 @@ namespace Actisense
 			constexpr std::array<std::string_view, 6> kLogCategoryNames = {
 				{"General", "Transport", "Protocol", "Bem", "Session", "Metrics"}};
 
+			/* Keep gCategoryLogLevels and kLogCategoryNames in lock-step with the
+			   public LogCategory enum: adding a category without resizing these
+			   arrays would silently drop the new category to the global level. */
+			static_assert(static_cast<std::size_t>(LogCategory::Metrics) + 1 == 6,
+						  "gCategoryLogLevels / kLogCategoryNames size must match LogCategory");
+
 		} /* anonymous namespace */
 
 		/* Public Function Definitions ------------------------------------------ */

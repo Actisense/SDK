@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       commit_to_eeprom.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      Commit To EEPROM BEM command types and helpers
  \details    Structures and functions for encoding/decoding Commit To EEPROM

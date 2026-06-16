@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       total_time.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      Total Time BEM command types and helpers
  \details    Structures and functions for encoding/decoding Total Time

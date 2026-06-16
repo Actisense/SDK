@@ -1,6 +1,6 @@
 /**************************************************************************/ /**
 \file       test_session_nmea2000_product_info.cpp
-\author     (Created) Claude Code
+\author     (Created) Phil Whitehurst
 \date       (Created) 15/05/2026
 \brief      Session-level smoke tests for NMEA 2000 Product Info helpers (0x41-0x45)
 \details    Verifies SessionImpl::{getProductInfo, get/setCanConfig,

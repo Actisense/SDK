@@ -1,6 +1,6 @@
 /**************************************************************************/ /**
 \file       test_can_packet_mode.cpp
-\author     (Created) Claude Code
+\author     (Created) Phil Whitehurst
 \date       (Created) 08/06/2026
 \brief      Black-box integration test for NGX CAN Packet routing (NGXSW-4207)
 \details    Drives a real NGX into CAN Packet mode via the SDK and proves, as a

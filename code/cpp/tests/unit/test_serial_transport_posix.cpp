@@ -1,6 +1,6 @@
 /**************************************************************************/ /**
  \file       test_serial_transport_posix.cpp
- \author     (Created) Claude
+ \author     (Created) Phil Whitehurst
  \date       (Created) 15/06/2026
  \brief      POSIX SerialTransport tests (GIT-119): custom baud + prompt close.
  \details    Drives the real SerialTransport POSIX path against a pseudo-terminal

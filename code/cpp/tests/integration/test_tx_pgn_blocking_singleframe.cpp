@@ -157,8 +157,8 @@ static const std::unordered_set<uint32_t> kSkipPgns = {
 };
 
 /* Zero-based byte index of the Data Instance field within each PGN's
-   payload, sourced from LibN2K's i_instance_ values. PGNs not in this
-   map have no instance field (i_instance_ == 255).
+   payload, sourced from the NMEA 2000 PGN definitions. PGNs not in this
+   map have no instance field.
 
    GIT-103: the NGT-1 firmware enforces a Data Instance match on host-
    Tx. It pre-builds one Tx Virtual Object per PGN with data_inst_ = 0

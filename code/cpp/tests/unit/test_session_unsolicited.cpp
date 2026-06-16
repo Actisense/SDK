@@ -1,6 +1,6 @@
 /**************************************************************************/ /**
 \file       test_session_unsolicited.cpp
-\author     (Created) Claude Code
+\author     (Created) Phil Whitehurst
 \date       (Created) 28/04/2026
 \brief      Session-level tests for unsolicited BEM messages (0xF0/0xF1/0xF4)
 \details    Verifies that SessionImpl decodes unsolicited BEM responses received

@@ -40,7 +40,7 @@ namespace
 	 *
 	 * The point of these tests is round-tripping: writer output must be
 	 * decodable by an independent parser. Implementing the parser inside the
-	 * test (rather than depending on the LibDev EBL Reader DLL) keeps the
+	 * test (rather than depending on an external EBL reader) keeps the
 	 * SDK tests self-contained and gives us a second implementation against
 	 * which the writer is verified.
 	 *

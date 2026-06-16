@@ -40,7 +40,7 @@ bem.buildSetPortPCode(codes, frame, err);
 ```
 
 > The numeric P-Code values are defined per-product. Refer to the relevant
-> product manual or `LibDev/StandardsLib` for the canonical table.
+> product manual for the canonical table.
 
 ---
 

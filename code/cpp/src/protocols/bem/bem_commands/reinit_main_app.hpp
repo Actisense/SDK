@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       reinit_main_app.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      ReInit Main App BEM command types and helpers
  \details    Structures and functions for encoding/decoding ReInit Main App

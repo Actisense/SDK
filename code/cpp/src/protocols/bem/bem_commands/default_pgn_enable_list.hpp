@@ -3,15 +3,14 @@
 
 /**************************************************************************/ /**
  \file       default_pgn_enable_list.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      Default PGN Enable List BEM command types and helpers (0x4C)
  \details    Restores the operating-mode-specific default Rx/Tx PGN enable
-			 list. Per the firmware command handler
-			 (AMKLib BemCommandDefaultPGNEnableList), the payload must be a
+			 list. Per the firmware command handler, the payload must be a
 			 single byte selecting which list(s) to restore (0=Rx, 1=Tx,
-			 2=Both). An empty payload returns ARL errorCode
-			 ES10_BST_INVALID_PARAMETER_LEN (-1096 / 0xFFFFFBB8).
+			 2=Both). An empty payload is rejected by the device with an
+			 invalid-parameter-length error.
 
 			 Reuses the DeletePgnListSelector enum from
 			 delete_pgn_enable_lists.hpp since the two commands share their

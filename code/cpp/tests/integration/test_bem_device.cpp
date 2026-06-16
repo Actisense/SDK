@@ -1,6 +1,6 @@
 /**************************************************************************//**
 \file       test_bem_device.cpp
-\author     (Created) Claude Code
+\author     (Created) Phil Whitehurst
 \date       (Created) 28/01/2026
 \brief      Integration test for BEM commands against a real Actisense device
 \details    Connects to a real device via serial port and exercises each BEM
@@ -1201,8 +1201,7 @@ TEST_F(BemDeviceTest, PgnListWireDiagnostic)
 
 /* GIT-74: Real Rx per-PGN SET path via 0x46 (RxPgnEnable).
 
-   The F2 list commands (0x4E/0x4F) have no firmware SET handler (per
-   AMKLib BemCommandRxPGNEnableListF2 / BemCommandTxPGNEnableListF2 — they
+   The F2 list commands (0x4E/0x4F) have no firmware SET handler (they
    only implement read); to change Rx enable state the application must
    use the per-PGN command 0x46.
 
@@ -1217,14 +1216,14 @@ TEST_F(BemDeviceTest, RxPgnEnable_PerPgnSetPath)
 {
 	using namespace std::chrono_literals;
 
-	/* NGT-1 firmware: the per-PGN 0x46 handler queries the PgnController
-	   via VD 0 and returns ES9_N2000_PGN_NOT_ON_LIST (-995) for PGNs that
-	   appear in the F1 enabled list but aren't accessible from that VD.
+	/* NGT-1 firmware: the per-PGN 0x46 handler queries the PGN controller
+	   via virtual device 0 and returns a PGN-not-on-list error (-995) for
+	   PGNs that appear in the F1 enabled list but aren't accessible from that VD.
 	   That's a firmware-side quirk worth investigating separately. Skip
 	   here so the test stays meaningful on NGX-1 and any firmware where
 	   the per-PGN path works as designed. */
 	if (modelId_ == static_cast<uint16_t>(ArlModelId::NGT1)) {
-		GTEST_SKIP() << "RxPgnEnable 0x46 returns ES9_N2000_PGN_NOT_ON_LIST on NGT-1"
+		GTEST_SKIP() << "RxPgnEnable 0x46 returns a PGN-not-on-list error on NGT-1"
 		             << " for PGNs in the F1 list — firmware investigation needed";
 	}
 
@@ -1293,7 +1292,7 @@ TEST_F(BemDeviceTest, RxPgnEnable_PerPgnSetPath)
 
 /* GIT-74: Verify Default(Rx) is accepted by firmware now that the SDK
    sends the required 1-byte selector. Previously the SDK sent no payload
-   and the firmware returned ES10_BST_INVALID_PARAMETER_LEN (-1096). */
+   and the firmware returned an invalid-parameter-length error (-1096). */
 TEST_F(BemDeviceTest, DefaultPgnEnableList_AcceptsSelector)
 {
 	auto result = sendConvenience([this](auto t, auto cb) {
@@ -1428,10 +1427,10 @@ TEST_F(BemDeviceTest, RxPgnEnable_WellKnownPgnsAddressableViaPerPgn)
 				++result.ok;
 				continue;
 			}
-			if (arlErr == 0xFFFFFC1Du) { /* ES9_N2000_PGN_NOT_ON_LIST */
+			if (arlErr == 0xFFFFFC1Du) { /* PGN not on list (-995) */
 				result.es9Pgns.push_back(p.pgn);
 				std::cout << "    PGN " << p.pgn << " (" << p.name
-				          << "): ES9_N2000_PGN_NOT_ON_LIST" << std::endl;
+				          << "): PGN not on list" << std::endl;
 			} else {
 				result.otherFailures.emplace_back(p.pgn, r.errorMsg);
 				std::cout << "    PGN " << p.pgn << " (" << p.name
@@ -1778,7 +1777,7 @@ TEST_F(BemDeviceTest, PgnEnable_ComprehensiveSweep)
 				err = r.errorMsg;
 				if (r.response.has_value() &&
 					r.response->header.errorCode == 0xFFFFFC1Du) {
-					err += " (ES9_N2000_PGN_NOT_ON_LIST)";
+					err += " (PGN not on list)";
 				}
 				return std::nullopt;
 			}
@@ -1814,7 +1813,7 @@ TEST_F(BemDeviceTest, PgnEnable_ComprehensiveSweep)
 				err = r.errorMsg;
 				if (r.response.has_value() &&
 					r.response->header.errorCode == 0xFFFFFC1Du) {
-					err += " (ES9_N2000_PGN_NOT_ON_LIST)";
+					err += " (PGN not on list)";
 				}
 				return std::nullopt;
 			}
@@ -1909,7 +1908,7 @@ TEST_F(BemDeviceTest, PgnEnable_ComprehensiveSweep)
    Delete is a list-level operation that does not go through the per-PGN
    VD-0 path, so it works on both NGT-1 and NGX-1 for the Rx/Tx selectors.
    The legacy NGT-1 firmware rejects selector Both (0x02) with ARL error
-   0xFFFFFC23 — only the AMKLib firmware (NGX-1) implements that selector.
+   0xFFFFFC23 — only the newer firmware (NGX-1) implements that selector.
    Test follows up with Default(Both) to put the device back into a known
    state for the rest of the suite. */
 TEST_F(BemDeviceTest, DeletePgnEnableLists_AllSelectors)
@@ -1939,8 +1938,9 @@ TEST_F(BemDeviceTest, DeletePgnEnableLists_AllSelectors)
 	issueDelete(DeletePgnListSelector::TxList, "tx");
 	std::this_thread::sleep_for(100ms);
 
-	/* Selector Both (0x02) is AMKLib-only; the legacy NGT-1 firmware rejects
-	   it with ARL error 0xFFFFFC23. Don't issue it against NGT-1. */
+	/* Selector Both (0x02) is supported only on newer firmware; the legacy
+	   NGT-1 firmware rejects it with ARL error 0xFFFFFC23. Don't issue it
+	   against NGT-1. */
 	if (modelId_ != static_cast<uint16_t>(ArlModelId::NGT1)) {
 		issueDelete(DeletePgnListSelector::Both, "both");
 		std::this_thread::sleep_for(100ms);

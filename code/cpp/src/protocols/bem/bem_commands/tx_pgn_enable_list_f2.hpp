@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       tx_pgn_enable_list_f2.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      Tx PGN Enable List Format 2 (BEM 0x4F) types and helpers
  \details    The TX list is split into two structure-variant flavours which
@@ -58,10 +58,7 @@
 			 decodeTxPgnEnableListF2Response remains available for callers
 			 driving aggregation themselves.
 
-			 Wire format matches the firmware-side implementation at
-			 LibDev/AMKLib/AMKLib/Command/NMEACommands/BemCommandTxPGNEnableListF2.cpp
-			 and the legacy ACComps decoder at
-			 LibDev/ACCompLib/Codec-M/DecodeBEMCoreCmdResp.cpp DecodeTxPGNEnableList.
+			 The wire format matches the gateway firmware's read-path encoding.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -260,11 +257,11 @@ namespace Actisense
 			outData.clear();
 		}
 
-		/* Note: 0x4F has no SET handler in the firmware (AMKLib BemCommandTxPGNEnableListF2
-		   only implements the read path, emitting both the std variant (one or more
-		   messages) and a final proprietary-variant message with sequenceId=2). To
-		   change Tx enable state, priority, or rate for a PGN use the per-PGN BEM
-		   command 0x47 (TxPgnEnable) — see tx_pgn_enable.hpp. */
+		/* Note: 0x4F has no SET handler in the firmware (it only implements the read
+		   path, emitting both the std variant (one or more messages) and a final
+		   proprietary-variant message with sequenceId=2). To change Tx enable state,
+		   priority, or rate for a PGN use the per-PGN BEM command 0x47 (TxPgnEnable)
+		   — see tx_pgn_enable.hpp. */
 
 		/* Multi-message aggregation --------------------------------------- */
 

@@ -195,7 +195,13 @@ namespace Actisense
 				if (bem.commandsSent == 0) {
 					return 100.0;
 				}
-				const auto successful = bem.responsesReceived - bem.deviceErrors;
+				/* Guard against unsigned underflow: deviceErrors should never exceed
+				   responsesReceived, but clamp defensively so a transient
+				   miscount cannot produce a nonsensical (astronomically large)
+				   success rate. */
+				const auto successful = bem.responsesReceived > bem.deviceErrors
+											? bem.responsesReceived - bem.deviceErrors
+											: 0u;
 				return (static_cast<double>(successful) / static_cast<double>(bem.commandsSent)) *
 					   100.0;
 			}

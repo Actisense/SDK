@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       activate_pgn_enable_lists.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      Activate PGN Enable Lists BEM command types and helpers
  \details    Structures and functions for encoding/decoding Activate PGN Enable

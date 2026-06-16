@@ -3,7 +3,7 @@
 
 /**************************************************************************/ /**
  \file       can_config.hpp
- \author     (Created) Claude Code
+ \author     (Created) Phil Whitehurst
  \date       (Created) 28/01/2026
  \brief      CAN Config BEM command types and helpers
  \details    Structures and functions for encoding/decoding CAN Config (0x42)
