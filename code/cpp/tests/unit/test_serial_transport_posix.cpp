@@ -123,6 +123,13 @@ TEST(SerialTransportPosix, OpensNonStandardBaud) {
 	/* Core GIT-119 behaviour: 250000 baud has no termios B-constant, so before
 	   this change open() returned an error. It must now succeed via the custom
 	   baud path (Linux BOTHER/TCSETS2; a pty accepts the rate). */
+#if defined(__APPLE__)
+	/* macOS sets a custom rate via the IOSSIOSPEED ioctl, which a pty rejects
+	   (it is only valid on real serial devices). The macOS custom-baud path is
+	   verified on hardware by GIT-125, so skip the pty-based check here. */
+	GTEST_SKIP() << "IOSSIOSPEED is unsupported on a pty; macOS custom baud is "
+					"covered on hardware by GIT-125";
+#endif
 	PtyPair pty;
 	ASSERT_TRUE(pty.valid());
 

@@ -95,6 +95,16 @@ namespace Actisense
 			[[nodiscard]] std::size_t messagesAvailable() const noexcept;
 
 			/**************************************************************************/ /**
+			 \brief      Get number of parked (not-yet-completed) receive requests
+			 \return     Number of asyncRecv() calls currently awaiting data
+			 \details    Lets a test wait until a session's receive loop has actually
+						 registered a receive before injecting, so injectData() drains
+						 it synchronously on the caller's thread rather than depending
+						 on the receive thread being promptly scheduled.
+			 *******************************************************************************/
+			[[nodiscard]] std::size_t pendingReceiveCount() const noexcept;
+
+			/**************************************************************************/ /**
 			 \brief      Clear all buffers
 			 *******************************************************************************/
 			void clearBuffers();

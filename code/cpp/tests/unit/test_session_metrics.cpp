@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <vector>
 
 namespace Actisense
@@ -79,10 +80,38 @@ protected:
 		transport_ = nullptr;
 	}
 
-	bool waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(2000))
+	/* Spin until the session's receive loop has parked a receive on the
+	   loopback. Injecting only then guarantees injectData() drains the parked
+	   receive and dispatches the event synchronously on this thread, rather than
+	   leaving the message buffered for the receive thread to pick up later —
+	   which on a heavily loaded CI runner could exceed the wait timeout and
+	   flake (the event delivery itself is otherwise reliable). */
+	void waitForReceiveParked()
 	{
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+		while (transport_->pendingReceiveCount() == 0 &&
+		       std::chrono::steady_clock::now() < deadline) {
+			std::this_thread::yield();
+		}
+		ASSERT_GT(transport_->pendingReceiveCount(), 0u);
+	}
+
+	/* Inject an unsolicited response and wait for exactly the event it raises.
+	   The wait target is captured BEFORE injecting because, once the receive
+	   loop has parked a receive, injectData() drains it and dispatches the event
+	   synchronously on this thread — so by the time the wait runs the event has
+	   often already arrived. Capturing the baseline first keeps the wait correct
+	   whether delivery ends up synchronous or asynchronous. */
+	bool injectUnsolicitedAndWait(uint8_t bemId, uint32_t headerErrorCode,
+	                              std::chrono::milliseconds timeout = std::chrono::milliseconds(2000))
+	{
+		int target;
+		{
+			std::lock_guard<std::mutex> lk(mutex_);
+			target = eventCount_ + 1;
+		}
+		injectUnsolicited(bemId, headerErrorCode);
 		std::unique_lock<std::mutex> lk(mutex_);
-		const int target = eventCount_ + 1;
 		return cv_.wait_for(lk, timeout, [this, target] { return eventCount_ >= target; });
 	}
 
@@ -91,6 +120,8 @@ protected:
 	   helper in test_session_unsolicited.cpp. */
 	void injectUnsolicited(uint8_t bemId, uint32_t headerErrorCode)
 	{
+		waitForReceiveParked();
+
 		BstDatagram datagram;
 		datagram.bstId = static_cast<uint8_t>(BstId::Bem_GP_A0);
 
@@ -140,8 +171,7 @@ TEST_F(SessionMetricsTest, TransmitRecordsBytesAndCommand)
    response must now count towards framesReceived() (the under-report fix). */
 TEST_F(SessionMetricsTest, ReceiveRecordsBytesAndFrames)
 {
-	injectUnsolicited(/*bemId=*/0xF0, /*headerErrorCode=*/0);
-	ASSERT_TRUE(waitForEvent());
+	ASSERT_TRUE(injectUnsolicitedAndWait(/*bemId=*/0xF0, /*headerErrorCode=*/0));
 
 	const SessionMetrics m = session_->metrics();
 	EXPECT_GT(m.transport.bytesReceived, 0u);
@@ -156,8 +186,7 @@ TEST_F(SessionMetricsTest, ReceiveRecordsBytesAndFrames)
    device-error counter. */
 TEST_F(SessionMetricsTest, DeviceErrorRecorded)
 {
-	injectUnsolicited(/*bemId=*/0xF0, /*headerErrorCode=*/0x00000001);
-	ASSERT_TRUE(waitForEvent());
+	ASSERT_TRUE(injectUnsolicitedAndWait(/*bemId=*/0xF0, /*headerErrorCode=*/0x00000001));
 
 	const SessionMetrics m = session_->metrics();
 	EXPECT_GT(m.bem.deviceErrors, 0u);

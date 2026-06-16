@@ -181,6 +181,11 @@ namespace Actisense
 			return messageBuffer_.size();
 		}
 
+		std::size_t LoopbackTransport::pendingReceiveCount() const noexcept {
+			std::lock_guard<std::mutex> lock(mutex_);
+			return pending_recvs_.size();
+		}
+
 		void LoopbackTransport::clearBuffers() {
 			std::lock_guard<std::mutex> lock(mutex_);
 			messageBuffer_.clear();
