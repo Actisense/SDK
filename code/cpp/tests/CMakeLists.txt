@@ -10,7 +10,8 @@ set(SDK_PUBLIC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src/public")
 # Test Helper Function
 # ============================================================================
 function(add_sdk_test test_name test_file)
-    add_executable(${test_name} ${test_file})
+    # Extra source files (e.g. an isolated helper TU) may follow test_file.
+    add_executable(${test_name} ${test_file} ${ARGN})
 
     target_link_libraries(${test_name}
         PRIVATE

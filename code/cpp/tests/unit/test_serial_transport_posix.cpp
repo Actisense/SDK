@@ -30,10 +30,12 @@
 
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <thread>
 #include <vector>
 
+#include "posix_baud_readback.hpp"
 #include "transport/serial/serial_transport.hpp"
 
 using Actisense::Sdk::ConstByteSpan;
@@ -238,6 +240,54 @@ TEST(SerialTransportPosix, NoFdLeakAcrossCycles) {
 		transport.close();
 	}
 	EXPECT_EQ(countOpenFds(), before) << "fd count grew across open/close cycles (leak)";
+}
+
+TEST(SerialTransportPosix, CustomBaudHonouredOnRealHardware) {
+	/* Hardware-gated companion to OpensNonStandardBaud (GIT-125). A pty accepts a
+	   custom rate without applying it to any UART, so the only way to prove the
+	   BOTHER/TCSETS2 path actually reached a driver is to open a real USB-serial
+	   adapter and read the rate back via TCGETS2. Bridge one into WSL2 with
+	   usbipd-win, then point ACTISENSE_TEST_SERIAL_PORT at it (e.g. /dev/ttyUSB0);
+	   optionally set ACTISENSE_TEST_SERIAL_BAUD to override the requested rate.
+	   Skips cleanly when no port is supplied so the default suite stays green
+	   without hardware. */
+	const char* port = std::getenv("ACTISENSE_TEST_SERIAL_PORT");
+	if (port == nullptr || port[0] == '\0') {
+		GTEST_SKIP() << "Set ACTISENSE_TEST_SERIAL_PORT to a real USB-serial device "
+						"(e.g. /dev/ttyUSB0) to run the on-hardware custom-baud check.";
+	}
+
+	unsigned requested = 250000; /* no termios B-constant — exercises the custom path */
+	if (const char* baud_env = std::getenv("ACTISENSE_TEST_SERIAL_BAUD")) {
+		const unsigned parsed = static_cast<unsigned>(std::strtoul(baud_env, nullptr, 10));
+		if (parsed != 0) {
+			requested = parsed;
+		}
+	}
+
+	SerialTransport transport;
+	ASSERT_EQ(transport.open(makeConfig(port, requested)), ErrorCode::Ok)
+		<< "custom baud " << requested << " was rejected on " << port;
+	EXPECT_TRUE(transport.isOpen());
+
+#if defined(__linux__)
+	/* While the transport holds the port open, read the rate the kernel actually
+	   applied. A real driver (e.g. ftdi_sio) reports the granted rate, which can
+	   differ slightly from the request due to the clock divisor — allow ~2%. */
+	unsigned applied = 0;
+	ASSERT_TRUE(Actisense::Sdk::test::readAppliedBaudLinux(port, applied))
+		<< "TCGETS2 baud readback failed on " << port;
+	EXPECT_NEAR(static_cast<double>(applied), static_cast<double>(requested), 0.02 * requested)
+		<< "driver applied " << applied << " bps for requested " << requested << " bps";
+#endif
+
+	transport.close();
+	EXPECT_FALSE(transport.isOpen());
+
+	/* A standard rate must still open on the same hardware. */
+	SerialTransport standard;
+	EXPECT_EQ(standard.open(makeConfig(port, 115200)), ErrorCode::Ok);
+	standard.close();
 }
 
 #else /* _WIN32 */
