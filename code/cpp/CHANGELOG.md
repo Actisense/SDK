@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Public received-frame accessor `asReceivedFrame()` (GIT-128).** New
+  `public/received_frame.hpp` exposes a `ReceivedFrame` (PGN, source,
+  destination, priority, length, and a `std::span<const uint8_t>` data view)
+  from a `ParsedMessageEvent`, returning `std::nullopt` for non-NMEA-2000
+  events. Customer code can now read received PGN fields without reaching into
+  internal `protocols/` headers. The data span is valid only for the duration
+  of the event callback — copy the bytes to retain them.
+- **New example: `nmea_reader_console` (GIT-128).** A minimal "NMEA Reader"
+  built on `asReceivedFrame()`: it connects to a serial gateway, switches it to
+  Rx-All (restoring the prior mode on exit), and renders a live, in-place table
+  of received PGNs — one row per PGN+source — with Src/Dst/PGN/Priority/Length/
+  Data(hex) columns. Includes a framework-agnostic `PgnTableModel` designed to
+  back a future Qt or native GUI.
+
 ### Changed
 
 - **BEM device errors now report `ErrorCode::BemDeviceError` instead of
