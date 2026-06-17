@@ -10,14 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **`NgTransferRxAllMode` (Rx-All) documentation clarified for NGX (GIT-107).**
-  Current NGX firmware does not forward PGN 59904 (ISO Request) from the bus to
-  the host in Rx-All mode, despite the mode being documented as forwarding "all
-  PGNs"; NGT-1 forwards it normally and ISO Address Claim (60928) is forwarded by
+  Current NGX firmware (verified on fw 3.085) silently drops the ISO control
+  PGNs 59904 (ISO Request) and 59392 (ISO ACK) from the bus-to-host stream in
+  Rx-All mode, despite the mode being documented as forwarding "all PGNs"; an
+  NGT-class gateway forwards them and ISO Address Claim (60928) is forwarded by
   both. The `OperatingMode` enum documentation and the "Receiving NMEA 2000"
-  guide now call out this NGX-specific gap and point bus analysers at the raw-CAN
-  `CanPacket` (5) mode for an unfiltered capture. Documentation only — no API,
-  wire, or behaviour change. The underlying NGX firmware behaviour is tracked
-  separately.
+  guide now call out this NGX-specific gap. A two-gateway bench
+  characterisation test (`test_rxall_pgn_filter_git107`) records the behaviour.
+  Documentation only — no API, wire, or behaviour change. The underlying NGX
+  firmware behaviour is tracked separately.
 
 ## [1.0.0] - <release date — set with GIT-123>
 

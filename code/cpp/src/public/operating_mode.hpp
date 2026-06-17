@@ -68,13 +68,13 @@ namespace Actisense
 						 List is active.
 						 Transfer method is BST93/94
 			 \note		NGX caveat: despite the "all PGNs" wording above, current NGX
-						 firmware does NOT forward PGN 59904 (ISO Request) from the bus
-						 to the host in this mode - it is silently filtered out of the
-						 BST-93 receive stream. Other PGNs, including ISO Address Claim
-						 (60928), are forwarded normally, and NGT-1 firmware does forward
-						 PGN 59904 in this mode. To capture ISO Request traffic on an
-						 NGX, use a raw-CAN CanPacket (5) session, which transfers every
-						 CAN frame regardless of PGN-level forwarding filters.
+						 firmware (verified on fw 3.085) silently drops the ISO control
+						 PGNs 59904 (ISO Request) and 59392 (ISO ACK) from the
+						 bus-to-host BST-93 stream in this mode. ISO Address Claim
+						 (60928) and ordinary data PGNs are forwarded normally, and
+						 NGT-class firmware forwards 59904 in this mode. A host that
+						 must observe these ISO control PGNs cannot rely on NGX Rx-All
+						 forwarding to surface them.
 			 \note		Enum value 2.
 			 ***************************************************************************/
 			NgTransferRxAllMode = 2,
