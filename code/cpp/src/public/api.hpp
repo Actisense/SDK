@@ -21,6 +21,7 @@
 #include "public/config.hpp"
 #include "public/error.hpp"
 #include "public/events.hpp"
+#include "public/received_frame.hpp"
 #include "public/serial_device_info.hpp"
 #include "public/session.hpp"
 #include "public/transport.hpp"

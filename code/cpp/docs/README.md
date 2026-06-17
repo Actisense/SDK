@@ -206,7 +206,9 @@ The CMakeLists.txt will auto-detect vcpkg from `VCPKG_ROOT` environment variable
 cpp/
 ├── src/              # SDK source code
 ├── examples/         # Example applications
-│   └── actisense_console.cpp
+│   ├── actisense_console.cpp
+│   ├── pgn_transmitter.cpp
+│   └── nmea_reader/  # Live NMEA 2000 PGN list reader (model + console view)
 ├── tests/
 │   ├── unit/         # Unit tests
 │   └── integration/  # Integration tests

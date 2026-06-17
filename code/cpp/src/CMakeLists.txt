@@ -32,6 +32,7 @@ set(PUBLIC_HEADERS
     public/operating_mode.hpp
     public/hardware_info.hpp
     public/pgn_encoders.hpp
+    public/received_frame.hpp
 )
 
 # ============================================================================
@@ -80,6 +81,7 @@ set(SDK_SOURCES
     public/ebl_writer.cpp
     public/hardware_info.cpp
     public/pgn_encoders.cpp
+    public/received_frame.cpp
 
     # Platform-specific
     $<$<PLATFORM_ID:Windows>:platform/windows/enumerate_serial_devices_windows.cpp>

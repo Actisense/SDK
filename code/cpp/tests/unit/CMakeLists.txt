@@ -30,6 +30,15 @@ add_sdk_test(test_bdtp_protocol test_bdtp_protocol.cpp)
 add_sdk_test(test_bdtp_frame_assembler test_bdtp_frame_assembler.cpp)
 add_sdk_test(test_bst_frame test_bst_frame.cpp)
 
+# Public received-frame accessor (GIT-128)
+add_sdk_test(test_received_frame test_received_frame.cpp)
+
+# nmea_reader example PGN table model (GIT-128) — compiles the example model
+# source into the test exe so its insert-or-overwrite behaviour is covered.
+add_sdk_test(test_pgn_table_model
+    test_pgn_table_model.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../examples/nmea_reader/pgn_table_model.cpp)
+
 # BEM Command tests
 add_sdk_test(test_operating_mode test_operating_mode.cpp)
 add_sdk_test(test_port_baudrate test_port_baudrate.cpp)
