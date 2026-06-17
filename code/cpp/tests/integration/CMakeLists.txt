@@ -34,6 +34,9 @@ add_sdk_test(test_can_packet_mode test_can_packet_mode.cpp)
 add_sdk_test(test_negative_ack_loopback test_negative_ack_loopback.cpp)
 # getRxPgnEnable device-error reporting — hermetic loopback, no hardware (GIT-127).
 add_sdk_test(test_rx_pgn_enable_device_error_loopback test_rx_pgn_enable_device_error_loopback.cpp)
+# GIT-107 characterisation: NGX Rx-All silently drops PGN 59904 (ISO Request).
+# Two-gateway live bus; requires ACTISENSE_TEST_NGT_PORT + ACTISENSE_TEST_NGX_PORT.
+add_sdk_test(test_rxall_pgn_filter_git107 test_rxall_pgn_filter_git107.cpp)
 
 # Add integration test files here as they are developed
 

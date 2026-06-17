@@ -112,6 +112,14 @@ const auto& raw = event.rawData;
 const auto& protocol = event.protocol;  // e.g. "bst"
 ```
 
+## Operating Mode and PGN Forwarding
+
+Which PGNs reach the host depends on the gateway's operating mode (see `OperatingMode` in `public/operating_mode.hpp`).
+
+`NgTransferRxAllMode` ("Rx-All") forwards bus traffic to the host with the Rx PGN Enable List inactive, so almost every PGN on the bus is transferred. Known exceptions: **current NGX firmware (verified on fw 3.085) silently drops the ISO control PGNs 59904 (ISO Request) and 59392 (ISO ACK)** from the bus-to-host BST-93 stream. ISO Address Claim (60928) and ordinary data PGNs are forwarded normally, and an NGT-class gateway forwards 59904 in Rx-All. So a bus analyser built on an NGX in Rx-All will see the address-claim *responses* to an ISO Request, but never the request itself.
+
+If your application depends on observing these ISO control PGNs, do not rely on NGX Rx-All forwarding to surface them. For a raw, unfiltered view, switch the NGX to `CanPacket` mode (5): it delivers every CAN frame on the bus to the host as a BST-95 message, a separate raw-CAN path that is not subject to the N2K PGN forwarding filters.
+
 ## Thread Safety
 
 The event callback is invoked from the SDK's receive thread. If you need to pass data to another thread, copy the relevant fields:

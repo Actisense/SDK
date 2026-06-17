@@ -20,6 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PGNs Rx-disabled (`ES9_N2000_PGN_NOT_ON_LIST`, -995) or absent from its
   NMEA 2000 library (`ES9_N2000_PGN_NOT_IN_LIBRARY`, -997) — both correct
   firmware responses that were being mis-reported. `bemDeviceErrorMessage()`
+- **`NgTransferRxAllMode` (Rx-All) documentation clarified for NGX (GIT-107).**
+  Current NGX firmware (verified on fw 3.085) silently drops the ISO control
+  PGNs 59904 (ISO Request) and 59392 (ISO ACK) from the bus-to-host stream in
+  Rx-All mode, despite the mode being documented as forwarding "all PGNs"; an
+  NGT-class gateway forwards them and ISO Address Claim (60928) is forwarded by
+  both. The `OperatingMode` enum documentation and the "Receiving NMEA 2000"
+  guide now call out this NGX-specific gap. A two-gateway bench
+  characterisation test (`test_rxall_pgn_filter_git107`) records the behaviour.
+  Documentation only — no API, wire, or behaviour change. The underlying NGX
+  firmware behaviour is tracked separately.
+
   gains descriptions for the PGN-enable-list ARL codes. Callers branching on
   `UnsupportedOperation` for BEM replies should switch to `BemDeviceError`.
 

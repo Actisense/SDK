@@ -67,6 +67,14 @@ namespace Actisense
 						 are enabled for reception (and Transfer to PC). Tx PGN Enable
 						 List is active.
 						 Transfer method is BST93/94
+			 \note		NGX caveat: despite the "all PGNs" wording above, current NGX
+						 firmware (verified on fw 3.085) silently drops the ISO control
+						 PGNs 59904 (ISO Request) and 59392 (ISO ACK) from the
+						 bus-to-host BST-93 stream in this mode. ISO Address Claim
+						 (60928) and ordinary data PGNs are forwarded normally, and
+						 NGT-class firmware forwards 59904 in this mode. A host that
+						 must observe these ISO control PGNs cannot rely on NGX Rx-All
+						 forwarding to surface them.
 			 \note		Enum value 2.
 			 ***************************************************************************/
 			NgTransferRxAllMode = 2,
