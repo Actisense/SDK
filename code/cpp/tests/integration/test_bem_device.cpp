@@ -555,10 +555,21 @@ TEST_F(BemDeviceTest, GetRxPgnEnable)
 		});
 
 	auto result = future.get();
-	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
-	ASSERT_TRUE(result.response.has_value());
-	std::cout << "  Rx PGN Enable (60928) response: "
-	          << result.response->data.size() << " data bytes" << std::endl;
+	/* The device legitimately rejects the query when 60928 is Rx-disabled on
+	   this unit (ES9_N2000_PGN_NOT_ON_LIST) or absent from its NMEA 2000
+	   library (ES9_N2000_PGN_NOT_IN_LIBRARY) — surfaced as BemDeviceError since
+	   GIT-127. Accept either a successful read or that device error; only an
+	   unexpected SDK error (timeout, malformed frame, etc.) is a failure. */
+	if (result.errorCode == ErrorCode::Ok) {
+		ASSERT_TRUE(result.response.has_value());
+		std::cout << "  Rx PGN Enable (60928) response: "
+		          << result.response->data.size() << " data bytes" << std::endl;
+	} else {
+		EXPECT_EQ(result.errorCode, ErrorCode::BemDeviceError)
+			<< "Unexpected error querying Rx PGN Enable (60928): " << result.errorMsg;
+		std::cout << "  Rx PGN Enable (60928) rejected by device: "
+		          << result.errorMsg << std::endl;
+	}
 }
 
 TEST_F(BemDeviceTest, GetTxPgnEnable)
@@ -579,10 +590,19 @@ TEST_F(BemDeviceTest, GetTxPgnEnable)
 		});
 
 	auto result = future.get();
-	ASSERT_EQ(result.errorCode, ErrorCode::Ok) << result.errorMsg;
-	ASSERT_TRUE(result.response.has_value());
-	std::cout << "  Tx PGN Enable (60928) response: "
-	          << result.response->data.size() << " data bytes" << std::endl;
+	/* As for the Rx query: the device may legitimately reject this PGN with a
+	   BemDeviceError (not on list / not in library — GIT-127). Accept Ok or
+	   that device error; anything else is a real failure. */
+	if (result.errorCode == ErrorCode::Ok) {
+		ASSERT_TRUE(result.response.has_value());
+		std::cout << "  Tx PGN Enable (60928) response: "
+		          << result.response->data.size() << " data bytes" << std::endl;
+	} else {
+		EXPECT_EQ(result.errorCode, ErrorCode::BemDeviceError)
+			<< "Unexpected error querying Tx PGN Enable (60928): " << result.errorMsg;
+		std::cout << "  Tx PGN Enable (60928) rejected by device: "
+		          << result.errorMsg << std::endl;
+	}
 }
 
 /* ========================================================================== */

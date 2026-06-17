@@ -428,10 +428,12 @@ TEST_F(RemoteBemLoopbackTest, DeviceErrorCode_SurfacesAsError)
 	auto fut = promise.get_future();
 	ASSERT_EQ(fut.wait_for(std::chrono::seconds(2)), std::future_status::ready);
 	auto [ec, errMsg, decoded] = fut.get();
-	/* The correlator promotes any non-zero ARL error code to
-	   ErrorCode::UnsupportedOperation (see BemProtocol::correlateResponse).
-	   The typed wrapper forwards that error directly. */
-	EXPECT_NE(ec, ErrorCode::Ok);
+	/* The correlator surfaces any non-zero ARL error code as
+	   ErrorCode::BemDeviceError, with the raw code in the message (GIT-127;
+	   was the catch-all UnsupportedOperation). The typed wrapper forwards that
+	   error directly. */
+	EXPECT_EQ(ec, ErrorCode::BemDeviceError)
+		<< "got " << static_cast<int>(ec) << " (" << errMsg << ")";
 	EXPECT_FALSE(decoded.has_value());
 	EXPECT_NE(errMsg.find("123"), std::string::npos)
 		<< "Expected error message to mention the ARL code (123); got: " << errMsg;

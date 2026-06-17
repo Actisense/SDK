@@ -32,6 +32,8 @@ add_sdk_test(test_can_packet_mode test_can_packet_mode.cpp)
 # Negative Ack (0xF4) cancels the in-flight BEM request — hermetic loopback,
 # no hardware required (GIT-100).
 add_sdk_test(test_negative_ack_loopback test_negative_ack_loopback.cpp)
+# getRxPgnEnable device-error reporting — hermetic loopback, no hardware (GIT-127).
+add_sdk_test(test_rx_pgn_enable_device_error_loopback test_rx_pgn_enable_device_error_loopback.cpp)
 
 # Add integration test files here as they are developed
 

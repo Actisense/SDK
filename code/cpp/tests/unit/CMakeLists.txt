@@ -58,6 +58,9 @@ add_sdk_test(test_bem_wrap_126720 test_bem_wrap_126720.cpp)
 # BEM correlator srcAddr keying (GIT-88)
 add_sdk_test(test_bem_correlation_src_addr test_bem_correlation_src_addr.cpp)
 
+# BEM device-error mapping: ARL error -> BemDeviceError, not UnsupportedOperation (GIT-127)
+add_sdk_test(test_bem_device_error_mapping test_bem_device_error_mapping.cpp)
+
 # Public PGN encoder tests (GIT-14)
 add_sdk_test(test_pgn_encoders test_pgn_encoders.cpp)
 

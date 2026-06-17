@@ -194,6 +194,18 @@ namespace Actisense
 				case -1076:
 					return "Data size exceeds maximum";
 
+				// N2K PGN Enable List errors (Section 9: -999 to -977)
+				case -997:
+					return "PGN not in NMEA 2000 library";
+				case -996:
+					return "PGN already enabled";
+				case -995:
+					return "PGN not on enable list (disabled)";
+				case -986:
+					return "PGN already disabled";
+				case -979:
+					return "Invalid PGN mask";
+
 				// Hardware/device errors
 				case -2099:
 					return "Hardware not present";

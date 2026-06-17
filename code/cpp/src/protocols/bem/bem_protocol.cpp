@@ -12,6 +12,7 @@
 #include "protocols/bem/bem_commands/can_info_fields.hpp"
 #include "protocols/bem/bem_commands/echo.hpp"
 #include "protocols/bem/bem_commands/operating_mode.hpp"
+#include "public/error.hpp"
 #include "util/endian.hpp"
 
 namespace Actisense
@@ -636,8 +637,20 @@ namespace Actisense
 			ErrorCode ec = ErrorCode::Ok;
 			std::string errorMsg;
 			if (response.header.errorCode != 0) {
-				ec = ErrorCode::UnsupportedOperation; /* Map ARL errors later */
-				errorMsg = "Device returned error: " + std::to_string(response.header.errorCode);
+				/* The device reported a non-zero ARL error in the BEM response
+				   header. Surface it as BemDeviceError (rather than the historic
+				   catch-all UnsupportedOperation, which masked every device
+				   rejection as "operation not supported" — GIT-127) and recover
+				   the signed ARL value: the header field is an unsigned 32-bit
+				   carrier of a negative ARL code (e.g. ES9_N2000_PGN_NOT_ON_LIST
+				   = -995 arrives as 0xFFFFFC1D). The raw code and its description
+				   go into the message, mirroring the Negative Ack path (GIT-100),
+				   since the typed callbacks carry no structured device-error
+				   field. */
+				const int32_t arlError = static_cast<int32_t>(response.header.errorCode);
+				ec = ErrorCode::BemDeviceError;
+				errorMsg = "Device error " + std::to_string(arlError) + " (" +
+						   std::string(bemDeviceErrorMessage(arlError)) + ")";
 			}
 
 			if (callbackToFire) {

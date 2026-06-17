@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BEM device errors now report `ErrorCode::BemDeviceError` instead of
+  `ErrorCode::UnsupportedOperation` (GIT-127).** When a device answers a BEM
+  command with a non-zero ARL error code in the response header, the callback
+  now receives `ErrorCode::BemDeviceError` with the raw signed ARL code and its
+  description in the message (e.g. `"Device error -995 (PGN not on enable list
+  (disabled))"`), rather than the historic catch-all `UnsupportedOperation`
+  that masked every device rejection. This is what surfaced for a customer
+  calling `getRxPgnEnable` for PGNs 60928 / 126996 on an NGT-1 that has those
+  PGNs Rx-disabled (`ES9_N2000_PGN_NOT_ON_LIST`, -995) or absent from its
+  NMEA 2000 library (`ES9_N2000_PGN_NOT_IN_LIBRARY`, -997) — both correct
+  firmware responses that were being mis-reported. `bemDeviceErrorMessage()`
+  gains descriptions for the PGN-enable-list ARL codes. Callers branching on
+  `UnsupportedOperation` for BEM replies should switch to `BemDeviceError`.
+
 ## [1.0.0] - <release date — set with GIT-123>
 
 First public, SemVer-stable release. From 1.0.0 the `src/public/` API is
