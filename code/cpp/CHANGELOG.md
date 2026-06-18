@@ -5,7 +5,11 @@ All notable changes to the Actisense C++ SDK are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0] - 2026-06-18
+
+First public, SemVer-stable release. From 1.0.0 the `src/public/` API is
+covered by Semantic Versioning; this release consolidates all accumulated
+pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
 
 ### Added
 
@@ -22,42 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of received PGNs — one row per PGN+source — with Src/Dst/PGN/Priority/Length/
   Data(hex) columns. Includes a framework-agnostic `PgnTableModel` designed to
   back a future Qt or native GUI.
-
-### Changed
-
-- **BEM device errors now report `ErrorCode::BemDeviceError` instead of
-  `ErrorCode::UnsupportedOperation` (GIT-127).** When a device answers a BEM
-  command with a non-zero ARL error code in the response header, the callback
-  now receives `ErrorCode::BemDeviceError` with the raw signed ARL code and its
-  description in the message (e.g. `"Device error -995 (PGN not on enable list
-  (disabled))"`), rather than the historic catch-all `UnsupportedOperation`
-  that masked every device rejection. This is what surfaced for a customer
-  calling `getRxPgnEnable` for PGNs 60928 / 126996 on an NGT-1 that has those
-  PGNs Rx-disabled (`ES9_N2000_PGN_NOT_ON_LIST`, -995) or absent from its
-  NMEA 2000 library (`ES9_N2000_PGN_NOT_IN_LIBRARY`, -997) — both correct
-  firmware responses that were being mis-reported. `bemDeviceErrorMessage()`
-- **`NgTransferRxAllMode` (Rx-All) documentation clarified for NGX (GIT-107).**
-  Current NGX firmware (verified on fw 3.085) silently drops the ISO control
-  PGNs 59904 (ISO Request) and 59392 (ISO ACK) from the bus-to-host stream in
-  Rx-All mode, despite the mode being documented as forwarding "all PGNs"; an
-  NGT-class gateway forwards them and ISO Address Claim (60928) is forwarded by
-  both. The `OperatingMode` enum documentation and the "Receiving NMEA 2000"
-  guide now call out this NGX-specific gap. A two-gateway bench
-  characterisation test (`test_rxall_pgn_filter_git107`) records the behaviour.
-  Documentation only — no API, wire, or behaviour change. The underlying NGX
-  firmware behaviour is tracked separately.
-
-  gains descriptions for the PGN-enable-list ARL codes. Callers branching on
-  `UnsupportedOperation` for BEM replies should switch to `BemDeviceError`.
-
-## [1.0.0] - <release date — set with GIT-123>
-
-First public, SemVer-stable release. From 1.0.0 the `src/public/` API is
-covered by Semantic Versioning; this release consolidates all accumulated
-pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
-
-### Added
-
 - **`Api::openWithTransport()` lets callers supply their own transport
   (GIT-108).** The transport abstraction `ITransport` is now part of the public
   surface (`public/transport.hpp`); `openWithTransport(options, transport, …)`
@@ -80,6 +48,32 @@ pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
   raw CAN transfer moved to `CanPacket` (5) / `CanPacketAscii` (6). The
   enum value is **retained** for public-API stability, but its documentation
   now marks it legacy — new code should target `CanPacket`.
+
+### Changed
+
+- **BEM device errors now report `ErrorCode::BemDeviceError` instead of
+  `ErrorCode::UnsupportedOperation` (GIT-127).** When a device answers a BEM
+  command with a non-zero ARL error code in the response header, the callback
+  now receives `ErrorCode::BemDeviceError` with the raw signed ARL code and its
+  description in the message (e.g. `"Device error -995 (PGN not on enable list
+  (disabled))"`), rather than the historic catch-all `UnsupportedOperation`
+  that masked every device rejection. This is what surfaced for a customer
+  calling `getRxPgnEnable` for PGNs 60928 / 126996 on an NGT-1 that has those
+  PGNs Rx-disabled (`ES9_N2000_PGN_NOT_ON_LIST`, -995) or absent from its
+  NMEA 2000 library (`ES9_N2000_PGN_NOT_IN_LIBRARY`, -997) — both correct
+  firmware responses that were being mis-reported. `bemDeviceErrorMessage()`
+  gains descriptions for the PGN-enable-list ARL codes. Callers branching on
+  `UnsupportedOperation` for BEM replies should switch to `BemDeviceError`.
+- **`NgTransferRxAllMode` (Rx-All) documentation clarified for NGX (GIT-107).**
+  Current NGX firmware (verified on fw 3.085) silently drops the ISO control
+  PGNs 59904 (ISO Request) and 59392 (ISO ACK) from the bus-to-host stream in
+  Rx-All mode, despite the mode being documented as forwarding "all PGNs"; an
+  NGT-class gateway forwards them and ISO Address Claim (60928) is forwarded by
+  both. The `OperatingMode` enum documentation and the "Receiving NMEA 2000"
+  guide now call out this NGX-specific gap. A two-gateway bench
+  characterisation test (`test_rxall_pgn_filter_git107`) records the behaviour.
+  Documentation only — no API, wire, or behaviour change. The underlying NGX
+  firmware behaviour is tracked separately.
 
 ### Changed (breaking)
 

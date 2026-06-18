@@ -1,5 +1,8 @@
 # Unit Tests
 
+# SDK version constants / runtime query — locks the 1.0.0 release (GIT-123)
+add_sdk_test(test_version test_version.cpp)
+
 # Error handling tests
 add_sdk_test(test_error_category test_error_category.cpp)
 

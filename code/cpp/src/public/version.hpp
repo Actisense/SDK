@@ -24,11 +24,13 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      SDK version numbers (compile-time constants)
 		 *******************************************************************************/
-		/* 0.5.0 marks the GIT-115 ABI baseline: Session and RemoteDevice became
-		   final, non-polymorphic pimpl handles (one-time intentional ABI break;
-		   source-compatible). Future verbs append symbols, not vtable slots. */
-		constexpr int VERSION_MAJOR = 0;
-		constexpr int VERSION_MINOR = 5;
+		/* 1.0.0 is the initial public, SemVer-stable release: from here the
+		   src/public/ API is under Semantic Versioning. It carries the GIT-115
+		   ABI baseline (Session and RemoteDevice as final, non-polymorphic pimpl
+		   handles) — future verbs append symbols, not vtable slots — and any
+		   public-breaking change now requires a new major version. */
+		constexpr int VERSION_MAJOR = 1;
+		constexpr int VERSION_MINOR = 0;
 		constexpr int VERSION_PATCH = 0;
 
 		/**************************************************************************/ /**
