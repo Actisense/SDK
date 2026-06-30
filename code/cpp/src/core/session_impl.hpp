@@ -700,8 +700,12 @@ namespace Actisense
 						 regardless of whether they came directly from the gateway or
 						 from a device on the N2K bus behind it.
 			 \param[in]  response  Decoded BEM response that did not correlate to a request
+			 \param[in]  srcAddr   Source address the reply arrived from: kLocalSrcAddr
+								   for the local gateway path, or the remote N2K source
+								   address for the PGN 126720 unwrap path. Used to stamp
+								   the ResponseOrigin carried on the emitted event (GIT-130).
 			 *******************************************************************************/
-			void emitUncorrelatedBemResponse(const BemResponse& response);
+			void emitUncorrelatedBemResponse(const BemResponse& response, uint8_t srcAddr);
 
 			/**************************************************************************/ /**
 			 \brief      If the response is a Negative Ack, fail the request it rejects

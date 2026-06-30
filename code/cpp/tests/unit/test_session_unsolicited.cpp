@@ -202,6 +202,14 @@ TEST_F(SessionUnsolicitedTest, StartupStatusModern_EmitsTypedEvent)
 	EXPECT_EQ(data.format, StartupStatusFormat::Modern);
 	EXPECT_EQ(data.startupMode, 0x1234u);
 	EXPECT_EQ(data.errorCode, 0xDEADBEEFu);
+
+	/* GIT-130: the typed event carries the responder identity + receive path
+	   in origin (modelId/serial from the BEM header injected by the fixture). */
+	ASSERT_TRUE(ev.origin.has_value());
+	EXPECT_EQ(ev.origin->modelId, 0x000Eu);
+	EXPECT_EQ(ev.origin->serialNumber, 0x12345678u);
+	EXPECT_EQ(ev.origin->path, TransportPath::Local);
+	EXPECT_EQ(ev.origin->n2kSourceAddress, 0xFFu);
 }
 
 TEST_F(SessionUnsolicitedTest, StartupStatusLegacy_EmitsTypedEvent)
@@ -332,6 +340,13 @@ TEST_F(SessionUnsolicitedTest, SystemStatus_EmitsTypedEvent)
 	EXPECT_TRUE(data.unified_buffers_.empty());
 	EXPECT_FALSE(data.can_status_.has_value());
 	EXPECT_FALSE(data.operating_mode_.has_value());
+
+	/* GIT-130: System Status (Exp's CAN-load source) must carry origin so a
+	   consumer recovers the device identity the typed payload omits. */
+	ASSERT_TRUE(ev.origin.has_value());
+	EXPECT_EQ(ev.origin->modelId, 0x000Eu);
+	EXPECT_EQ(ev.origin->serialNumber, 0x12345678u);
+	EXPECT_EQ(ev.origin->path, TransportPath::Local);
 }
 
 /* Decode Failure Fallback -------------------------------------------------- */
@@ -412,6 +427,15 @@ TEST_F(SessionUnsolicitedTest, RemoteUnwrap_StartupStatus_EmitsTypedEvent)
 	EXPECT_EQ(data.format, StartupStatusFormat::Modern);
 	EXPECT_EQ(data.startupMode, 0x1234u);
 	EXPECT_EQ(data.errorCode, 0xDEADBEEFu);
+
+	/* GIT-130: a remote unsolicited (PGN 126720 wrapped) reports the remote
+	   path and the N2K source address it arrived from, plus the wrapped
+	   device's model/serial. */
+	ASSERT_TRUE(ev.origin.has_value());
+	EXPECT_EQ(ev.origin->modelId, 0x0012u);
+	EXPECT_EQ(ev.origin->serialNumber, 0x12345678u);
+	EXPECT_EQ(ev.origin->path, TransportPath::Remote);
+	EXPECT_EQ(ev.origin->n2kSourceAddress, 200u);
 }
 
 /* Unhandled unsolicited type --------------------------------------------- */

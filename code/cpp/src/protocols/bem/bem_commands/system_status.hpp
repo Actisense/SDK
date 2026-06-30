@@ -20,60 +20,18 @@
 #include <string>
 #include <vector>
 
+#include "public/bem_responses/system_status.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
 	{
 		/* Definitions ---------------------------------------------------------- */
 
-		/**************************************************************************/ /**
-		 \brief      Individual Buffer statistics
-		 \details    Statistics for each individual buffer (Rx/Tx channel)
-		 *******************************************************************************/
-		struct IndividualBufferStats
-		{
-			uint8_t rx_bandwidth_; ///< Receive bandwidth usage (%)
-			uint8_t rx_loading_;   ///< Receive loading (%)
-			uint8_t rx_filtered_;  ///< Receive filtered packets (%)
-			uint8_t rx_dropped_;   ///< Receive dropped packets (%)
-			uint8_t tx_bandwidth_; ///< Transmit bandwidth usage (%)
-			uint8_t tx_loading_;   ///< Transmit loading (%)
-		};
-
-		/**************************************************************************/ /**
-		 \brief      Unified Buffer statistics
-		 \details    Statistics for each unified buffer
-		 *******************************************************************************/
-		struct UnifiedBufferStats
-		{
-			uint8_t bandwidth_;		  ///< Buffer bandwidth usage (%)
-			uint8_t deleted_;		  ///< Deleted packets (%)
-			uint8_t loading_;		  ///< Buffer loading (%)
-			uint8_t pointer_loading_; ///< Pointer queue loading (%)
-		};
-
-		/**************************************************************************/ /**
-		 \brief      CAN Extended Status (optional)
-		 \details    CAN bus error counters and status flags
-		 *******************************************************************************/
-		struct CanExtendedStatus
-		{
-			uint8_t rx_error_count_; ///< CAN bus receive error count
-			uint8_t tx_error_count_; ///< CAN bus transmit error count
-			uint8_t can_status_;	 ///< CAN bus status flags
-		};
-
-		/**************************************************************************/ /**
-		 \brief      System Status message data
-		 \details    Decoded system status from BEM F2H unsolicited message
-		 *******************************************************************************/
-		struct SystemStatusData
-		{
-			std::vector<IndividualBufferStats> individual_buffers_; ///< Individual buffer stats
-			std::vector<UnifiedBufferStats> unified_buffers_;		///< Unified buffer stats
-			std::optional<CanExtendedStatus> can_status_;			///< Optional CAN status
-			std::optional<uint16_t> operating_mode_;				///< Optional operating mode
-		};
+		/* The data structures (IndividualBufferStats, UnifiedBufferStats,
+		   CanExtendedStatus, SystemStatusData) are the public payload contract
+		   and now live in public/bem_responses/system_status.hpp (GIT-130).
+		   Only the wire-format decode/format helpers remain internal here. */
 
 		/**************************************************************************/ /**
 		 \brief      Decode System Status from BEM data block

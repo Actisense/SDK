@@ -1,8 +1,12 @@
 /**************************************************************************//**
 \file       actisense_console.cpp
 \brief      Actisense SDK Console Demo Application
-\details    Connects to an Actisense device, displays received frames,
-            and executes BEM commands (Get/Set Operating Mode)
+\details    Connects to an Actisense device, displays received frames and
+            unsolicited BEM messages, and executes BEM commands (Get/Set
+            Operating Mode). Built entirely on the public SDK surface
+            (Actisense::Sdk::Api / Session) — it does not reach into any
+            internal core/ or protocols/ headers (GIT-130), so it doubles as
+            a reference for what integrators can do with the public API alone.
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 
@@ -18,19 +22,15 @@ Examples:
 *******************************************************************************/
 
 /* Dependent includes ------------------------------------------------------- */
+/* Public SDK surface only — no core/ or protocols/ includes. */
 #include "public/api.hpp"
-
-/* Internal includes for advanced console functionality */
-#include "core/session_impl.hpp"
-#include "protocols/bst/bst_types.hpp"
-#include "protocols/bst/bst_decoder.hpp"
-#include "protocols/bst/bst_frame.hpp"
-#include "protocols/bem/bem_types.hpp"
-#include "protocols/bem/bem_commands/system_status.hpp"
+#include "public/bem_responses/unsolicited.hpp"
+#include "public/logging.hpp"
 #include "public/operating_mode.hpp"
+#include "public/received_frame.hpp"
 #include "public/wire_trace.hpp"
-#include "util/debug_log.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <iomanip>
 #include <string>
@@ -39,7 +39,9 @@ Examples:
 #include <atomic>
 #include <csignal>
 #include <fstream>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <sstream>
 
 #ifdef _WIN32
@@ -66,10 +68,85 @@ void listSerialPorts();
 void signalHandler(int signal);
 std::string formatHexBytes(const std::vector<uint8_t>& data, std::size_t maxBytes = 16);
 std::string formatTimestamp();
+std::string formatOrigin(const std::optional<ResponseOrigin>& origin);
 void logFrame(const std::string& message);
 bool hasKeyPressed();
 char getKey();
-void processUserInput(std::unique_ptr<SessionImpl>& session);
+void processUserInput(std::unique_ptr<Session>& session);
+
+/* Demo Logger -------------------------------------------------------------- */
+
+/**
+ * @brief   Minimal ILogger that fans SDK log messages out to the console
+ *          (stderr) and/or a file, each with its own verbosity threshold.
+ * @details Demonstrates the public logging extension point (setLogger): the
+ *          SDK calls log() on the installed logger from its receive thread, so
+ *          the sinks are mutex-guarded. A std::nullopt threshold disables that
+ *          sink.
+ */
+class DemoLogger final : public ILogger
+{
+public:
+	DemoLogger(std::optional<LogLevel> consoleLevel, std::optional<LogLevel> fileLevel,
+			   std::ofstream fileStream)
+		: consoleLevel_(consoleLevel), fileLevel_(fileLevel), fileStream_(std::move(fileStream))
+	{
+	}
+
+	void log(LogLevel level, LogCategory category, std::string_view message,
+			 std::string_view file, int line) override
+	{
+		std::lock_guard<std::mutex> lk(mutex_);
+		if (consoleLevel_ && level <= *consoleLevel_) {
+			std::cerr << "[" << logLevelName(level) << "/" << logCategoryName(category) << "] "
+					  << message << '\n';
+		}
+		if (fileLevel_ && fileStream_.is_open() && level <= *fileLevel_) {
+			fileStream_ << "[" << logLevelName(level) << "/" << logCategoryName(category) << "] "
+						<< message;
+			if (!file.empty()) {
+				fileStream_ << " (" << file << ":" << line << ")";
+			}
+			fileStream_ << '\n';
+		}
+	}
+
+	[[nodiscard]] bool isEnabled(LogLevel level, LogCategory /*category*/) const noexcept override
+	{
+		const bool console = consoleLevel_ && level <= *consoleLevel_;
+		const bool toFile = fileLevel_ && level <= *fileLevel_;
+		return console || toFile;
+	}
+
+	void flush() override
+	{
+		std::lock_guard<std::mutex> lk(mutex_);
+		std::cerr.flush();
+		if (fileStream_.is_open()) {
+			fileStream_.flush();
+		}
+	}
+
+private:
+	std::mutex mutex_;
+	std::optional<LogLevel> consoleLevel_;
+	std::optional<LogLevel> fileLevel_;
+	std::ofstream fileStream_;
+};
+
+/* Map a 0..5 verbosity number to a public LogLevel (0 = off / std::nullopt). */
+static std::optional<LogLevel> verbosityToLevel(int level)
+{
+	switch (level)
+	{
+		case 1:  return LogLevel::Error;
+		case 2:  return LogLevel::Warn;
+		case 3:  return LogLevel::Info;
+		case 4:  return LogLevel::Debug;
+		case 5:  return LogLevel::Trace;
+		default: return std::nullopt; /* 0 (or out of range) = off */
+	}
+}
 
 /* Event Handlers ----------------------------------------------------------- */
 
@@ -77,96 +154,88 @@ void onEvent(const EventVariant& event)
 {
 	std::visit([](const auto& e) {
 		using T = std::decay_t<decltype(e)>;
-		
+
 		if constexpr (std::is_same_v<T, ParsedMessageEvent>)
 		{
 			std::ostringstream ss;
 			ss << "[" << formatTimestamp() << "] ";
 			ss << "[RX] " << e.protocol << ": " << e.messageType;
 
-			/* Check for BEM unsolicited messages first */
+			/* Unsolicited BEM messages arrive as typed ParsedMessageEvents
+			   (GIT-101/GIT-130): dispatch on messageType and any_cast the
+			   payload to the matching public bem_responses struct. The device
+			   identity (model/serial/source) travels in e.origin. */
 			if (e.protocol == "bem")
 			{
-				try
+				ss << formatOrigin(e.origin);
+
+				if (e.messageType == "SystemStatus")
 				{
-					const auto& response = std::any_cast<const BemResponse&>(e.payload);
-					const auto bemId = static_cast<BemCommandId>(response.header.bemId);
-					
-					if (bemId == BemCommandId::SystemStatus)
+					const auto& status = std::any_cast<const SystemStatusData&>(e.payload);
+
+					ss << "\n         Individual Buffers: " << status.individual_buffers_.size();
+					for (std::size_t i = 0; i < status.individual_buffers_.size(); ++i)
 					{
-						/* Decode System Status (F2H) */
-						ss << "\n[STATUS] System Status from "
-						   << modelIdToString(response.header.modelId)
-						   << " (Serial: " << response.header.serialNumber << ")";
-						
-						if (!response.data.empty())
-						{
-							std::string error;
-							SystemStatusData status;
-							if (decodeSystemStatus(response.data, status, error))
-							{
-								ss << "\n         Individual Buffers: " << status.individual_buffers_.size();
-								for (std::size_t i = 0; i < status.individual_buffers_.size(); ++i)
-								{
-									const auto& buf = status.individual_buffers_[i];
-									ss << "\n           [" << i << "] Rx: "
-									   << static_cast<int>(buf.rx_bandwidth_) << "% BW, "
-									   << static_cast<int>(buf.rx_loading_) << "% Load, "
-									   << static_cast<int>(buf.rx_filtered_) << "% Filt, "
-									   << static_cast<int>(buf.rx_dropped_) << "% Drop"
-									   << " | Tx: "
-									   << static_cast<int>(buf.tx_bandwidth_) << "% BW, "
-									   << static_cast<int>(buf.tx_loading_) << "% Load";
-								}
-
-								ss << "\n         Unified Buffers: " << status.unified_buffers_.size();
-								for (std::size_t j = 0; j < status.unified_buffers_.size(); ++j)
-								{
-									const auto& buf = status.unified_buffers_[j];
-									ss << "\n           [" << j << "] "
-									   << static_cast<int>(buf.bandwidth_) << "% BW, "
-									   << static_cast<int>(buf.loading_) << "% Load, "
-									   << static_cast<int>(buf.deleted_) << "% Del, "
-									   << static_cast<int>(buf.pointer_loading_) << "% Ptr";
-								}
-
-								if (status.can_status_)
-								{
-									ss << "\n         CAN: RxErr="
-									   << static_cast<int>(status.can_status_->rx_error_count_)
-									   << " TxErr=" << static_cast<int>(status.can_status_->tx_error_count_)
-									   << " Status=0x" << std::hex
-									   << static_cast<int>(status.can_status_->can_status_) << std::dec;
-								}
-
-								if (status.operating_mode_)
-								{
-									const uint16_t mode = *status.operating_mode_;
-									const char* modeName = OperatingModeName(static_cast<OperatingMode>(mode));
-									ss << "\n         Operating Mode: 0x" << std::hex << mode << std::dec
-									   << " (" << modeName << ")";
-								}
-							}
-							else
-							{
-								ss << "\n         Decode error: " << error;
-							}
-						}
+						const auto& buf = status.individual_buffers_[i];
+						ss << "\n           [" << i << "] Rx: "
+						   << static_cast<int>(buf.rx_bandwidth_) << "% BW, "
+						   << static_cast<int>(buf.rx_loading_) << "% Load, "
+						   << static_cast<int>(buf.rx_filtered_) << "% Filt, "
+						   << static_cast<int>(buf.rx_dropped_) << "% Drop"
+						   << " | Tx: "
+						   << static_cast<int>(buf.tx_bandwidth_) << "% BW, "
+						   << static_cast<int>(buf.tx_loading_) << "% Load";
 					}
-					else
+
+					ss << "\n         Unified Buffers: " << status.unified_buffers_.size();
+					for (std::size_t j = 0; j < status.unified_buffers_.size(); ++j)
 					{
-						/* Other unsolicited BEM messages */
-						ss << " | BEM ID=0x" << std::hex 
-						   << static_cast<int>(response.header.bemId) << std::dec
-						   << " from " << modelIdToString(response.header.modelId)
-						   << " | " << formatHexBytes(response.data);
+						const auto& buf = status.unified_buffers_[j];
+						ss << "\n           [" << j << "] "
+						   << static_cast<int>(buf.bandwidth_) << "% BW, "
+						   << static_cast<int>(buf.loading_) << "% Load, "
+						   << static_cast<int>(buf.deleted_) << "% Del, "
+						   << static_cast<int>(buf.pointer_loading_) << "% Ptr";
+					}
+
+					if (status.can_status_)
+					{
+						ss << "\n         CAN: RxErr="
+						   << static_cast<int>(status.can_status_->rx_error_count_)
+						   << " TxErr=" << static_cast<int>(status.can_status_->tx_error_count_)
+						   << " Status=0x" << std::hex
+						   << static_cast<int>(status.can_status_->can_status_) << std::dec;
+					}
+
+					if (status.operating_mode_)
+					{
+						const uint16_t mode = *status.operating_mode_;
+						const char* modeName = OperatingModeName(static_cast<OperatingMode>(mode));
+						ss << "\n         Operating Mode: 0x" << std::hex << mode << std::dec
+						   << " (" << modeName << ")";
 					}
 				}
-				catch (const std::bad_any_cast&)
+				else if (e.messageType == "StartupStatus")
 				{
-					/* Not a BEM response */
+					const auto& data = std::any_cast<const StartupStatusData&>(e.payload);
+					ss << " | startupMode=0x" << std::hex << data.startupMode
+					   << " errorCode=0x" << data.errorCode << std::dec;
 				}
-				
+				else if (e.messageType == "ErrorReport")
+				{
+					const auto& data = std::any_cast<const ErrorReportData&>(e.payload);
+					ss << " | variant=0x" << std::hex << data.structureVariantId
+					   << " errorCode=0x" << data.errorCode << std::dec;
+				}
+				else if (e.messageType == "NegativeAck")
+				{
+					const auto& data = std::any_cast<const NegativeAckData&>(e.payload);
+					ss << " | uniqueId=0x" << std::hex << data.uniqueId << std::dec;
+				}
+				/* Untyped unsolicited IDs (messageType "BEM_Response_*") carry a
+				   raw BemResponse, which is not part of the public surface; the
+				   messageType + origin above is all a public consumer can show. */
+
 				if (g_consoleOutputEnabled) {
 					std::cout << ss.str() << std::endl;
 				}
@@ -174,27 +243,18 @@ void onEvent(const EventVariant& event)
 				return;
 			}
 
-			/* Use BstFrame for unified access to all BST frame types */
-			if (auto frame = BstFrame::fromParsedEvent(e))
+			/* Non-BEM events: read the NMEA 2000 frame fields via the public
+			   asReceivedFrame() accessor (GIT-128) instead of an internal
+			   frame type. */
+			if (auto frame = asReceivedFrame(e))
 			{
-				ss << " | PGN=" << std::hex << std::setw(5) << std::setfill('0') << frame->pgn()
-				   << " Src=" << std::dec << static_cast<int>(frame->source())
-				   << " Dst=" << static_cast<int>(frame->destination())
-				   << " Pri=" << static_cast<int>(frame->priority());
+				ss << " | PGN=" << std::hex << std::setw(5) << std::setfill('0') << frame->pgn
+				   << " Src=" << std::dec << static_cast<int>(frame->source)
+				   << " Dst=" << static_cast<int>(frame->destination)
+				   << " Pri=" << static_cast<int>(frame->priority)
+				   << " Len=" << frame->length;
 
-				if (frame->hasTimestamp()) {
-					ss << " T=" << frame->timestamp() << "ms";
-				}
-
-				if (frame->hasExtendedFields()) {
-					ss << " Type=" << static_cast<int>(frame->messageType());
-				}
-
-				ss << " Len=" << frame->dataLength();
-
-				/* Convert span to vector for formatHexBytes */
-				auto dataSpan = frame->data();
-				std::vector<uint8_t> dataVec(dataSpan.begin(), dataSpan.end());
+				std::vector<uint8_t> dataVec(frame->data.begin(), frame->data.end());
 				ss << " | " << formatHexBytes(dataVec);
 			}
 
@@ -229,8 +289,8 @@ int main(int argc, char* argv[])
 	std::string logPath;
 	std::string eblPath;
 	std::string debugLogPath;
-	LogLevel consoleDebugLevel = LogLevel::None;
-	LogLevel fileDebugLevel = LogLevel::None;
+	std::optional<LogLevel> consoleDebugLevel;
+	std::optional<LogLevel> fileDebugLevel;
 
 	/* Parse command line arguments */
 	for (int i = 1; i < argc; ++i)
@@ -272,7 +332,7 @@ int main(int argc, char* argv[])
 			int level = std::stoi(argv[++i]);
 			if (level >= 0 && level <= 5)
 			{
-				consoleDebugLevel = static_cast<LogLevel>(level);
+				consoleDebugLevel = verbosityToLevel(level);
 			}
 		}
 		else if ((arg == "--file-debug") && i + 1 < argc)
@@ -280,7 +340,7 @@ int main(int argc, char* argv[])
 			int level = std::stoi(argv[++i]);
 			if (level >= 0 && level <= 5)
 			{
-				fileDebugLevel = static_cast<LogLevel>(level);
+				fileDebugLevel = verbosityToLevel(level);
 			}
 		}
 		else if (arg == "-v")
@@ -310,19 +370,34 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	/* Set debug log levels */
-	DebugLog::instance().setConsoleLevel(consoleDebugLevel);
-	
-	/* If debug log file specified, set file level (default to Trace if not specified) */
+	/* Open the SDK debug-log file if requested (defaults to Trace verbosity). */
+	std::ofstream debugLogStream;
 	if (!debugLogPath.empty())
 	{
-		DebugLog::instance().setLogFile(debugLogPath);
-		if (fileDebugLevel == LogLevel::None)
+		debugLogStream.open(debugLogPath, std::ios::out | std::ios::trunc);
+		if (!debugLogStream.is_open())
 		{
-			fileDebugLevel = LogLevel::Trace;  /* Default to full verbosity in file */
+			std::cerr << "Warning: Could not open debug log file: " << debugLogPath << std::endl;
+		}
+		else if (!fileDebugLevel)
+		{
+			fileDebugLevel = LogLevel::Trace; /* Default to full verbosity in file */
 		}
 	}
-	DebugLog::instance().setFileLevel(fileDebugLevel);
+
+	/* Install the public logger only if a sink is actually active. The SDK's
+	   global level gates message construction; set it to the most verbose of
+	   the two sinks so neither is starved. */
+	const bool fileLogActive = debugLogStream.is_open() && fileDebugLevel.has_value();
+	const std::optional<LogLevel> effectiveFileLevel = fileLogActive ? fileDebugLevel : std::nullopt;
+	if (consoleDebugLevel || effectiveFileLevel)
+	{
+		const LogLevel globalLevel = std::max(consoleDebugLevel.value_or(LogLevel::Error),
+											  effectiveFileLevel.value_or(LogLevel::Error));
+		setLogLevel(globalLevel);
+		setLogger(std::make_shared<DemoLogger>(consoleDebugLevel, effectiveFileLevel,
+											   std::move(debugLogStream)));
+	}
 
 	/* Open frame log file if specified */
 	if (!logPath.empty())
@@ -369,13 +444,13 @@ int main(int argc, char* argv[])
 	std::cout << "========================================" << std::endl;
 	std::cout << "Port: " << port << std::endl;
 	std::cout << "Baud: " << baud << std::endl;
-	if (consoleDebugLevel != LogLevel::None)
+	if (consoleDebugLevel)
 	{
-		std::cout << "Console Debug: " << static_cast<int>(consoleDebugLevel) << std::endl;
+		std::cout << "Console Debug: " << logLevelName(*consoleDebugLevel) << std::endl;
 	}
 	if (!debugLogPath.empty())
 	{
-		std::cout << "Debug Log: " << debugLogPath << " (level " << static_cast<int>(fileDebugLevel) << ")" << std::endl;
+		std::cout << "Debug Log: " << debugLogPath << std::endl;
 	}
 	if (!logPath.empty())
 	{
@@ -398,10 +473,10 @@ int main(int argc, char* argv[])
 	config.parity = 'N';
 	config.stopBits = 1;
 
-	/* Create session */
+	/* Create session via the public Api facade (returns a public Session). */
 	std::cout << "[INIT] Opening connection to " << port << "..." << std::endl;
 
-	auto session = createSerialSession(config, onEvent, onError);
+	auto session = Api::createSerialSession(config, onEvent, onError);
 	if (!session)
 	{
 		std::cerr << "[FAIL] Could not open serial port: " << port << std::endl;
@@ -434,16 +509,17 @@ int main(int argc, char* argv[])
 	{
 		/* Check for user keyboard input */
 		processUserInput(session);
-		
+
 		/* Let the session process data */
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
 
 	/* Clean shutdown */
+	const SessionMetrics finalMetrics = session->metrics();
 	std::cout << std::endl;
 	std::cout << "[EXIT] Shutting down..." << std::endl;
-	std::cout << "       Frames received: " << session->framesReceived() << std::endl;
-	std::cout << "       BEM responses: " << session->bemResponsesReceived() << std::endl;
+	std::cout << "       Frames received: " << finalMetrics.protocol.framesReceived << std::endl;
+	std::cout << "       BEM responses: " << finalMetrics.bem.responsesReceived << std::endl;
 
 	/* Stop the trace before closing the session so no further writes hit
 	   g_eblFile after we close it below. */
@@ -453,6 +529,9 @@ int main(int argc, char* argv[])
 	}
 
 	session->close();
+
+	/* Release the logger before the streams it owns go out of scope. */
+	setLogger(nullptr);
 
 	if (g_logFile.is_open())
 	{
@@ -559,8 +638,28 @@ std::string formatTimestamp()
 #endif
 
 	std::ostringstream ss;
-	ss << std::put_time(&tm_buf, "%H:%M:%S") << "." 
+	ss << std::put_time(&tm_buf, "%H:%M:%S") << "."
 	   << std::setw(3) << std::setfill('0') << ms.count();
+	return ss.str();
+}
+
+/* Render the responding device's identity from a typed unsolicited event's
+   ResponseOrigin. modelIdToString() is internal, so the public example prints
+   the numeric ARL model id and serial number. */
+std::string formatOrigin(const std::optional<ResponseOrigin>& origin)
+{
+	if (!origin)
+	{
+		return {};
+	}
+
+	std::ostringstream ss;
+	ss << " from model 0x" << std::hex << std::setw(4) << std::setfill('0') << origin->modelId
+	   << std::dec << " (serial " << origin->serialNumber << ")";
+	if (origin->path == TransportPath::Remote)
+	{
+		ss << " [remote SA " << static_cast<int>(origin->n2kSourceAddress) << "]";
+	}
 	return ss.str();
 }
 
@@ -595,13 +694,13 @@ char getKey()
 #endif
 }
 
-void processUserInput(std::unique_ptr<SessionImpl>& session)
+void processUserInput(std::unique_ptr<Session>& session)
 {
 	if (!hasKeyPressed())
 		return;
 
 	char key = getKey();
-	
+
 	switch (key)
 	{
 		case 'g':
@@ -609,30 +708,18 @@ void processUserInput(std::unique_ptr<SessionImpl>& session)
 			std::cout << "[USER] Requesting Operating Mode..." << std::endl;
 			session->getOperatingMode(
 				std::chrono::seconds(5),
-				[](const std::optional<BemResponse>& response, ErrorCode code, std::string_view errorMsg) {
-					if (code == ErrorCode::Ok && response)
+				[](ErrorCode code, std::string_view errorMsg, std::optional<OperatingMode> mode,
+				   ResponseOrigin origin) {
+					if (code == ErrorCode::Ok && mode)
 					{
+						const char* modeName = OperatingModeName(*mode);
 						std::cout << "[RSP] Operating Mode Response:" << std::endl;
-						std::cout << "      Model: " << modelIdToString(response->header.modelId) 
-						          << " (0x" << std::hex << response->header.modelId << ")" << std::endl;
-						std::cout << "      Serial: " << std::dec << response->header.serialNumber << std::endl;
-						std::cout << "      Error Code: " << response->header.errorCode << std::endl;
-
-						if (!response->data.empty())
-						{
-							uint16_t mode = 0;
-							if (response->data.size() >= 2)
-							{
-								mode = response->data[0] | (response->data[1] << 8);
-							}
-							else if (response->data.size() == 1)
-							{
-								mode = response->data[0];
-							}
-							const char* modeName = OperatingModeName(static_cast<OperatingMode>(mode));
-							std::cout << "      Operating Mode: 0x" << std::hex << mode << std::dec 
-							          << " (" << modeName << ")" << std::endl;
-						}
+						std::cout << "      Model: 0x" << std::hex << std::setw(4)
+						          << std::setfill('0') << origin.modelId << std::dec << std::endl;
+						std::cout << "      Serial: " << origin.serialNumber << std::endl;
+						std::cout << "      Operating Mode: 0x" << std::hex
+						          << static_cast<uint16_t>(*mode) << std::dec
+						          << " (" << modeName << ")" << std::endl;
 					}
 					else if (code == ErrorCode::Timeout)
 					{
@@ -647,31 +734,24 @@ void processUserInput(std::unique_ptr<SessionImpl>& session)
 
 		case 's':
 		case 'S':
-			std::cout << "[USER] Setting Operating Mode to 2 (NgTransferRxAllMode)..." << std::endl;
+			std::cout << "[USER] Setting Operating Mode to NgTransferRxAllMode..." << std::endl;
 			session->setOperatingMode(
-				2,  // NgTransferRxAllMode
+				OperatingMode::NgTransferRxAllMode,
 				std::chrono::seconds(5),
-				[](const std::optional<BemResponse>& response, ErrorCode code, std::string_view errorMsg) {
-					if (code == ErrorCode::Ok && response)
+				[](ErrorCode code, std::string_view errorMsg, ResponseOrigin origin) {
+					if (code == ErrorCode::Ok)
 					{
 						std::cout << "[RSP] Set Operating Mode Response:" << std::endl;
-						std::cout << "      Model: " << modelIdToString(response->header.modelId) 
-						          << " (0x" << std::hex << response->header.modelId << ")" << std::endl;
-						std::cout << "      Serial: " << std::dec << response->header.serialNumber << std::endl;
-						std::cout << "      Error Code: " << response->header.errorCode << std::endl;
-
-						if (response->header.errorCode == 0)
-						{
-							std::cout << "      Operating Mode successfully set to 2 (NgTransferRxAllMode)" << std::endl;
-						}
-						else
-						{
-							std::cout << "      Device returned error code: " << response->header.errorCode << std::endl;
-						}
+						std::cout << "      Model: 0x" << std::hex << std::setw(4)
+						          << std::setfill('0') << origin.modelId << std::dec << std::endl;
+						std::cout << "      Serial: " << origin.serialNumber << std::endl;
+						std::cout << "      Operating Mode successfully set to NgTransferRxAllMode"
+						          << std::endl;
 					}
 					else if (code == ErrorCode::Timeout)
 					{
-						std::cout << "[RSP] Timeout waiting for Set Operating Mode response" << std::endl;
+						std::cout << "[RSP] Timeout waiting for Set Operating Mode response"
+						          << std::endl;
 					}
 					else
 					{

@@ -24,6 +24,8 @@
 #include <span>
 #include <string>
 
+#include "public/bem_responses/startup_status.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -36,31 +38,10 @@ namespace Actisense
 		/// Legacy Startup Status format size (3 bytes)
 		static constexpr std::size_t kStartupStatusLegacySize = 3;
 
-		/* Enumerations --------------------------------------------------------- */
-
-		/**************************************************************************/ /**
-		 \brief      Startup Status format type
-		 \details    Indicates which format was detected in the message
-		 *******************************************************************************/
-		enum class StartupStatusFormat : uint8_t
-		{
-			Unknown = 0, ///< Could not determine format
-			Legacy = 1,	 ///< 3-byte legacy format
-			Modern = 2	 ///< 6-byte modern format
-		};
-
-		/* Data Structures ------------------------------------------------------ */
-
-		/**************************************************************************/ /**
-		 \brief      Startup Status message data
-		 \details    Decoded startup status from BEM F0H unsolicited message
-		 *******************************************************************************/
-		struct StartupStatusData
-		{
-			StartupStatusFormat format = StartupStatusFormat::Unknown;
-			uint16_t startupMode = 0; ///< Startup/boot mode value
-			uint32_t errorCode = 0;	  ///< Error code (0 = no error)
-		};
+		/* The StartupStatusFormat enum and StartupStatusData struct are the
+		   public payload contract and now live in
+		   public/bem_responses/startup_status.hpp (GIT-130). Only the
+		   wire-format decode/format helpers remain internal here. */
 
 		/* Helper Functions ----------------------------------------------------- */
 

@@ -23,6 +23,8 @@
 #include <string>
 #include <vector>
 
+#include "public/bem_responses/error_report.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -35,33 +37,10 @@ namespace Actisense
 		/// Error Report with standard error code (SV ID + error code)
 		static constexpr std::size_t kErrorReportStandardSize = 8;
 
-		/* Enumerations --------------------------------------------------------- */
-
-		/**************************************************************************/ /**
-		 \brief      Error Report Structure Variant IDs
-		 \details    Identifies the format of the error report data
-		 *******************************************************************************/
-		enum class ErrorReportVariant : uint32_t
-		{
-			Unknown = 0x00000000,		   ///< Unknown or unrecognized format
-			StandardError = 0x00000001,	   ///< Standard error format (4-byte error code)
-			ExtendedError = 0x00000002,	   ///< Extended error with context data
-			TimestampedError = 0x00000003, ///< Error with timestamp
-		};
-
-		/* Data Structures ------------------------------------------------------ */
-
-		/**************************************************************************/ /**
-		 \brief      Error Report message data
-		 \details    Decoded error report from BEM F1H unsolicited message
-		 *******************************************************************************/
-		struct ErrorReportData
-		{
-			uint32_t structureVariantId = 0;   ///< Structure Variant ID
-			uint32_t errorCode = 0;			   ///< Primary error code
-			std::optional<uint32_t> timestamp; ///< Optional timestamp (if present)
-			std::vector<uint8_t> contextData;  ///< Additional context data (if present)
-		};
+		/* The ErrorReportVariant enum and ErrorReportData struct are the public
+		   payload contract and now live in
+		   public/bem_responses/error_report.hpp (GIT-130). Only the wire-format
+		   decode/format helpers remain internal here. */
 
 		/* Helper Functions ----------------------------------------------------- */
 

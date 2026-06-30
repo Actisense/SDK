@@ -517,7 +517,7 @@ namespace Actisense
 						if (tryFailRequestForNegativeAck(*response, frame.source())) {
 							return;
 						}
-						emitUncorrelatedBemResponse(*response);
+						emitUncorrelatedBemResponse(*response, frame.source());
 						return;
 					}
 				}
@@ -556,7 +556,7 @@ namespace Actisense
 				return;
 			}
 
-			emitUncorrelatedBemResponse(response);
+			emitUncorrelatedBemResponse(response, kLocalSrcAddr);
 		}
 
 		bool Session::Impl::tryFailRequestForNegativeAck(const BemResponse& response,
@@ -581,10 +581,18 @@ namespace Actisense
 												  static_cast<int32_t>(response.header.errorCode));
 		}
 
-		void Session::Impl::emitUncorrelatedBemResponse(const BemResponse& response) {
+		void Session::Impl::emitUncorrelatedBemResponse(const BemResponse& response,
+														uint8_t srcAddr) {
 			if (!eventCallback_) {
 				return;
 			}
+
+			/* Stamp the responder's identity + receive path onto every event we
+			   emit below. The typed unsolicited payloads (SystemStatusData etc.)
+			   no longer carry the BEM header, so origin is how a consumer recovers
+			   the device model/serial and local-vs-remote source (GIT-130). */
+			ResponseOrigin origin = detail::makeOrigin(*this, srcAddr);
+			detail::stampOriginFromResponse(origin, response);
 
 			/* Unsolicited response: decode known F0/F1/F2/F4 types into typed events.
 			   On decode failure, fall through to the generic emission below so
@@ -594,6 +602,7 @@ namespace Actisense
 				std::string decodeError;
 				ParsedMessageEvent typedEvent;
 				typedEvent.protocol = "bem";
+				typedEvent.origin = origin;
 				bool emitted = false;
 
 				switch (bemId) {
@@ -660,6 +669,7 @@ namespace Actisense
 			event.protocol = "bem";
 			event.messageType = "BEM_Response_" + std::format("{:X}", response.header.bemId);
 			event.payload = response;
+			event.origin = origin;
 
 			eventCallback_(EventVariant{event});
 		}

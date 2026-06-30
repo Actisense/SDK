@@ -5,6 +5,73 @@ All notable changes to the Actisense C++ SDK are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Public unsolicited BEM payload headers (GIT-130).** The four typed
+  unsolicited payloads and their enums now live in dedicated public headers —
+  `public/bem_responses/system_status.hpp` (`SystemStatusData` +
+  `IndividualBufferStats` / `UnifiedBufferStats` / `CanExtendedStatus`),
+  `startup_status.hpp` (`StartupStatusData`, `StartupStatusFormat`),
+  `error_report.hpp` (`ErrorReportData`, `ErrorReportVariant`) and
+  `negative_ack.hpp` (`NegativeAckData`) — plus an aggregate
+  `public/bem_responses/unsolicited.hpp`. A pure-public-API consumer can now
+  name the payload type delivered with a typed unsolicited `ParsedMessageEvent`
+  without reaching into internal `protocols/bem/bem_commands/*` headers. The
+  wire-format decode/format helpers stay internal; **type names and namespaces
+  are unchanged — only the include path is new** (mirrors the GIT-112
+  relocation of the correlated-response structs).
+- **`ParsedMessageEvent::origin` (GIT-130).** Typed unsolicited BEM events
+  (`messageType` "StartupStatus" / "ErrorReport" / "SystemStatus" /
+  "NegativeAck", plus the generic "BEM_Response_*" fallback) now carry an
+  optional `ResponseOrigin` describing the responding device — `modelId` /
+  `serialNumber` (from the BEM reply header) and the receive path
+  (`n2kSourceAddress` / `TransportPath`). This restores the device identity that
+  the typed payload structs omit, so a consumer of e.g. `SystemStatusData` can
+  still tell *which* device produced it. `std::nullopt` for BST / NMEA 2000
+  events.
+
+### Changed
+
+- **`actisense_console` example rewritten onto the public API (GIT-130).** The
+  console demo now creates its session via `Api::createSerialSession` (public
+  `Session`) and consumes typed unsolicited events, public `metrics()`, public
+  `OperatingMode` callbacks, `asReceivedFrame()`, and the public `ILogger`
+  logging surface — it no longer `#include`s any internal `core/` or
+  `protocols/` header. It is now a faithful reference for what the public API
+  alone supports. (Previously it bound the internal `SessionImpl`
+  `createSerialSession` overload and `std::any_cast`-ed unsolicited payloads to
+  the internal `BemResponse`, which silently broke once unsolicited messages
+  became typed events.)
+
+### Changed (breaking)
+
+- **`ParsedMessageEvent` gained a trailing `std::optional<ResponseOrigin>
+  origin` member (GIT-130).** Source-additive — existing code compiles
+  unchanged — but it changes the layout/size of `ParsedMessageEvent` and the
+  `EventVariant` that wraps it, so it is a binary-ABI break for consumers
+  linking a pre-built SDK binary. Bump the binary version on the next release,
+  per the GIT-115 ABI-break precedent.
+
+### Migration
+
+- **Unsolicited BEM messages (F0/F1/F2/F4) are delivered as *typed*
+  `ParsedMessageEvent`s — `e.payload` is the decoded `*Data` struct, not a raw
+  `BemResponse`.** Code that does `std::any_cast<const BemResponse&>(e.payload)`
+  for these throws `std::bad_any_cast` (and any surrounding `catch` may swallow
+  it silently, so the message appears to vanish). Dispatch on `messageType` and
+  cast to the matching public payload instead:
+
+  ```cpp
+  if (auto* msg = std::get_if<ParsedMessageEvent>(&event);
+      msg && msg->protocol == "bem" && msg->messageType == "SystemStatus") {
+      const auto& status = std::any_cast<const SystemStatusData&>(msg->payload);
+      if (msg->origin) { /* msg->origin->modelId, ->serialNumber */ }
+      for (const auto& buf : status.individual_buffers_) { /* CAN load, etc. */ }
+  }
+  ```
+
 ## [1.0.0] - 2026-06-18
 
 First public, SemVer-stable release. From 1.0.0 the `src/public/` API is

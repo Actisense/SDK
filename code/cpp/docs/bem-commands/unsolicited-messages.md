@@ -117,9 +117,21 @@ typed `ParsedMessageEvent`s for you — correlate-or-typed-dispatch happens
 inside the SDK. A minimal customer-side dispatcher just switches on
 `messageType` and casts the payload:
 
+The payload structs are public — include
+`public/bem_responses/unsolicited.hpp` (or the individual
+`public/bem_responses/<type>.hpp` headers) for `SystemStatusData`,
+`StartupStatusData`, `ErrorReportData` and `NegativeAckData`; no internal
+`protocols/` include is needed (GIT-130). The typed payloads do **not** carry
+the BEM reply header, so the responding device's identity travels in
+`ParsedMessageEvent::origin` — an optional `ResponseOrigin` with `modelId`,
+`serialNumber`, and the receive path (`n2kSourceAddress` / `TransportPath`):
+
 ```cpp
+#include "public/bem_responses/unsolicited.hpp"
+
 if (auto* msg = std::get_if<ParsedMessageEvent>(&event);
     msg && msg->protocol == "bem") {
+    if (msg->origin) { /* msg->origin->modelId, ->serialNumber, ->path */ }
     if      (msg->messageType == "StartupStatus") {
         onStartup(std::any_cast<const StartupStatusData&>(msg->payload));
     } else if (msg->messageType == "ErrorReport") {

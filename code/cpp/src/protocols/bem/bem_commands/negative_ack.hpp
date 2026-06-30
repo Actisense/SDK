@@ -19,6 +19,8 @@
 #include <span>
 #include <string>
 
+#include "public/bem_responses/negative_ack.hpp"
+
 namespace Actisense
 {
 	namespace Sdk
@@ -28,19 +30,9 @@ namespace Actisense
 		/// Negative Ack data size (4-byte unique ID)
 		static constexpr std::size_t kNegativeAckDataSize = 4;
 
-		/* Data Structures ------------------------------------------------------ */
-
-		/**************************************************************************/ /**
-		 \brief      Negative Ack message data
-		 \details    Decoded negative acknowledgement from BEM F4H unsolicited message.
-					 The error code in the BEM response header indicates why the
-					 command was rejected. The unique_id field helps correlate with
-					 the rejected command.
-		 *******************************************************************************/
-		struct NegativeAckData
-		{
-			uint32_t uniqueId = 0; ///< Unique ID field for command correlation
-		};
+		/* The NegativeAckData struct is the public payload contract and now
+		   lives in public/bem_responses/negative_ack.hpp (GIT-130). Only the
+		   wire-format decode/format helpers remain internal here. */
 
 		/* Helper Functions ----------------------------------------------------- */
 
