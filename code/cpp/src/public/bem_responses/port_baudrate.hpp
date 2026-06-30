@@ -27,17 +27,21 @@ namespace Actisense
 
 		/**************************************************************************/ /**
 		 \brief      Hardware protocol types
-		 \details    Identifies the communication protocol used on a port
+		 \details    Identifies the communication protocol used on a port. The
+					 enumerator values are the on-wire codes emitted by the device
+					 firmware in the Port Baudrate (0x17) response — they mirror the
+					 firmware HardwareProtocol_e enum (Serial 0x00-0x1F, CAN
+					 0x20-0x3F, Ethernet 0x40-0x5F), so decoding is a direct cast.
 		 *******************************************************************************/
 		enum class HardwareProtocol : uint8_t
 		{
-			Bst = 0,	  ///< BST (Binary Standard Transport) protocol
-			Nmea0183 = 1, ///< NMEA 0183 protocol
-			Nmea2000 = 2, ///< NMEA 2000 protocol
-			Ipv4 = 3,	  ///< IPv4 (reserved)
-			Ipv6 = 4,	  ///< IPv6 (reserved)
-			RawAscii = 5, ///< Raw ASCII (reserved)
-			N2kAscii = 6  ///< N2K ASCII (reserved)
+			SerialNmea0183 = 0,	   ///< Serial NMEA 0183
+			SerialBst = 1,		   ///< Serial BST (Binary Standard Transport)
+			CanNmea2000 = 32,	   ///< CAN NMEA 2000
+			CanJ1939 = 33,		   ///< CAN J1939
+			EthernetBst = 64,	   ///< Ethernet BST
+			EthernetNmea0183 = 65, ///< Ethernet NMEA 0183
+			EthernetOneNet = 66	   ///< Ethernet OneNet
 		};
 
 		/* Data Structures ------------------------------------------------------ */
@@ -61,7 +65,7 @@ namespace Actisense
 		{
 			uint8_t totalPorts = 0;							   ///< Total ports on device
 			uint8_t portNumber = 0;							   ///< Queried/configured port
-			HardwareProtocol protocol = HardwareProtocol::Bst; ///< Protocol type on this port
+			HardwareProtocol protocol = HardwareProtocol::SerialBst; ///< Protocol type on this port
 			uint32_t sessionBaud = 0;						   ///< Current session baudrate
 			uint32_t storeBaud = 0;							   ///< Stored (EEPROM) baudrate
 		};

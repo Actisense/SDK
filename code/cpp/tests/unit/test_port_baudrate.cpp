@@ -122,13 +122,13 @@ TEST_F(PortBaudrateTest, EncodeSetRequest_CommonBaudrates)
 TEST_F(PortBaudrateTest, DecodeResponse_ValidData)
 {
 	/* Response: totalPorts(1) + port(1) + protocol(1) + sessionBaud(4) + storeBaud(4) = 11 bytes */
-	/* Example: 2 ports, port 0, BST protocol, 115200 session, 115200 store */
+	/* Example: an NGX-1 port-0 reply — 2 ports, port 0 = CAN NMEA 2000, 250000 session/store */
 	const std::array<uint8_t, 11> responseData = {
 		0x02,                                       /* totalPorts = 2 */
 		0x00,                                       /* portNumber = 0 */
-		0x00,                                       /* protocol = BST */
-		0x00, 0xC2, 0x01, 0x00,                     /* sessionBaud = 115200 (LE) */
-		0x00, 0xC2, 0x01, 0x00                      /* storeBaud = 115200 (LE) */
+		0x20,                                       /* protocol = CAN NMEA 2000 (32) */
+		0x90, 0xD0, 0x03, 0x00,                     /* sessionBaud = 250000 (LE) */
+		0x90, 0xD0, 0x03, 0x00                      /* storeBaud = 250000 (LE) */
 	};
 
 	PortBaudrateResponse response;
@@ -137,9 +137,9 @@ TEST_F(PortBaudrateTest, DecodeResponse_ValidData)
 
 	EXPECT_EQ(response.totalPorts, 2);
 	EXPECT_EQ(response.portNumber, 0);
-	EXPECT_EQ(response.protocol, HardwareProtocol::Bst);
-	EXPECT_EQ(response.sessionBaud, 115200u);
-	EXPECT_EQ(response.storeBaud, 115200u);
+	EXPECT_EQ(response.protocol, HardwareProtocol::CanNmea2000);
+	EXPECT_EQ(response.sessionBaud, 250000u);
+	EXPECT_EQ(response.storeBaud, 250000u);
 }
 
 TEST_F(PortBaudrateTest, DecodeResponse_DifferentBauds)
@@ -148,7 +148,7 @@ TEST_F(PortBaudrateTest, DecodeResponse_DifferentBauds)
 	const std::array<uint8_t, 11> responseData = {
 		0x01,                                       /* totalPorts = 1 */
 		0x00,                                       /* portNumber = 0 */
-		0x01,                                       /* protocol = NMEA 0183 */
+		0x01,                                       /* protocol = Serial BST (1) */
 		0x00, 0x84, 0x03, 0x00,                     /* sessionBaud = 230400 (LE) */
 		0x00, 0xC2, 0x01, 0x00                      /* storeBaud = 115200 (LE) */
 	};
@@ -157,7 +157,7 @@ TEST_F(PortBaudrateTest, DecodeResponse_DifferentBauds)
 	EXPECT_TRUE(decodePortBaudrateResponse(responseData, response, m_error));
 
 	EXPECT_EQ(response.totalPorts, 1);
-	EXPECT_EQ(response.protocol, HardwareProtocol::Nmea0183);
+	EXPECT_EQ(response.protocol, HardwareProtocol::SerialBst);
 	EXPECT_EQ(response.sessionBaud, 230400u);
 	EXPECT_EQ(response.storeBaud, 115200u);
 }
@@ -170,15 +170,15 @@ TEST_F(PortBaudrateTest, DecodeResponse_AllProtocols)
 		0x00, 0xC2, 0x01, 0x00                      /* storeBaud */
 	};
 
-	/* Test each protocol type */
+	/* Test each protocol type (wire codes mirror the firmware enum) */
 	const std::array<HardwareProtocol, 7> protocols = {
-		HardwareProtocol::Bst,
-		HardwareProtocol::Nmea0183,
-		HardwareProtocol::Nmea2000,
-		HardwareProtocol::Ipv4,
-		HardwareProtocol::Ipv6,
-		HardwareProtocol::RawAscii,
-		HardwareProtocol::N2kAscii
+		HardwareProtocol::SerialNmea0183,
+		HardwareProtocol::SerialBst,
+		HardwareProtocol::CanNmea2000,
+		HardwareProtocol::CanJ1939,
+		HardwareProtocol::EthernetBst,
+		HardwareProtocol::EthernetNmea0183,
+		HardwareProtocol::EthernetOneNet
 	};
 
 	for (auto protocol : protocols) {
@@ -238,13 +238,13 @@ TEST_F(PortBaudrateTest, EncodeSetRequestData)
 
 TEST_F(PortBaudrateTest, HardwareProtocolToString_AllValues)
 {
-	EXPECT_STREQ(hardwareProtocolToString(HardwareProtocol::Bst), "BST");
-	EXPECT_STREQ(hardwareProtocolToString(HardwareProtocol::Nmea0183), "NMEA 0183");
-	EXPECT_STREQ(hardwareProtocolToString(HardwareProtocol::Nmea2000), "NMEA 2000");
-	EXPECT_STREQ(hardwareProtocolToString(HardwareProtocol::Ipv4), "IPv4");
-	EXPECT_STREQ(hardwareProtocolToString(HardwareProtocol::Ipv6), "IPv6");
-	EXPECT_STREQ(hardwareProtocolToString(HardwareProtocol::RawAscii), "Raw ASCII");
-	EXPECT_STREQ(hardwareProtocolToString(HardwareProtocol::N2kAscii), "N2K ASCII");
+	EXPECT_STREQ(hardwareProtocolToString(HardwareProtocol::SerialNmea0183), "Serial NMEA 0183");
+	EXPECT_STREQ(hardwareProtocolToString(HardwareProtocol::SerialBst), "Serial BST");
+	EXPECT_STREQ(hardwareProtocolToString(HardwareProtocol::CanNmea2000), "CAN NMEA 2000");
+	EXPECT_STREQ(hardwareProtocolToString(HardwareProtocol::CanJ1939), "CAN J1939");
+	EXPECT_STREQ(hardwareProtocolToString(HardwareProtocol::EthernetBst), "Ethernet BST");
+	EXPECT_STREQ(hardwareProtocolToString(HardwareProtocol::EthernetNmea0183), "Ethernet NMEA 0183");
+	EXPECT_STREQ(hardwareProtocolToString(HardwareProtocol::EthernetOneNet), "Ethernet OneNet");
 	EXPECT_STREQ(hardwareProtocolToString(static_cast<HardwareProtocol>(99)), "Unknown");
 }
 
@@ -281,7 +281,7 @@ namespace
 	constexpr std::array<uint8_t, 11> kCaptureNgt1Port0 = {
 		0x01,                   /* totalPorts = 1 */
 		0x00,                   /* portNumber = 0 */
-		0x00,                   /* protocol = BST */
+		0x00,                   /* protocol = Serial NMEA 0183 (0) */
 		0x00, 0xC2, 0x01, 0x00, /* sessionBaud = 115200 */
 		0x00, 0xC2, 0x01, 0x00  /* storeBaud   = 115200 */
 	};
@@ -290,7 +290,7 @@ namespace
 	constexpr std::array<uint8_t, 11> kCaptureNgx1Port0 = {
 		0x01,                   /* totalPorts = 1 */
 		0x00,                   /* portNumber = 0 */
-		0x00,                   /* protocol = BST */
+		0x00,                   /* protocol = Serial NMEA 0183 (0) */
 		0x00, 0xC2, 0x01, 0x00, /* sessionBaud = 115200 */
 		0x00, 0xC2, 0x01, 0x00  /* storeBaud   = 115200 */
 	};

@@ -34,6 +34,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`HardwareProtocol` enum now carries the real on-wire codes.**
+  The enumerators were renamed and renumbered to mirror the firmware
+  `HardwareProtocol_e` wire values emitted in the Port Baudrate (0x17) response:
+  `SerialNmea0183 = 0`, `SerialBst = 1`, `CanNmea2000 = 32`, `CanJ1939 = 33`,
+  `EthernetBst = 64`, `EthernetNmea0183 = 65`, `EthernetOneNet = 66` (previously
+  `Bst`/`Nmea0183`/`Nmea2000`/`Ipv4`/`Ipv6`/`RawAscii`/`N2kAscii` with invented
+  values 0–6). The decoder previously surfaced every real device port as
+  "Unknown" (e.g. an NGX-1 CAN port reports 0x20) or mislabelled it; it now
+  decodes correctly. **Source-breaking rename of the public enumerators** —
+  shipped in the 1.x line as a bug-fix correction, since the prior values never
+  matched any device and so could not have been relied upon.
 - **`public/api.hpp` is now a true umbrella header (GIT-131).** A single
   `#include "public/api.hpp"` now exposes the *entire* public surface — it
   aggregates every `src/public/*.hpp`, including the previously-omitted

@@ -125,20 +125,20 @@ namespace Actisense
 		 *******************************************************************************/
 		[[nodiscard]] inline const char* hardwareProtocolToString(HardwareProtocol protocol) {
 			switch (protocol) {
-				case HardwareProtocol::Bst:
-					return "BST";
-				case HardwareProtocol::Nmea0183:
-					return "NMEA 0183";
-				case HardwareProtocol::Nmea2000:
-					return "NMEA 2000";
-				case HardwareProtocol::Ipv4:
-					return "IPv4";
-				case HardwareProtocol::Ipv6:
-					return "IPv6";
-				case HardwareProtocol::RawAscii:
-					return "Raw ASCII";
-				case HardwareProtocol::N2kAscii:
-					return "N2K ASCII";
+				case HardwareProtocol::SerialNmea0183:
+					return "Serial NMEA 0183";
+				case HardwareProtocol::SerialBst:
+					return "Serial BST";
+				case HardwareProtocol::CanNmea2000:
+					return "CAN NMEA 2000";
+				case HardwareProtocol::CanJ1939:
+					return "CAN J1939";
+				case HardwareProtocol::EthernetBst:
+					return "Ethernet BST";
+				case HardwareProtocol::EthernetNmea0183:
+					return "Ethernet NMEA 0183";
+				case HardwareProtocol::EthernetOneNet:
+					return "Ethernet OneNet";
 				default:
 					return "Unknown";
 			}

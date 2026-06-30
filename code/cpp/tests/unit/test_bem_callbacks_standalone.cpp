@@ -30,8 +30,8 @@ namespace
 		EXPECT_EQ(productInfo.nmea2000Version, 0);
 
 		PortBaudrateResponse baud{};
-		baud.protocol = HardwareProtocol::Nmea2000;
-		EXPECT_EQ(baud.protocol, HardwareProtocol::Nmea2000);
+		baud.protocol = HardwareProtocol::CanNmea2000;
+		EXPECT_EQ(baud.protocol, HardwareProtocol::CanNmea2000);
 
 		CanConfigResponse canConfig{};
 		canConfig.name.setManufacturerCode(1857);
