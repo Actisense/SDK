@@ -81,9 +81,14 @@ include(Doxygen)
 # ============================================================================
 # Install Targets
 # ============================================================================
+# Install the public headers preserving their public/ path segment, so an
+# installed consumer adds <prefix>/include to the include path and writes
+# #include "public/api.hpp" exactly as the docs say — and the headers' own
+# cross-includes (#include "public/...") resolve against the install tree. The
+# library's INSTALL_INTERFACE include is <prefix>/include (see src/CMakeLists.txt).
 install(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/public/
-    DESTINATION include/actisense
+    DESTINATION include/public
     FILES_MATCHING PATTERN "*.hpp"
 )
 

@@ -5,9 +5,15 @@
 \file       api.hpp
 \author     (Created) Phil Whitehurst
 \date       (Created) 02/01/2026
-\brief      Main facade for Actisense SDK
+\brief      Main facade and umbrella header for the Actisense SDK
 \details    High-level entry points for device discovery, session creation,
-			and SDK management.
+			and SDK management. This header is also the SDK umbrella: a single
+			#include "public/api.hpp" pulls in the entire public surface, so
+			external consumers never need to include individual public headers
+			(or, worse, internal ones). When a new public header is added under
+			src/public/, add it to the include list below — the
+			public_api_umbrella_complete guard and the test_api_umbrella
+			translation unit fail until it is aggregated here.
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 ==============================================================================*/
@@ -18,14 +24,27 @@
 #include <string>
 #include <vector>
 
+/* Umbrella: every public header is aggregated here so that a single
+   #include "public/api.hpp" exposes the complete public API. Keep this list in
+   sync with src/public/*.hpp (see the guard noted in the file header). */
+#include "public/bem_callbacks.hpp"
 #include "public/config.hpp"
+#include "public/ebl_writer.hpp"
 #include "public/error.hpp"
 #include "public/events.hpp"
+#include "public/hardware_info.hpp"
+#include "public/logging.hpp"
+#include "public/metrics.hpp"
+#include "public/operating_mode.hpp"
+#include "public/pgn_encoders.hpp"
 #include "public/received_frame.hpp"
+#include "public/remote_device.hpp"
+#include "public/response_origin.hpp"
 #include "public/serial_device_info.hpp"
 #include "public/session.hpp"
 #include "public/transport.hpp"
 #include "public/version.hpp"
+#include "public/wire_trace.hpp"
 
 namespace Actisense
 {
@@ -134,6 +153,6 @@ namespace Actisense
 	} /* namespace Sdk */
 } /* namespace Actisense */
 
-#endif /* __ACTISENSE_SDK_SDK_HPP */
+#endif /* __ACTISENSE_SDK_API_HPP */
 
 /**************** (C) COPYRIGHT Active Research Limited  ** END OF FILE **/

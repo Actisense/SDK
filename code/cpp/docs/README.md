@@ -86,30 +86,41 @@ Available options:
 
 ## Running Examples
 
-### Console Application
+All examples are built only against the public `public/` headers — they are the
+canonical reference for what an external consumer can do with the installed SDK.
+Each accepts `--help` for its full option list and `--list` to enumerate serial
+ports.
 
-The `actisense_console` example demonstrates connecting to an Actisense device:
+### NMEA Reader (`nmea_reader_console`)
+
+Connects to a serial gateway, switches it to Rx-All (restoring the prior mode on
+exit), and renders a live, in-place table of received PGNs — one row per
+PGN+source:
 
 **Windows**:
 ```powershell
-.\build\examples\Release\actisense_console.exe --port COM9
+.\build\examples\Release\nmea_reader_console.exe --port COM9
 ```
 
 **Linux** (using `build_linux` directory):
 ```bash
-./build_linux/examples/actisense_console --port /dev/ttyUSB0 --baud 115200
+./build_linux/examples/nmea_reader_console --port /dev/ttyUSB0 --baud 115200
 ```
 
-**List available serial ports**:
+### PGN Transmitter (`pgn_transmitter`)
+
+Encodes and transmits a selected NMEA 2000 PGN to the bus at a chosen rate via
+the public PGN encoders and `Session::sendPgn()`:
+
+**Windows**:
 ```powershell
-.\build\examples\Release\actisense_console.exe --list
+.\build\examples\Release\pgn_transmitter.exe --port COM9 --pgn 128267
 ```
 
-**Command-line options**:
-- `--port <port>` - Serial port (e.g., COM7 or /dev/ttyUSB0)
-- `--baud <rate>` - Baud rate (default: 115200)
-- `--log <file>` - Log output to file
-- `--list` - List available serial ports
+**List available serial ports** (either example):
+```powershell
+.\build\examples\Release\nmea_reader_console.exe --list
+```
 
 ## Running Tests
 
@@ -205,8 +216,7 @@ The CMakeLists.txt will auto-detect vcpkg from `VCPKG_ROOT` environment variable
 ```
 cpp/
 ├── src/              # SDK source code
-├── examples/         # Example applications
-│   ├── actisense_console.cpp
+├── examples/         # Example applications (public-API only)
 │   ├── pgn_transmitter.cpp
 │   └── nmea_reader/  # Live NMEA 2000 PGN list reader (model + console view)
 ├── tests/
@@ -244,28 +254,11 @@ int main() {
 }
 ```
 
-### For Advanced Examples
-
-Advanced examples that need to decode protocol details or access implementation types may require additional includes:
-
-```cpp
-#include "public/api.hpp"                               // Main SDK API
-#include "protocols/bem/bem_types.hpp"                  // BEM protocol types
-#include "protocols/bem/bem_commands/operating_mode.hpp" // BEM command details
-#include "core/session_impl.hpp"                        // Session implementation
-```
-
-The `actisense_console` example demonstrates this advanced usage for protocol decoding and detailed message display.
-    
-    // Enumerate devices
-    auto devices = enumerateSerialDevices();
-    
-    // Create session
-    auto session = createSession(/* config */);
-    
-    return 0;
-}
-```
+External consumers use the public API exclusively — `public/api.hpp` is an
+umbrella header that exposes the entire public surface on its own. Internal
+headers (`core/`, `protocols/`, `transport/`, `util/`, `platform/`) are not part
+of the installed SDK and must not be included by consumer or example code; this
+is enforced at build time by the public-header and examples include guards.
 
 ### Include Path Rules
 

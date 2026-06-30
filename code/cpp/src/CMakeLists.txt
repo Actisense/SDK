@@ -5,13 +5,51 @@
 # ============================================================================
 add_library(actisense_sdk STATIC)
 
-# Public headers (relative to src/)
+# ============================================================================
+# Public-only staged include tree (GIT-131)
+# ============================================================================
+# Downstream consumers (the examples, the public-header self-containment sweep,
+# and the api.hpp umbrella TU) must be able to reach public/ headers but NOT the
+# internal dirs (core/, protocols/, transport/, util/, platform/). src/ contains
+# both, so exposing src/ downstream would let an example #include an internal
+# header. Instead we stage a build-tree tree that holds ONLY public/*.hpp and
+# expose THAT as the library's downstream (PUBLIC) build-interface include. The
+# library compiles its own TUs against src/ (PRIVATE), where the internal headers
+# live. In-tree tests that legitimately use internals add src/ explicitly (see
+# tests/CMakeLists.txt). The install interface is unchanged (<prefix>/include,
+# with headers installed under include/public/ — see the top-level CMakeLists).
+set(SDK_PUBLIC_INCLUDE_STAGE "${CMAKE_BINARY_DIR}/public_include"
+    CACHE INTERNAL "Public-only staged include root for downstream consumers")
+file(MAKE_DIRECTORY "${SDK_PUBLIC_INCLUDE_STAGE}/public")
+
+# Refresh the staged copy on every build so header edits propagate
+# (copy_if_different keeps it incremental); CONFIGURE_DEPENDS re-globs when a
+# public header is added or removed.
+file(GLOB_RECURSE _public_header_sources CONFIGURE_DEPENDS
+     "${CMAKE_CURRENT_SOURCE_DIR}/public/*.hpp")
+set(_staged_public_headers "")
+foreach(_hdr ${_public_header_sources})
+    file(RELATIVE_PATH _rel "${CMAKE_CURRENT_SOURCE_DIR}/public" "${_hdr}")
+    set(_staged "${SDK_PUBLIC_INCLUDE_STAGE}/public/${_rel}")
+    add_custom_command(
+        OUTPUT  "${_staged}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_hdr}" "${_staged}"
+        DEPENDS "${_hdr}"
+        COMMENT "Staging public header ${_rel}"
+        VERBATIM)
+    list(APPEND _staged_public_headers "${_staged}")
+endforeach()
+add_custom_target(stage_public_headers DEPENDS ${_staged_public_headers})
+add_dependencies(actisense_sdk stage_public_headers)
+
+# Public headers reach downstream via the public-only stage; internal src/ is
+# PRIVATE to the library's own TUs.
 target_include_directories(actisense_sdk
     PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        $<BUILD_INTERFACE:${SDK_PUBLIC_INCLUDE_STAGE}>
         $<INSTALL_INTERFACE:include>
     PRIVATE
-        # No additional private directories needed
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
 
 # ============================================================================

@@ -34,16 +34,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`actisense_console` example rewritten onto the public API (GIT-130).** The
-  console demo now creates its session via `Api::createSerialSession` (public
-  `Session`) and consumes typed unsolicited events, public `metrics()`, public
-  `OperatingMode` callbacks, `asReceivedFrame()`, and the public `ILogger`
-  logging surface — it no longer `#include`s any internal `core/` or
-  `protocols/` header. It is now a faithful reference for what the public API
-  alone supports. (Previously it bound the internal `SessionImpl`
-  `createSerialSession` overload and `std::any_cast`-ed unsolicited payloads to
-  the internal `BemResponse`, which silently broke once unsolicited messages
-  became typed events.)
+- **`public/api.hpp` is now a true umbrella header (GIT-131).** A single
+  `#include "public/api.hpp"` now exposes the *entire* public surface — it
+  aggregates every `src/public/*.hpp`, including the previously-omitted
+  `pgn_encoders.hpp`, `remote_device.hpp`, `logging.hpp` and `ebl_writer.hpp` —
+  matching the README's "single include gives access to the entire SDK" promise.
+  A `public_api_umbrella_complete` guard test and a `test_api_umbrella`
+  compile-proof keep it complete as new public headers are added.
+- **Installed headers keep their `public/` path prefix (GIT-131).** The install
+  step now maps `src/public/` → `include/public/` (previously
+  `include/actisense/`), so an installed consumer adds `<prefix>/include` to the
+  include path and writes `#include "public/api.hpp"` exactly as documented, and
+  the headers' own `#include "public/…"` cross-references resolve against the
+  install tree. *(Install-tree layout change — consumers that hard-coded
+  `include/actisense/` must adjust; no released consumer existed.)*
+
+### Removed
+
+- **`actisense_console` example removed (GIT-131).** The console demo was built
+  against the private `SessionImpl` interface and internal `core/`, `protocols/`
+  and `util/` headers, so it could not be reproduced by an external consumer and
+  broke silently when public callback signatures changed. Its demonstrable
+  surface (frame display, Get/Set operating mode, EBL capture) is already covered
+  by the public-API-only `nmea_reader_console` and `pgn_transmitter` examples,
+  which are now the canonical references. (Supersedes the unreleased GIT-130
+  rewrite of the same example.)
+
+### Guardrails
+
+- **Example/public-header boundary is now enforced at build time (GIT-131).**
+  Four checks, run under `ctest`, prevent the two boundary defects above from
+  recurring: (a) a generalized static guard (`public_headers_no_internal_include`)
+  rejects any internal include — `core/`, `transport/`, `platform/`, `util/`,
+  `protocols/` — from a public header; (b) the same guard
+  (`examples_no_internal_include`) enforces public-only includes in `examples/`;
+  (c) a per-header self-containment compile sweep
+  (`public_headers_selfcontained`) compiles every public header standalone; and
+  (d) examples and the sweeps build against a public-only include path so
+  internal headers are physically unreachable, not merely discouraged. Broadens
+  the GIT-112 `protocols/`-only guard.
 
 ### Changed (breaking)
 
