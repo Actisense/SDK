@@ -66,10 +66,10 @@ def main() -> None:
     doc_example += bytes([cd.bst_checksum(doc_example)])
     t.equal("decode documented example", cd.decode_bem_mode_response(doc_example), 0x0203)
 
-    # Regression (NGXSW-4343): the mode must be read from behind the 14-byte
-    # header. The original decoder read the Sequence Id and Model-Id low byte
-    # instead, so a device genuinely in mode 5 was reported as 15105 (0x3B01 -
-    # seq 0x01 as the low byte, model-id low byte 0x3B as the high byte).
+    # Regression: the mode must be read from behind the 14-byte response header.
+    # An earlier decoder read the Sequence Id and Model-Id low byte instead, so a
+    # device genuinely in mode 5 was reported as 15105 (0x3B01 - seq 0x01 as the
+    # low byte, model-id low byte 0x3B as the high byte).
     misread = fake_mode_response(cd.MODE_CAN_DIRECT, seq=0x01, model=0x003B)
     t.equal("mode 5 not misread as 15105",
             cd.decode_bem_mode_response(misread), cd.MODE_CAN_DIRECT)
