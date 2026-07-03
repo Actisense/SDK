@@ -29,6 +29,10 @@ add_sdk_test(test_iso_request_git106 test_iso_request_git106.cpp)
 # Black-box NGX CAN Packet routing — CanPacket / CanPacketAscii (NGXSW-4207).
 # Requires ACTISENSE_TEST_PORT (a real NGX on a live N2K bus); skips otherwise.
 add_sdk_test(test_can_packet_mode test_can_packet_mode.cpp)
+# Headless NGX CAN Packet routing over a TCP host-link against the Product
+# Emulator (NGXSW-4208). Supplies a TCP ITransport; opt in with
+# ACTISENSE_EMU_ENABLE=1 (host/port via ACTISENSE_EMU_HOST/PORT); skips otherwise.
+add_sdk_test(test_can_packet_mode_emulator test_can_packet_mode_emulator.cpp)
 # Negative Ack (0xF4) cancels the in-flight BEM request — hermetic loopback,
 # no hardware required (GIT-100).
 add_sdk_test(test_negative_ack_loopback test_negative_ack_loopback.cpp)
