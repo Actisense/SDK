@@ -12,9 +12,24 @@ def datagram_on_wire(wire: bytes) -> bytes:
     return frames[0]
 
 
-def fake_mode_response(mode: int) -> bytes:
-    """Build the BDTP-recovered datagram a device would send for a mode read."""
-    datagram = bytes([cd.BEM_RSP_ID, 3, cd.BEM_OPMODE, mode & 0xFF, (mode >> 8) & 0xFF])
+def fake_mode_response(mode: int, *, seq: int = 1, model: int = 0x000E,
+                       serial: int = 0x12345678, error: int = 0) -> bytes:
+    """Build the BDTP-recovered datagram a device would send for a mode read.
+
+    Mirrors the real BEM response wire layout (bst-bem-response.md): a data block
+    of BEM Id, Sequence Id, Model Id (2, LE), Serial Number (4, LE), Error Code
+    (4, LE) then the 2-byte little-endian operating mode, plus the trailing
+    zero-sum checksum. The mode therefore sits behind the 14-byte header, not
+    immediately after the BEM Id.
+    """
+    data_block = (
+        bytes([cd.BEM_OPMODE, seq & 0xFF])
+        + (model & 0xFFFF).to_bytes(2, "little")
+        + (serial & 0xFFFFFFFF).to_bytes(4, "little")
+        + (error & 0xFFFFFFFF).to_bytes(4, "little")
+        + bytes([mode & 0xFF, (mode >> 8) & 0xFF])
+    )
+    datagram = bytes([cd.BEM_RSP_ID, len(data_block)]) + data_block
     return datagram + bytes([cd.bst_checksum(datagram)])
 
 
@@ -45,6 +60,20 @@ def main() -> None:
         got = cd.decode_bem_mode_response(fake_mode_response(mode))
         t.equal(f"decode mode response {mode}", got, mode)
 
+    # Decode the worked example from bst-bem-response.md (mode 0x0203).
+    doc_example = bytes([0xA0, 0x0E, 0x11, 0x05, 0x00, 0x0E, 0x78, 0x56, 0x34, 0x12,
+                         0x00, 0x00, 0x00, 0x00, 0x03, 0x02])
+    doc_example += bytes([cd.bst_checksum(doc_example)])
+    t.equal("decode documented example", cd.decode_bem_mode_response(doc_example), 0x0203)
+
+    # Regression (NGXSW-4343): the mode must be read from behind the 14-byte
+    # header. The original decoder read the Sequence Id and Model-Id low byte
+    # instead, so a device genuinely in mode 5 was reported as 15105 (0x3B01 -
+    # seq 0x01 as the low byte, model-id low byte 0x3B as the high byte).
+    misread = fake_mode_response(cd.MODE_CAN_DIRECT, seq=0x01, model=0x003B)
+    t.equal("mode 5 not misread as 15105",
+            cd.decode_bem_mode_response(misread), cd.MODE_CAN_DIRECT)
+
     # --- Negative cases: non-mode frames must return None, not raise ---------
     not_mode = cd.decode_bem_mode_response(datagram_on_wire(cd.encode_bem_get_mode()))
     t.equal("command frame is not a mode response", not_mode, None)
@@ -53,6 +82,8 @@ def main() -> None:
     corrupt = bytearray(fake_mode_response(cd.MODE_CAN_DIRECT))
     corrupt[-1] ^= 0xFF
     t.equal("corrupt response rejected", cd.decode_bem_mode_response(bytes(corrupt)), None)
+    err_rsp = fake_mode_response(cd.MODE_NORMAL, error=0x00000019)
+    t.equal("error-code response rejected", cd.decode_bem_mode_response(err_rsp), None)
 
     print(f"\nSet-mode-5 wire: {hexstr(cd.encode_bem_set_mode(cd.MODE_CAN_DIRECT))}")
     t.finish()

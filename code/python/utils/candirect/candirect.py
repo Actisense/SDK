@@ -47,6 +47,14 @@ BEM_CMD_ID = 0xA1  # BST ID for a BEM command
 BEM_RSP_ID = 0xA0  # BST ID for a BEM response
 BEM_OPMODE = 0x11  # BEM Id for "operating mode"
 
+# BEM responses (unlike commands) carry a fixed header before the data block
+# (see DataFormats/Binary/bst-bem-response.md): within the BST datagram this is
+# BST ID, BST Length, BEM Id, Sequence Id, Model Id (2), Serial Number (4) and
+# Error Code (4) - 14 bytes - so the command-specific data payload begins at
+# datagram offset 14, NOT immediately after the BEM Id as it does in a command.
+BEM_RSP_HEADER_LEN = 14      # datagram bytes before the data block (incl. BST ID + length)
+BEM_RSP_ERRCODE_OFFSET = 10  # 4-byte little-endian ARL error code within the datagram
+
 # Operating-mode codes (firmware OperatingModeCodes.h, mirrored in the SDK
 # public operating_mode.hpp).
 MODE_NORMAL = 1      # OM_NGTransferNormalMode
@@ -343,9 +351,14 @@ def encode_bem_get_mode() -> bytes:
 def decode_bem_mode_response(frame: bytes) -> Optional[int]:
     """Extract the 16-bit operating mode from a BDTP-recovered BEM response.
 
-    Returns None if the frame is not a valid operating-mode response.
+    A BEM response carries a 14-byte header (BST ID, length, BEM Id, sequence
+    id, model id, serial number, error code) before its data block, so the
+    operating-mode value lives at datagram offset 14..15 - not immediately after
+    the BEM Id as in a command. Returns None if the frame is not a successful
+    operating-mode response.
     """
-    if len(frame) < 4:
+    # Need the full header plus the 2 mode bytes and the trailing checksum byte.
+    if len(frame) < BEM_RSP_HEADER_LEN + 2 + 1:
         return None
     if frame[0] != BEM_RSP_ID:
         return None
@@ -354,10 +367,14 @@ def decode_bem_mode_response(frame: bytes) -> Optional[int]:
         return None
     if not verify_zero_sum(frame):
         return None
-    payload = frame[2:-1]
-    if len(payload) < 3 or payload[0] != BEM_OPMODE:
+    if frame[2] != BEM_OPMODE:
         return None
-    return payload[1] | (payload[2] << 8)
+    # A non-zero ARL error code means the device rejected the request.
+    error_code = int.from_bytes(
+        frame[BEM_RSP_ERRCODE_OFFSET:BEM_RSP_ERRCODE_OFFSET + 4], "little")
+    if error_code != 0:
+        return None
+    return frame[BEM_RSP_HEADER_LEN] | (frame[BEM_RSP_HEADER_LEN + 1] << 8)
 
 
 # ---------------------------------------------------------------------------
