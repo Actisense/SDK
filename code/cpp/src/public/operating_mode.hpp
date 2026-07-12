@@ -205,6 +205,18 @@ namespace Actisense
 			 ***************************************************************************/
 			NsiMode1 = 24, /* Reserved for NSI mode */
 
+			/**********************************************************************/ /**
+			 \brief    	IEC 61162-450/460 Mode 1.
+			 \details  	Device operates as an IEC 61162-450 network node (with
+						 the IEC 61162-460 constraints layered on top).
+						 Activation is by this Operating Mode alone; mutual
+						 exclusion with NSI mode and every other mode comes
+						 from the device's standard operating mode machinery.
+			 \note		Enum value 25. Matches firmware OperatingModeCodes.h
+						 OM_IEC450_MODE_1 (IEC450-201).
+			 ***************************************************************************/
+			Iec450Mode1 = 25,
+
 			/* All "Standard" modes are less than this number */
 			LastStandard = 253,
 

@@ -64,6 +64,8 @@ namespace Actisense
 					return "Test Mode 1";
 				case OperatingMode::NsiMode1:
 					return "NSI Mode 1";
+				case OperatingMode::Iec450Mode1:
+					return "IEC 450 Mode 1";
 				case OperatingMode::LastStandard:
 					return "Last Standard Mode";
 

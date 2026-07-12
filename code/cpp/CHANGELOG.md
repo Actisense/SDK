@@ -84,6 +84,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   via a `RemoteDevice` regardless of the stream, since that is a property of
   the target rather than the local link. See
   `docs/nmea0183-encapsulation.md`.
+- **`OperatingMode::Iec450Mode1` (IEC450-201).** New operating mode value 25,
+  mirroring the firmware `OM_IEC450_MODE_1` — the IEC 61162-450/460 network
+  mode introduced alongside (and mutually exclusive with) `NsiMode1`.
+  `OperatingModeName()` reports it as "IEC 450 Mode 1".
+
 - **Public unsolicited BEM payload headers.** The four typed
   unsolicited payloads and their enums now live in dedicated public headers —
   `public/bem_responses/system_status.hpp` (`SystemStatusData` +

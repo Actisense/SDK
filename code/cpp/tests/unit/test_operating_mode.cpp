@@ -103,6 +103,15 @@ TEST_F(OperatingModeHelperTest, EncodeSet_CanPacketAsciiMode)
 	EXPECT_EQ(data_[1], 0x00);
 }
 
+TEST_F(OperatingModeHelperTest, EncodeSet_Iec450Mode)
+{
+	/* IEC450-201: Iec450Mode1 = 25 — IEC 61162-450/460 network mode. */
+	encodeOperatingModeSetRequest(OperatingMode::Iec450Mode1, data_);
+	ASSERT_EQ(data_.size(), 2u);
+	EXPECT_EQ(data_[0], 0x19);
+	EXPECT_EQ(data_[1], 0x00);
+}
+
 TEST_F(OperatingModeHelperTest, EncodeSet_LittleEndianHighByte)
 {
 	/* Normal = 512 = 0x0200 — exercises the high byte */
@@ -172,6 +181,20 @@ TEST_F(OperatingModeHelperTest, DecodeResponse_UserMode)
 	OperatingMode mode = OperatingMode::UndefinedMode;
 	EXPECT_TRUE(decodeOperatingModeResponse(payload, mode, error_));
 	EXPECT_EQ(static_cast<uint16_t>(mode), 50000u);
+}
+
+TEST_F(OperatingModeHelperTest, DecodeResponse_Iec450Mode)
+{
+	/* IEC450-201: 0x0019 = 25 = Iec450Mode1 — completes the wire round-trip
+	   with EncodeSet_Iec450Mode, and pins the firmware OM_IEC450_MODE_1
+	   numeric mirror. */
+	const std::array<uint8_t, 2> payload = {0x19, 0x00};
+	OperatingMode mode = OperatingMode::UndefinedMode;
+	EXPECT_TRUE(decodeOperatingModeResponse(payload, mode, error_));
+	EXPECT_TRUE(error_.empty());
+	EXPECT_EQ(mode, OperatingMode::Iec450Mode1);
+	EXPECT_EQ(static_cast<uint16_t>(mode), 25u);
+	EXPECT_NE(mode, OperatingMode::NsiMode1);
 }
 
 TEST_F(OperatingModeHelperTest, DecodeResponse_AllowsTrailingBytes)
@@ -421,6 +444,9 @@ TEST(OperatingModeNameTest, NamedCases_BufferAndCombiner)
 	EXPECT_STREQ(OperatingModeName(OperatingMode::Combine2), "Combiner Fast Mode");
 	EXPECT_STREQ(OperatingModeName(OperatingMode::Test1), "Test Mode 1");
 	EXPECT_STREQ(OperatingModeName(OperatingMode::NsiMode1), "NSI Mode 1");
+	/* IEC450-201: IEC 61162-450/460 network mode, alongside (and mutually
+	   exclusive with) NSI mode. */
+	EXPECT_STREQ(OperatingModeName(OperatingMode::Iec450Mode1), "IEC 450 Mode 1");
 	EXPECT_STREQ(OperatingModeName(OperatingMode::LastStandard), "Last Standard Mode");
 }
 
