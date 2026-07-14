@@ -12,6 +12,7 @@
 #include "protocols/bem/bem_commands/can_info_fields.hpp"
 #include "protocols/bem/bem_commands/echo.hpp"
 #include "protocols/bem/bem_commands/operating_mode.hpp"
+#include "protocols/bem/bem_wrap_parlb.hpp"
 #include "public/error.hpp"
 #include "util/endian.hpp"
 
@@ -21,7 +22,7 @@ namespace Actisense
 	{
 		/* Public Function Definitions ------------------------------------------ */
 
-		BemProtocol::BemProtocol() = default;
+		BemProtocol::BemProtocol(CommandStream commandStream) : command_stream_(commandStream) {}
 
 		BemProtocol::~BemProtocol() {
 			/* Reentrancy contract: clearPendingRequests() fires each pending
@@ -66,6 +67,20 @@ namespace Actisense
 			if (!encodeCommandInnerBst(command, bstPayload, outError)) {
 				return false;
 			}
+
+			/* The inner BST bytes are stream-agnostic; only the envelope around
+			   them differs. This is the same seam the PGN 126720 wrap uses to
+			   reach a remote device. */
+			if (command_stream_ == CommandStream::N183) {
+				std::string sentence;
+				if (!wrapBemInParlb(bstPayload, sentence, outError)) {
+					return false;
+				}
+				outFrame.assign(sentence.begin(), sentence.end());
+				++commands_sent_;
+				return true;
+			}
+
 			bstPayload.reserve(bstPayload.size() + 1);
 
 			/* Calculate and append checksum */

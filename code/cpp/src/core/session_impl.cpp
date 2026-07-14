@@ -30,9 +30,10 @@ namespace Actisense
 		/* Public Function Definitions ------------------------------------------ */
 
 		Session::Impl::Impl(TransportPtr transport, EventCallback eventCallback,
-							ErrorCallback errorCallback)
+							ErrorCallback errorCallback, CommandStream commandStream)
 			: transport_(std::move(transport)), eventCallback_(std::move(eventCallback)),
-			  errorCallback_(std::move(errorCallback)) {}
+			  errorCallback_(std::move(errorCallback)), command_stream_(commandStream),
+			  bem_(commandStream) {}
 
 		Session::Impl::~Impl() {
 			close();

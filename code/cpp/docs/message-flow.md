@@ -41,6 +41,36 @@ graph TB
 | **BDTP** | Byte-stream framing, DLE escaping, checksum | `BdtpProtocol` |
 | **Transport** | Raw byte I/O over serial, TCP, UDP, or loopback | `ITransport`, `SerialTransport` |
 
+### 1.1 Command Streams
+
+The diagram above shows the default path. A BEM command is really just a small
+run of *inner BST bytes* — `BST ID + storeLength + BEM ID + data` — and the
+layer beneath decides what envelope carries them. The SDK has three:
+
+| Stream | Envelope | Used for |
+|--------|----------|----------|
+| **BST** (default) | BDTP framing: `DLE STX … DLE ETX` + checksum | Gateways whose serial port speaks the binary protocol |
+| **NMEA 0183** | `!PARLB,1,1,<6-bit armour>*hh<CR><LF>` | Gateways whose serial port emits NMEA 0183 and cannot accept binary framing |
+| **NMEA 2000** | PGN 126720 proprietary envelope, addressed over the bus | Devices reached through a gateway via `RemoteDevice` |
+
+The first two are properties of the *link* and are chosen once, at open time:
+
+```cpp
+OpenOptions options;
+options.transport.kind = TransportKind::Serial;
+options.transport.serial.port = "COM31";
+options.transport.serial.baud = 38400;
+options.commandStream = CommandStream::N183;   // default is CommandStream::Bst
+```
+
+Every session verb behaves identically on either stream — same commands, same
+responses, same correlation and timeout handling. Only the bytes on the wire
+differ. The third is a property of the *target* rather than the link, and is
+selected by addressing a `RemoteDevice` instead of the session.
+
+See [NMEA 0183 Encapsulation](nmea0183-encapsulation.md) for the `!PARLB` wire
+format and when to choose that stream.
+
 ---
 
 ## 2. Transmit Path (API to Wire)

@@ -105,10 +105,12 @@ set(SDK_SOURCES
     protocols/bst/bst_frame.cpp
     protocols/bem/bem_protocol.cpp
     protocols/bem/bem_wrap_126720.cpp
+    protocols/bem/bem_wrap_parlb.cpp
     protocols/bem/bem_commands/operating_mode.cpp
 
     # Utilities
     util/bdtp_frame_assembler.cpp
+    util/n183_sentence_assembler.cpp
     util/debug_log.cpp
     util/stderr_logger.cpp
 

@@ -6,6 +6,14 @@ add_sdk_test(test_bdtp_loopback test_bdtp_loopback.cpp)
 add_sdk_test(test_bem_device test_bem_device.cpp)
 # Remote BEM via PGN 126720 wrapping over a fake-gateway loopback (GIT-88)
 add_sdk_test(test_remote_bem_loopback test_remote_bem_loopback.cpp)
+
+# BEM over the NMEA 0183 (!PARLB) command stream — hermetic loopback,
+# fixtures captured from a real 0183 gateway (GIT-132)
+add_sdk_test(test_parlb_loopback test_parlb_loopback.cpp)
+
+# BEM over !PARLB against a real NMEA 0183 gateway
+# (requires ACTISENSE_TEST_PORT_N183 env var) (GIT-132)
+add_sdk_test(test_parlb_device test_parlb_device.cpp)
 # Remote BEM sweep against a real remote device on the N2K bus (GIT-92)
 # Requires ACTISENSE_TEST_PORT (local gateway) and optionally
 # ACTISENSE_TEST_REMOTE_ADDR (defaults to 200).

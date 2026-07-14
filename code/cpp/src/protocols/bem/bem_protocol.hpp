@@ -18,6 +18,7 @@
 #include "protocols/bdtp/bdtp_protocol.hpp"
 #include "protocols/bem/bem_commands/delete_pgn_enable_lists.hpp"
 #include "protocols/bem/bem_types.hpp"
+#include "public/config.hpp"
 
 namespace Actisense
 {
@@ -43,8 +44,11 @@ namespace Actisense
 		public:
 			/**************************************************************************/ /**
 			 \brief      Constructor
+			 \param[in]  commandStream  How encodeCommand() should wrap commands
+										for the wire. Defaults to the binary
+										host-link framing.
 			 *******************************************************************************/
-			BemProtocol();
+			explicit BemProtocol(CommandStream commandStream = CommandStream::Bst);
 
 			/**************************************************************************/ /**
 			 \brief      Destructor
@@ -56,12 +60,22 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Encode a BEM command for transmission
 			 \param[in]  command    Command to encode
-			 \param[out] outFrame   Complete BDTP-framed message ready to send
+			 \param[out] outFrame   Complete wire bytes ready to send verbatim:
+									a BDTP-framed message on the Bst stream, or a
+									complete "!PARLB" NMEA 0183 sentence
+									(including "*hh" and CR/LF) on the N183
+									stream. Either way the caller sends it as-is
+									and applies no further framing.
 			 \param[out] outError   Error message if encoding fails
 			 \return     True on success
 			 *******************************************************************************/
 			[[nodiscard]] bool encodeCommand(const BemCommand& command,
 											 std::vector<uint8_t>& outFrame, std::string& outError);
+
+			/**************************************************************************/ /**
+			 \brief      The command stream this protocol instance encodes for.
+			 *******************************************************************************/
+			[[nodiscard]] CommandStream commandStream() const noexcept { return command_stream_; }
 
 			/**************************************************************************/ /**
 			 \brief      Encode a BEM command as the bare inner BST bytes
@@ -658,6 +672,7 @@ namespace Actisense
 			std::map<uint64_t, PendingRequest> pending_requests_;
 
 			/* Statistics */
+			CommandStream command_stream_ = CommandStream::Bst;
 			std::size_t commands_sent_ = 0;
 			std::size_t responses_received_ = 0;
 			std::size_t responses_correlated_ = 0;
