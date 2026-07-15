@@ -10,6 +10,12 @@
 			 Lists (0x4A) BEM commands. This command clears session PGN enable
 			 lists without affecting stored configuration until committed.
 
+			 The DeletePgnListSelector enum itself is public — it is a parameter
+			 of Session::defaultPgnEnableList and RemoteDevice::defaultPgnEnableList
+			 — and lives in public/bem_responses/pgn_enable_lists.hpp (GIT-136).
+			 Only the wire-format constants and the encode/decode helpers below
+			 are internal.
+
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
 
@@ -18,6 +24,8 @@
 #include <span>
 #include <string>
 #include <vector>
+
+#include "public/bem_responses/pgn_enable_lists.hpp"
 
 namespace Actisense
 {
@@ -31,18 +39,8 @@ namespace Actisense
 		/// Delete PGN Enable Lists response size (no data, just BEM header)
 		static constexpr std::size_t kDeletePgnEnableListsResponseSize = 0;
 
-		/* Enumerations --------------------------------------------------------- */
-
-		/**************************************************************************/ /**
-		 \brief      Delete PGN Enable Lists selector values
-		 \details    Specifies which list(s) to delete from session
-		 *******************************************************************************/
-		enum class DeletePgnListSelector : uint8_t
-		{
-			RxList = 0x00, ///< Delete Rx PGN enable list only
-			TxList = 0x01, ///< Delete Tx PGN enable list only
-			Both = 0x02	   ///< Delete both Rx and Tx lists
-		};
+		/* DeletePgnListSelector is declared in
+		   public/bem_responses/pgn_enable_lists.hpp (included above). */
 
 		/* Helper Functions ----------------------------------------------------- */
 

@@ -86,6 +86,35 @@ namespace Actisense
 
 			[[nodiscard]] std::unique_ptr<RemoteDevice> openRemote(uint8_t n2kSourceAddress);
 
+			/* PGN enable lists, public ack shape (GIT-136). These overload the raw
+			   BemResponseCallback variants declared further down: they wrap the
+			   caller's BemResultCallback with wrapAck(*this, kLocalSrcAddr, ...) so
+			   the reply is delivered as (code, errorMsg, origin) with a local
+			   ResponseOrigin — exactly as setOperatingMode already does. Overload
+			   resolution is unambiguous because BemResponseCallback is not
+			   constructible from BemResultCallback (their signatures differ). */
+
+			void setRxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
+								BemResultCallback callback);
+
+			void setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
+										std::chrono::milliseconds timeout,
+										BemResultCallback callback);
+
+			void setTxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
+								BemResultCallback callback);
+
+			void setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
+										std::chrono::milliseconds timeout,
+										BemResultCallback callback);
+
+			void activatePgnEnableLists(std::chrono::milliseconds timeout,
+										BemResultCallback callback);
+
+			void defaultPgnEnableList(DeletePgnListSelector selector,
+									  std::chrono::milliseconds timeout,
+									  BemResultCallback callback);
+
 			[[nodiscard]] std::string_view transportLabel() const noexcept {
 				return transport_label_;
 			}

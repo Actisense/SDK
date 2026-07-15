@@ -105,6 +105,54 @@ namespace Actisense
 							 wrapAck(*this, kLocalSrcAddr, std::move(callback)));
 		}
 
+		/* PGN enable lists, public ack shape (GIT-136) ------------------------- */
+
+		/* Each of these forwards to the raw BemResponseCallback overload of the same
+		   name, wrapping the caller's BemResultCallback exactly as setOperatingMode
+		   above does. kLocalSrcAddr selects makeLocalOrigin() inside wrapAck, so a
+		   reply from the locally-connected gateway is stamped as local rather than
+		   carrying a bus source address. */
+
+		void Session::Impl::setRxPgnEnable(uint32_t pgn, uint8_t enable,
+										   std::chrono::milliseconds timeout,
+										   BemResultCallback callback) {
+			setRxPgnEnable(pgn, enable, timeout,
+						   wrapAck(*this, kLocalSrcAddr, std::move(callback)));
+		}
+
+		void Session::Impl::setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
+												   std::chrono::milliseconds timeout,
+												   BemResultCallback callback) {
+			setRxPgnEnableWithMask(pgn, enable, mask, timeout,
+								   wrapAck(*this, kLocalSrcAddr, std::move(callback)));
+		}
+
+		void Session::Impl::setTxPgnEnable(uint32_t pgn, uint8_t enable,
+										   std::chrono::milliseconds timeout,
+										   BemResultCallback callback) {
+			setTxPgnEnable(pgn, enable, timeout,
+						   wrapAck(*this, kLocalSrcAddr, std::move(callback)));
+		}
+
+		void Session::Impl::setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
+												   std::chrono::milliseconds timeout,
+												   BemResultCallback callback) {
+			setTxPgnEnableWithRate(pgn, enable, txRate, timeout,
+								   wrapAck(*this, kLocalSrcAddr, std::move(callback)));
+		}
+
+		void Session::Impl::activatePgnEnableLists(std::chrono::milliseconds timeout,
+												   BemResultCallback callback) {
+			activatePgnEnableLists(timeout, wrapAck(*this, kLocalSrcAddr, std::move(callback)));
+		}
+
+		void Session::Impl::defaultPgnEnableList(DeletePgnListSelector selector,
+												 std::chrono::milliseconds timeout,
+												 BemResultCallback callback) {
+			defaultPgnEnableList(selector, timeout,
+								 wrapAck(*this, kLocalSrcAddr, std::move(callback)));
+		}
+
 		void Session::Impl::getHardwareInfo(std::chrono::milliseconds timeout,
 											HardwareInfoCallback callback) {
 			getProductInfo(timeout, [this, cb = std::move(callback)](

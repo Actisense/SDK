@@ -166,6 +166,99 @@ namespace Actisense
 			 *******************************************************************************/
 			[[nodiscard]] std::unique_ptr<RemoteDevice> openRemote(uint8_t n2kSourceAddress);
 
+			/* PGN enable lists -------------------------------------------------- */
+
+			/* These verbs configure the locally-connected gateway's own Rx/Tx PGN
+			   enable lists — the filters deciding which PGNs it forwards bus-to-host
+			   and host-to-bus. They mirror the same-named RemoteDevice verbs (GIT-93),
+			   which act on a device reached over the N2K bus instead (GIT-136).
+
+			   Changes are session-only until committed: set the individual entries,
+			   then call activatePgnEnableLists() to apply them. Nothing here writes
+			   EEPROM/FLASH, so a power cycle restores the stored configuration. */
+
+			/**************************************************************************/ /**
+			 \brief      Set the Rx-enable state for a single PGN on the local gateway.
+			 \param[in]  pgn       PGN to configure
+			 \param[in]  enable    0 = disabled, 1 = enabled, 2 = respond mode
+			 \param[in]  timeout   Response timeout
+			 \param[in]  callback  Invoked with the device's acknowledgement
+			 \details    Takes effect on the next activatePgnEnableLists() call.
+			 *******************************************************************************/
+			void setRxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
+								BemResultCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Set Rx-enable for a PGN with an explicit instance/group mask.
+			 \param[in]  pgn       PGN to configure
+			 \param[in]  enable    0 = disabled, 1 = enabled, 2 = respond mode
+			 \param[in]  mask      PGN mask for instance/group filtering
+			 \param[in]  timeout   Response timeout
+			 \param[in]  callback  Invoked with the device's acknowledgement
+			 *******************************************************************************/
+			void setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
+										std::chrono::milliseconds timeout,
+										BemResultCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Set the Tx-enable state for a single PGN on the local gateway.
+			 \param[in]  pgn       PGN to configure
+			 \param[in]  enable    0 = disabled, 1 = enabled, 2 = respond mode
+			 \param[in]  timeout   Response timeout
+			 \param[in]  callback  Invoked with the device's acknowledgement
+			 \details    Takes effect on the next activatePgnEnableLists() call.
+			 *******************************************************************************/
+			void setTxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
+								BemResultCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Set Tx-enable for a PGN with an explicit transmit rate.
+			 \param[in]  pgn       PGN to configure
+			 \param[in]  enable    0 = disabled, 1 = enabled, 2 = respond mode
+			 \param[in]  txRate    Transmission rate in milliseconds
+			 \param[in]  timeout   Response timeout
+			 \param[in]  callback  Invoked with the device's acknowledgement
+			 *******************************************************************************/
+			void setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
+										std::chrono::milliseconds timeout,
+										BemResultCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Activate the local gateway's session PGN-enable lists.
+			 \param[in]  timeout   Response timeout
+			 \param[in]  callback  Invoked with the device's acknowledgement
+			 \details    Applies the entries accumulated by the set* verbs above.
+						 Until this is called, those entries are staged and the
+						 device keeps filtering on its previous lists.
+			 *******************************************************************************/
+			void activatePgnEnableLists(std::chrono::milliseconds timeout,
+										BemResultCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Restore the operating-mode default Rx/Tx enable list(s).
+			 \param[in]  selector  Which list(s) to restore (Rx, Tx, or Both)
+			 \param[in]  timeout   Response timeout
+			 \param[in]  callback  Invoked with the device's acknowledgement
+			 \details    Discards session-only enable mutations, returning the
+						 selected list(s) to the defaults for the current operating
+						 mode. Follow with activatePgnEnableLists() to apply.
+			 *******************************************************************************/
+			void defaultPgnEnableList(DeletePgnListSelector selector,
+									  std::chrono::milliseconds timeout,
+									  BemResultCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Walk the local gateway's Supported PGN List end-to-end and
+						 deliver the merged result.
+			 \param[in]  perGetTimeout  Timeout per sub-list GET
+			 \param[in]  callback       Invoked once with the merged result
+			 \note       This reports the PGNs the device itself produces as a node
+						 on the bus — not the set it will accept on host-Tx and
+						 forward. The Tx enable list is the forwarding filter.
+			 *******************************************************************************/
+			void getSupportedPgnList_All(std::chrono::milliseconds perGetTimeout,
+										 SupportedPgnListResultCallback callback);
+
 			/**************************************************************************/ /**
 			 \brief      Transport label reported in ResponseOrigin::transportId
 						 on every typed BEM callback this Session (and its

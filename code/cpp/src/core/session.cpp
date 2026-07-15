@@ -63,6 +63,48 @@ namespace Actisense
 			return impl_->openRemote(n2kSourceAddress);
 		}
 
+		/* PGN enable lists (GIT-136) ------------------------------------------- */
+
+		void Session::setRxPgnEnable(uint32_t pgn, uint8_t enable,
+									 std::chrono::milliseconds timeout,
+									 BemResultCallback callback) {
+			impl_->setRxPgnEnable(pgn, enable, timeout, std::move(callback));
+		}
+
+		void Session::setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
+											 std::chrono::milliseconds timeout,
+											 BemResultCallback callback) {
+			impl_->setRxPgnEnableWithMask(pgn, enable, mask, timeout, std::move(callback));
+		}
+
+		void Session::setTxPgnEnable(uint32_t pgn, uint8_t enable,
+									 std::chrono::milliseconds timeout,
+									 BemResultCallback callback) {
+			impl_->setTxPgnEnable(pgn, enable, timeout, std::move(callback));
+		}
+
+		void Session::setTxPgnEnableWithRate(uint32_t pgn, uint8_t enable, uint32_t txRate,
+											 std::chrono::milliseconds timeout,
+											 BemResultCallback callback) {
+			impl_->setTxPgnEnableWithRate(pgn, enable, txRate, timeout, std::move(callback));
+		}
+
+		void Session::activatePgnEnableLists(std::chrono::milliseconds timeout,
+											 BemResultCallback callback) {
+			impl_->activatePgnEnableLists(timeout, std::move(callback));
+		}
+
+		void Session::defaultPgnEnableList(DeletePgnListSelector selector,
+										   std::chrono::milliseconds timeout,
+										   BemResultCallback callback) {
+			impl_->defaultPgnEnableList(selector, timeout, std::move(callback));
+		}
+
+		void Session::getSupportedPgnList_All(std::chrono::milliseconds perGetTimeout,
+											  SupportedPgnListResultCallback callback) {
+			impl_->getSupportedPgnList_All(perGetTimeout, std::move(callback));
+		}
+
 		std::string_view Session::transportLabel() const noexcept {
 			return impl_->transportLabel();
 		}

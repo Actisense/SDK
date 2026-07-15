@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **PGN enable-list verbs on `Session` (GIT-136).** `Session` can now configure
+  the PGN enable lists of the gateway it is connected to:
+  `setRxPgnEnable()`, `setRxPgnEnableWithMask()`, `setTxPgnEnable()`,
+  `setTxPgnEnableWithRate()`, `activatePgnEnableLists()`,
+  `defaultPgnEnableList()` and `getSupportedPgnList_All()`. These mirror the
+  same-named `RemoteDevice` verbs, which act on a device reached over the
+  NMEA 2000 bus; the new ones act on the locally-attached gateway. Previously
+  this was possible only through SDK-internal headers, so a consumer of the
+  public API could configure a *remote* device's filters but not their own
+  gateway's. Entries are session-only until `activatePgnEnableLists()` is
+  called, and nothing here writes EEPROM/FLASH.
+
+- **`DeletePgnListSelector` is now a public type**, in
+  `public/bem_responses/pgn_enable_lists.hpp` (reachable via `public/api.hpp`).
+  It is the parameter of `defaultPgnEnableList()`, but `public/remote_device.hpp`
+  had only forward-declared it — so a consumer using public headers alone could
+  name the type yet never construct a value to pass. Purely additive: the enum
+  and its values are unchanged.
+
 - **NMEA 0183 command stream (`OpenOptions::commandStream`).** BEM device
   commands can now be carried inside proprietary `!PARLB` NMEA 0183 sentences
   as well as over the binary host link. `CommandStream::Bst` (the default, and

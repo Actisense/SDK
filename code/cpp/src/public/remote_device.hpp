@@ -41,10 +41,10 @@ namespace Actisense
 	{
 		/* Forward declarations ------------------------------------------------- */
 
-		/* Defined in the BEM command layer (delete_pgn_enable_lists.hpp).
-		   Forward-declared here so this public header is self-contained; callers
-		   that pass a concrete selector value include the defining header. */
-		enum class DeletePgnListSelector : uint8_t;
+		/* DeletePgnListSelector arrives complete via public/bem_callbacks.hpp ->
+		   public/bem_responses/pgn_enable_lists.hpp. It was previously only
+		   forward-declared here, which let a public caller name the type but never
+		   construct a value to pass to defaultPgnEnableList (GIT-136). */
 
 		namespace detail
 		{

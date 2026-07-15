@@ -173,7 +173,11 @@ TEST_F(SessionPgnListManagementTest, DeletePgnEnableLists_RejectsInvalidSelector
 
 TEST_F(SessionPgnListManagementTest, ActivatePgnEnableLists_SendsCommand)
 {
-	session_->activatePgnEnableLists(kTimeout, nullptr);
+	/* GIT-136 added a BemResultCallback overload of this verb for the public
+	   Session facade, so a bare nullptr no longer names one callback shape.
+	   These tests assert the encoded command bytes, which is the raw
+	   BemResponseCallback path — say so explicitly. */
+	session_->activatePgnEnableLists(kTimeout, BemResponseCallback{});
 
 	const auto dgm = captureSentDatagram();
 	EXPECT_EQ(dgm.bstId, static_cast<uint8_t>(BstId::Bem_PG_A1));
@@ -183,7 +187,7 @@ TEST_F(SessionPgnListManagementTest, ActivatePgnEnableLists_SendsCommand)
 
 TEST_F(SessionPgnListManagementTest, DefaultPgnEnableList_EncodesSelector)
 {
-	session_->defaultPgnEnableList(DeletePgnListSelector::Both, kTimeout, nullptr);
+	session_->defaultPgnEnableList(DeletePgnListSelector::Both, kTimeout, BemResponseCallback{});
 
 	const auto dgm = captureSentDatagram();
 	EXPECT_EQ(dgm.bstId, static_cast<uint8_t>(BstId::Bem_PG_A1));

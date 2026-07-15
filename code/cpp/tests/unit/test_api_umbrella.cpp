@@ -58,6 +58,38 @@ namespace
 		EXPECT_GT(sizeof(Version), 0u);              // version.hpp
 		EXPECT_GT(sizeof(WireTraceConfig), 0u);      // wire_trace.hpp
 	}
+
+	// GIT-136: DeletePgnListSelector must be *complete* through public/api.hpp
+	// alone, not merely declared.
+	//
+	// Note this deliberately names enumerators rather than taking sizeof(). The
+	// bug being pinned was that public/remote_device.hpp carried only an opaque
+	// declaration (`enum class DeletePgnListSelector : uint8_t;`) — and because an
+	// opaque enum has a fixed underlying type, sizeof() compiles happily against
+	// it. A public-only consumer could therefore name the parameter type but never
+	// construct a value to pass to defaultPgnEnableList(). Naming an enumerator is
+	// what actually requires the definition, so it is what guards the fix.
+	TEST(ApiUmbrella, PgnEnableListSelectorIsCompleteThroughApiHpp) {
+		EXPECT_EQ(static_cast<uint8_t>(DeletePgnListSelector::RxList), 0x00u);
+		EXPECT_EQ(static_cast<uint8_t>(DeletePgnListSelector::TxList), 0x01u);
+		EXPECT_EQ(static_cast<uint8_t>(DeletePgnListSelector::Both), 0x02u);
+	}
+
+	// GIT-136: the PGN enable-list verbs must be callable on the public Session.
+	// This TU is the only one compiled against a public-only include path, so it
+	// is the only place that can prove a consumer with nothing but api.hpp can
+	// reach them. Naming each member-function pointer forces the declaration to
+	// exist with exactly this signature; the loopback integration test covers the
+	// runtime behaviour.
+	TEST(ApiUmbrella, SessionPgnEnableVerbsAreReachableThroughApiHpp) {
+		EXPECT_NE(&Session::setRxPgnEnable, nullptr);
+		EXPECT_NE(&Session::setRxPgnEnableWithMask, nullptr);
+		EXPECT_NE(&Session::setTxPgnEnable, nullptr);
+		EXPECT_NE(&Session::setTxPgnEnableWithRate, nullptr);
+		EXPECT_NE(&Session::activatePgnEnableLists, nullptr);
+		EXPECT_NE(&Session::defaultPgnEnableList, nullptr);
+		EXPECT_NE(&Session::getSupportedPgnList_All, nullptr);
+	}
 } // namespace
 
 /**************** (C) COPYRIGHT Active Research Limited  ** END OF FILE **/

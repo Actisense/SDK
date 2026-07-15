@@ -35,6 +35,7 @@
 #include "public/bem_responses/echo.hpp"
 #include "public/bem_responses/params_pgn_enable_lists.hpp"
 #include "public/bem_responses/pgn_enable_list_f2.hpp"
+#include "public/bem_responses/pgn_enable_lists.hpp"
 #include "public/bem_responses/port_baudrate.hpp"
 #include "public/bem_responses/port_pcode.hpp"
 #include "public/bem_responses/product_info.hpp"
