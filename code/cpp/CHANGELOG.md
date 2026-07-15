@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **NMEA 0183 command stream (`OpenOptions::commandStream`).** BEM device
+  commands can now be carried inside proprietary `!PARLB` NMEA 0183 sentences
+  as well as over the binary host link. `CommandStream::Bst` (the default, and
+  the previous behaviour) suits gateways whose serial port speaks the Actisense
+  binary protocol; `CommandStream::N183` supports gateways that emit NMEA 0183
+  and cannot accept BST framing at all. Both streams carry exactly the same
+  commands and produce the same responses — only the envelope differs, and
+  every session verb behaves identically either way. On the 0183 stream, plain
+  NMEA 0183 sentences arriving from the device are surfaced as `nmea0183`
+  message events. Devices reached across the NMEA 2000 bus are still addressed
+  via a `RemoteDevice` regardless of the stream, since that is a property of
+  the target rather than the local link. See
+  `docs/nmea0183-encapsulation.md`.
 - **Public unsolicited BEM payload headers (GIT-130).** The four typed
   unsolicited payloads and their enums now live in dedicated public headers —
   `public/bem_responses/system_status.hpp` (`SystemStatusData` +
