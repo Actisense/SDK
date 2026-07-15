@@ -93,6 +93,34 @@ namespace Actisense
 		};
 
 		/**************************************************************************/ /**
+		 \brief      Selects how BEM commands are carried to and from the device.
+		 \details    A device's command stream is a property of the link it
+					 speaks, not of the command being sent, so it is chosen once
+					 when the session is opened.
+
+					 Both streams carry exactly the same BEM commands and produce
+					 exactly the same responses; only the envelope differs. Every
+					 session verb behaves identically either way.
+
+					 Devices reached across the NMEA 2000 bus are addressed via a
+					 RemoteDevice regardless of which stream this selects - that
+					 is a property of the target, not of the local link.
+		 *******************************************************************************/
+		enum class CommandStream
+		{
+			/// Binary host-link framing. The default, and correct for gateways
+			/// whose serial port speaks the Actisense binary protocol.
+			Bst,
+
+			/// BEM commands tunnelled inside proprietary "!PARLB" NMEA 0183
+			/// sentences. Required for gateways whose serial port emits NMEA
+			/// 0183 rather than binary - they cannot accept BST framing at all.
+			/// On this stream, plain NMEA 0183 sentences arriving from the
+			/// device are surfaced as "nmea0183" message events.
+			N183
+		};
+
+		/**************************************************************************/ /**
 		 \brief      Session open options
 		 *******************************************************************************/
 		struct OpenOptions
@@ -102,6 +130,8 @@ namespace Actisense
 			std::vector<std::string> enabledProtocols;	 ///< Protocol IDs to enable
 			std::chrono::milliseconds defaultRequestTimeout{
 				5000}; ///< Default request/response timeout
+			CommandStream commandStream =
+				CommandStream::Bst; ///< How BEM commands are carried (see CommandStream)
 		};
 
 	} /* namespace Sdk */

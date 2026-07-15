@@ -120,7 +120,7 @@ namespace Actisense
 			}
 
 			auto impl = std::make_unique<SessionImpl>(std::move(transport), std::move(onEvent),
-													  std::move(onError));
+													  std::move(onError), options.commandStream);
 			impl->startReceiving();
 			onOpened(ErrorCode::Ok, detail::SessionAccess::wrap(std::move(impl)));
 		}

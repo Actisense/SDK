@@ -31,6 +31,7 @@ add_sdk_test(test_serial_transport_posix
 # Protocol tests
 add_sdk_test(test_bdtp_protocol test_bdtp_protocol.cpp)
 add_sdk_test(test_bdtp_frame_assembler test_bdtp_frame_assembler.cpp)
+add_sdk_test(test_n183_sentence_assembler test_n183_sentence_assembler.cpp)
 add_sdk_test(test_bst_frame test_bst_frame.cpp)
 
 # Public received-frame accessor (GIT-128)
@@ -66,6 +67,9 @@ add_sdk_test(test_nmea2000_product_info test_nmea2000_product_info.cpp)
 
 # PGN 126720 BEM wrap/unwrap helpers (GIT-88)
 add_sdk_test(test_bem_wrap_126720 test_bem_wrap_126720.cpp)
+
+# !PARLB NMEA 0183 BEM wrap/unwrap helpers
+add_sdk_test(test_bem_wrap_parlb test_bem_wrap_parlb.cpp)
 
 # BEM correlator srcAddr keying (GIT-88)
 add_sdk_test(test_bem_correlation_src_addr test_bem_correlation_src_addr.cpp)

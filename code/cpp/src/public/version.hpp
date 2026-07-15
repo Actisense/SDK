@@ -30,7 +30,7 @@ namespace Actisense
 		   handles) — future verbs append symbols, not vtable slots — and any
 		   public-breaking change now requires a new major version. */
 		constexpr int VERSION_MAJOR = 1;
-		constexpr int VERSION_MINOR = 0;
+		constexpr int VERSION_MINOR = 1;
 		constexpr int VERSION_PATCH = 0;
 
 		/**************************************************************************/ /**

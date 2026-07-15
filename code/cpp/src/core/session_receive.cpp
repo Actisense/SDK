@@ -23,6 +23,7 @@
 #include "core/bem_helpers.hpp"
 #include "core/supported_pgn_list_walk.hpp"
 #include "protocols/bem/bem_wrap_126720.hpp"
+#include "protocols/bem/bem_wrap_parlb.hpp"
 #include "protocols/bst/bst_frame.hpp"
 #include "util/debug_log.hpp"
 
@@ -405,6 +406,15 @@ namespace Actisense
 		}
 
 		void Session::Impl::processReceivedData(std::span<const uint8_t> data) {
+			/* An NMEA 0183 device's stream contains no DLE/STX framing at all,
+			   so the BDTP parser would silently discard every byte of it. Pick
+			   the framing that matches the link. */
+			if (command_stream_ == CommandStream::N183) {
+				n183_assembler_.feed(
+					data, [this](std::string_view sentence) { handleN183Sentence(sentence); });
+				return;
+			}
+
 			/* Feed data through BDTP parser */
 			bdtp_.parse(
 				data,
@@ -428,6 +438,63 @@ namespace Actisense
 						errorCallback_(code, std::string(message));
 					}
 				});
+		}
+
+		void Session::Impl::handleN183Sentence(std::string_view sentence) {
+			if (!isParlbSentence(sentence)) {
+				/* Ordinary NMEA 0183 data from the device. Surface the sentence
+				   text as-is: decoding 0183 fields is not this layer's job, and
+				   consumers of an 0183 gateway generally want the raw sentence. */
+				if (eventCallback_) {
+					ParsedMessageEvent event;
+					event.protocol = "nmea0183";
+					/* Talker + sentence formatter, e.g. "GPGLL" from "$GPGLL,..".
+					   Bounded by the first delimiter so a truncated or exotic
+					   sentence cannot over-read. */
+					const std::size_t end = sentence.find_first_of(",*");
+					event.messageType = std::string(sentence.substr(
+						1, (end == std::string_view::npos) ? std::string_view::npos : (end - 1)));
+					event.payload = std::string(sentence);
+					eventCallback_(event);
+				}
+				return;
+			}
+
+			std::vector<uint8_t> innerBst;
+			const ParlbDecodeStatus status = unwrapBemFromParlb(sentence, innerBst);
+			if (status != ParlbDecodeStatus::Ok) {
+				/* Distinguish a corrupt sentence from a structurally unsupported
+				   one so the metric and the reported code match the defect. */
+				const bool isChecksum = (status == ParlbDecodeStatus::OuterChecksumMismatch) ||
+										(status == ParlbDecodeStatus::InnerChecksumMismatch);
+				const ErrorCode code =
+					(status == ParlbDecodeStatus::MultiSentenceUnsupported)
+						? ErrorCode::UnsupportedOperation
+						: (isChecksum ? ErrorCode::ChecksumError : ErrorCode::MalformedFrame);
+				if (isChecksum) {
+					metricsCollector_.recordChecksumError();
+				} else {
+					metricsCollector_.recordFramingError();
+				}
+				metricsCollector_.recordFrameDropped();
+				ACTISENSE_LOG_ERROR("Session", std::string("PARLB decode: ") +
+												   std::string(parlbStatusMessage(status)));
+				if (errorCallback_) {
+					errorCallback_(code, std::string(parlbStatusMessage(status)));
+				}
+				return;
+			}
+
+			/* Rebuild the datagram a BDTP frame would have produced and rejoin
+			   the shared path: BEM decode, correlation, negative-ack and
+			   unsolicited dispatch are all identical from here on. Every BST ID
+			   that may legally travel inside a !PARLB is Type 1, so the store
+			   length is the 8-bit field at index 1. */
+			BstDatagram datagram;
+			datagram.bstId = innerBst[0];
+			datagram.storeLength = innerBst[1];
+			datagram.data.assign(innerBst.begin() + 2, innerBst.end());
+			handleBstDatagram(datagram);
 		}
 
 		void Session::Impl::handleBstDatagram(const BstDatagram& datagram) {

@@ -29,6 +29,7 @@
 #include "public/session.hpp"
 #include "transport/transport.hpp"
 #include "util/bdtp_frame_assembler.hpp"
+#include "util/n183_sentence_assembler.hpp"
 
 namespace Actisense
 {
@@ -54,8 +55,13 @@ namespace Actisense
 			 \param[in]  transport       Transport to use (ownership transferred)
 			 \param[in]  eventCallback   Callback for parsed events
 			 \param[in]  errorCallback   Callback for errors
+			 \param[in]  commandStream   How BEM commands are carried on this
+										 link. Defaults to the binary host-link
+										 framing, which is what every existing
+										 caller expects.
 			 *******************************************************************************/
-			Impl(TransportPtr transport, EventCallback eventCallback, ErrorCallback errorCallback);
+			Impl(TransportPtr transport, EventCallback eventCallback, ErrorCallback errorCallback,
+				 CommandStream commandStream = CommandStream::Bst);
 
 			/**************************************************************************/ /**
 			 \brief      Destructor
@@ -667,10 +673,26 @@ namespace Actisense
 			void receiveThreadFunc();
 
 			/**************************************************************************/ /**
-			 \brief      Process received bytes through BDTP
+			 \brief      Process received bytes through this session's framing
 			 \param[in]  data  Raw bytes from transport
+			 \details    Dispatches to the BDTP parser or the NMEA 0183 sentence
+						 assembler according to the session's command stream. The
+						 two framings are mutually exclusive: a device speaking
+						 one emits nothing the other would recognise.
 			 *******************************************************************************/
 			void processReceivedData(std::span<const uint8_t> data);
+
+			/**************************************************************************/ /**
+			 \brief      Handle one complete NMEA 0183 sentence
+			 \param[in]  sentence  Sentence text, terminator already removed
+			 \details    A "!PARLB" sentence is unwrapped to its inner BST bytes
+						 and handed to the same handleBstDatagram() path a
+						 BDTP-framed message takes, so correlation, negative-ack
+						 handling and unsolicited dispatch are shared rather than
+						 duplicated. Any other sentence is surfaced as an
+						 "nmea0183" message event.
+			 *******************************************************************************/
+			void handleN183Sentence(std::string_view sentence);
 
 			/**************************************************************************/ /**
 			 \brief      Handle a parsed BST datagram
@@ -747,7 +769,10 @@ namespace Actisense
 			ErrorCallback errorCallback_;
 			std::string transport_label_;
 
+			CommandStream command_stream_ = CommandStream::Bst;
+
 			BdtpProtocol bdtp_;
+			N183SentenceAssembler n183_assembler_;
 			BstDecoder bstDecoder_;
 			BstEncoder bstEncoder_;
 			BemProtocol bem_;

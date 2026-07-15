@@ -58,11 +58,12 @@ for (const auto& dev : devices) {
 ```cpp
 // Configure the serial connection
 SerialConfig serialCfg;
-serialCfg.portName = "COM7";       // or "/dev/ttyUSB0" on Linux
-serialCfg.baudRate = 115200;
+serialCfg.port = "COM7";           // or "/dev/ttyUSB0" on Linux
+serialCfg.baud = 115200;
 
 OpenOptions options;
-options.serial = serialCfg;
+options.transport.kind = TransportKind::Serial;   // the default
+options.transport.serial = serialCfg;
 
 // Open the session
 Api::open(
@@ -74,8 +75,8 @@ Api::open(
         }, event);
     },
     // Error callback
-    [](ErrorCode code, const std::string& message) {
-        std::fprintf(stderr, "Error: %s\n", message.c_str());
+    [](ErrorCode code, std::string_view message) {
+        std::cerr << "Error: " << message << "\n";
     },
     // Session-opened callback
     [](ErrorCode code, std::unique_ptr<Session> session) {
@@ -87,6 +88,15 @@ Api::open(
     }
 );
 ```
+
+**Choosing the command stream.** `OpenOptions::commandStream` selects how BEM
+device commands are carried. The default, `CommandStream::Bst`, is correct for
+gateways whose serial port speaks the Actisense binary protocol. Gateways that
+emit NMEA 0183 rather than binary cannot accept BST framing at all and need
+`CommandStream::N183`, which tunnels exactly the same commands inside
+proprietary `!PARLB` sentences and surfaces plain 0183 sentences as `nmea0183`
+message events. Both streams expose the identical session API — only the
+envelope differs. See [NMEA 0183 Encapsulation](nmea0183-encapsulation.md).
 
 ### 4. Closing the Session
 

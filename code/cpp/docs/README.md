@@ -318,6 +318,7 @@ cmake --build build
 - [Receiving NMEA 2000](receiving-nmea2000.md) — Rx-path patterns
 - [Sending NMEA 2000](sending-nmea2000.md) — Tx-path patterns
 - **[BEM Commands](bem-commands/README.md) — C++ API reference for every public BEM command**
+- [NMEA 0183 Encapsulation](nmea0183-encapsulation.md) — talking to gateways that emit NMEA 0183 (`!PARLB`)
 - [Wire Trace](wire-trace.md) — optional hex-dump callback for protocol debugging
 
 ## Getting Help

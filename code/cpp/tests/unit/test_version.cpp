@@ -24,10 +24,10 @@ namespace Test
 
 /* Compile-time version constants ------------------------------------------- */
 
-TEST(VersionTest, CompileTimeConstantsAreOneZeroZero)
+TEST(VersionTest, CompileTimeConstantsAreOneOneZero)
 {
 	EXPECT_EQ(VERSION_MAJOR, 1);
-	EXPECT_EQ(VERSION_MINOR, 0);
+	EXPECT_EQ(VERSION_MINOR, 1);
 	EXPECT_EQ(VERSION_PATCH, 0);
 }
 
@@ -41,19 +41,19 @@ TEST(VersionTest, RuntimeVersionMatchesConstants)
 	EXPECT_EQ(v.patch, VERSION_PATCH);
 }
 
-TEST(VersionTest, RuntimeVersionIsOneZeroZero)
+TEST(VersionTest, RuntimeVersionIsOneOneZero)
 {
 	const Version v = Api::version();
 	EXPECT_EQ(v.major, 1);
-	EXPECT_EQ(v.minor, 0);
+	EXPECT_EQ(v.minor, 1);
 	EXPECT_EQ(v.patch, 0);
 }
 
 /* String formatting -------------------------------------------------------- */
 
-TEST(VersionTest, ToStringIsOneZeroZero)
+TEST(VersionTest, ToStringIsOneOneZero)
 {
-	EXPECT_EQ(Api::version().toString(), "1.0.0");
+	EXPECT_EQ(Api::version().toString(), "1.1.0");
 }
 
 } /* namespace Test */
