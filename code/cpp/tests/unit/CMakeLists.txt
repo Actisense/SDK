@@ -68,7 +68,7 @@ add_sdk_test(test_nmea2000_product_info test_nmea2000_product_info.cpp)
 # PGN 126720 BEM wrap/unwrap helpers (GIT-88)
 add_sdk_test(test_bem_wrap_126720 test_bem_wrap_126720.cpp)
 
-# !PARLB NMEA 0183 BEM wrap/unwrap helpers (GIT-132)
+# !PARLB NMEA 0183 BEM wrap/unwrap helpers
 add_sdk_test(test_bem_wrap_parlb test_bem_wrap_parlb.cpp)
 
 # BEM correlator srcAddr keying (GIT-88)
