@@ -63,11 +63,11 @@ namespace Actisense
 		 *******************************************************************************/
 		struct PortBaudrateResponse
 		{
-			uint8_t totalPorts = 0;							   ///< Total ports on device
-			uint8_t portNumber = 0;							   ///< Queried/configured port
+			uint8_t totalPorts = 0;									 ///< Total ports on device
+			uint8_t portNumber = 0;									 ///< Queried/configured port
 			HardwareProtocol protocol = HardwareProtocol::SerialBst; ///< Protocol type on this port
-			uint32_t sessionBaud = 0;						   ///< Current session baudrate
-			uint32_t storeBaud = 0;							   ///< Stored (EEPROM) baudrate
+			uint32_t sessionBaud = 0;								 ///< Current session baudrate
+			uint32_t storeBaud = 0;									 ///< Stored (EEPROM) baudrate
 		};
 
 	} /* namespace Sdk */
