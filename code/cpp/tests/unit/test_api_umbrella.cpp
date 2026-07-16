@@ -82,8 +82,10 @@ namespace
 	// exist with exactly this signature; the loopback integration test covers the
 	// runtime behaviour.
 	TEST(ApiUmbrella, SessionPgnEnableVerbsAreReachableThroughApiHpp) {
+		EXPECT_NE(&Session::getRxPgnEnable, nullptr);
 		EXPECT_NE(&Session::setRxPgnEnable, nullptr);
 		EXPECT_NE(&Session::setRxPgnEnableWithMask, nullptr);
+		EXPECT_NE(&Session::getTxPgnEnable, nullptr);
 		EXPECT_NE(&Session::setTxPgnEnable, nullptr);
 		EXPECT_NE(&Session::setTxPgnEnableWithRate, nullptr);
 		EXPECT_NE(&Session::activatePgnEnableLists, nullptr);

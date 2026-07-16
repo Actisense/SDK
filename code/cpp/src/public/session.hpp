@@ -178,6 +178,15 @@ namespace Actisense
 			   EEPROM/FLASH, so a power cycle restores the stored configuration. */
 
 			/**************************************************************************/ /**
+			 \brief      Get the Rx-enable state for a single PGN on the local gateway.
+			 \param[in]  pgn       PGN to query
+			 \param[in]  timeout   Response timeout
+			 \param[in]  callback  Invoked with the decoded state (or an error)
+			 *******************************************************************************/
+			void getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+								RxPgnEnableCallback callback);
+
+			/**************************************************************************/ /**
 			 \brief      Set the Rx-enable state for a single PGN on the local gateway.
 			 \param[in]  pgn       PGN to configure
 			 \param[in]  enable    0 = disabled, 1 = enabled, 2 = respond mode
@@ -199,6 +208,15 @@ namespace Actisense
 			void setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
 										std::chrono::milliseconds timeout,
 										BemResultCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Get the Tx-enable state for a single PGN on the local gateway.
+			 \param[in]  pgn       PGN to query
+			 \param[in]  timeout   Response timeout
+			 \param[in]  callback  Invoked with the decoded state (or an error)
+			 *******************************************************************************/
+			void getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+								TxPgnEnableCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Set the Tx-enable state for a single PGN on the local gateway.

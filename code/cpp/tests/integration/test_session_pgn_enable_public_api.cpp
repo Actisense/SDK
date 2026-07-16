@@ -193,6 +193,66 @@ protected:
 		ASSERT_GT(transport_->injectData(frame), 0u);
 	}
 
+	/* Append a little-endian uint32 to a byte vector. */
+	static void appendLe32(std::vector<uint8_t>& bytes, uint32_t value)
+	{
+		bytes.push_back(static_cast<uint8_t>(value & 0xFF));
+		bytes.push_back(static_cast<uint8_t>((value >> 8) & 0xFF));
+		bytes.push_back(static_cast<uint8_t>((value >> 16) & 0xFF));
+		bytes.push_back(static_cast<uint8_t>((value >> 24) & 0xFF));
+	}
+
+	/* Build the 12-byte BEM reply header for @p bemId with a success errorCode. */
+	static std::vector<uint8_t> makeReplyHeader(BemCommandId bemId)
+	{
+		std::vector<uint8_t> bytes;
+		bytes.push_back(static_cast<uint8_t>(bemId));
+		bytes.push_back(0x00); /* seqId */
+		bytes.push_back(0x3B);
+		bytes.push_back(0x00); /* modelId = 0x003B (NGX-1) LE */
+		bytes.push_back(0x78);
+		bytes.push_back(0x56);
+		bytes.push_back(0x34);
+		bytes.push_back(0x12);					   /* serial LE */
+		appendLe32(bytes, /*header errorCode=*/0); /* success */
+		return bytes;
+	}
+
+	void injectReply(std::vector<uint8_t> bytes)
+	{
+		BstDatagram datagram;
+		datagram.bstId = static_cast<uint8_t>(BstId::Bem_GP_A0);
+		datagram.data = std::move(bytes);
+		datagram.storeLength = static_cast<uint8_t>(datagram.data.size());
+
+		std::vector<uint8_t> frame;
+		BdtpProtocol::encodeBst(datagram, frame);
+		ASSERT_GT(transport_->injectData(frame), 0u);
+	}
+
+	/* Rx PGN Enable GET reply payload: PGN (LE32), enable (u8), mask (LE32). */
+	void injectRxGetReply(uint32_t pgn, uint8_t enable, uint32_t mask)
+	{
+		auto bytes = makeReplyHeader(BemCommandId::GetSetRxPgnEnable);
+		appendLe32(bytes, pgn);
+		bytes.push_back(enable);
+		appendLe32(bytes, mask);
+		injectReply(std::move(bytes));
+	}
+
+	/* Tx PGN Enable GET reply payload: PGN (LE32), enable (u8), txRate (LE32),
+	   txTimeout (LE32, deprecated), txPriority (u8) — 14 bytes, wider than Rx. */
+	void injectTxGetReply(uint32_t pgn, uint8_t enable, uint32_t txRate, uint8_t txPriority)
+	{
+		auto bytes = makeReplyHeader(BemCommandId::GetSetTxPgnEnable);
+		appendLe32(bytes, pgn);
+		bytes.push_back(enable);
+		appendLe32(bytes, txRate);
+		appendLe32(bytes, /*txTimeout=*/0);
+		bytes.push_back(txPriority);
+		injectReply(std::move(bytes));
+	}
+
 	/* Adapt a public BemResultCallback into a future. */
 	static std::pair<std::future<AckResult>, BemResultCallback> makeAckFuture()
 	{
@@ -281,6 +341,88 @@ TEST_F(SessionPgnEnablePublicApiTest, SetRxPgnEnableWithMaskEncodesPgnEnableThen
 
 	EXPECT_NE(txBytes().find("46 02 FD 01 00 01 00 00 FF FF"), std::string::npos)
 		<< "pgn/mask may be transposed. Tx bytes: " << txBytes();
+}
+
+/* ========================================================================== */
+/* Getters                                                                    */
+/* ========================================================================== */
+
+/* getTxPgnEnable must send a bare 0x47 + PGN query and decode the device's
+   echoed reply back to the caller through the public typed callback. PGN 127488
+   = 0x0001F200 -> LE 00 F2 01 00. */
+TEST_F(SessionPgnEnablePublicApiTest, GetTxPgnEnableDecodesReply)
+{
+	auto promise = std::make_shared<std::promise<std::optional<TxPgnEnableResponse>>>();
+	auto future = promise->get_future();
+
+	ErrorCode code = ErrorCode::Internal;
+	session_->getTxPgnEnable(127488, kTimeout,
+							 [promise, &code](ErrorCode ec, std::string_view,
+											  std::optional<TxPgnEnableResponse> resp, ResponseOrigin) {
+								 code = ec;
+								 promise->set_value(std::move(resp));
+							 });
+	injectTxGetReply(127488, /*enable=*/1, /*txRate=*/1000, /*txPriority=*/6);
+
+	ASSERT_EQ(future.wait_for(kWait), std::future_status::ready)
+		<< "public Session::getTxPgnEnable callback never fired";
+	const auto resp = future.get();
+	EXPECT_EQ(code, ErrorCode::Ok);
+	ASSERT_TRUE(resp.has_value()) << "typed getter must decode the reply payload";
+	EXPECT_EQ(resp->pgn, 127488u);
+	EXPECT_EQ(resp->txRate, 1000u) << "the decoded txRate must survive the round trip";
+
+	/* The GET request is a bare PGN query: 47 00 F2 01 00 with no enable byte
+	   following (that would be a SET). */
+	EXPECT_NE(txBytes().find("47 00 F2 01 00"), std::string::npos) << "Tx bytes: " << txBytes();
+}
+
+/* getRxPgnEnable: PGN 130306 (Wind Data) = 0x0001FD02 -> LE 02 FD 01 00. */
+TEST_F(SessionPgnEnablePublicApiTest, GetRxPgnEnableDecodesReply)
+{
+	auto promise = std::make_shared<std::promise<std::optional<RxPgnEnableResponse>>>();
+	auto future = promise->get_future();
+
+	ErrorCode code = ErrorCode::Internal;
+	session_->getRxPgnEnable(130306, kTimeout,
+							 [promise, &code](ErrorCode ec, std::string_view,
+											  std::optional<RxPgnEnableResponse> resp, ResponseOrigin) {
+								 code = ec;
+								 promise->set_value(std::move(resp));
+							 });
+	injectRxGetReply(130306, /*enable=*/1, /*mask=*/0xFFFF0000u);
+
+	ASSERT_EQ(future.wait_for(kWait), std::future_status::ready)
+		<< "public Session::getRxPgnEnable callback never fired";
+	const auto resp = future.get();
+	EXPECT_EQ(code, ErrorCode::Ok);
+	ASSERT_TRUE(resp.has_value());
+	EXPECT_EQ(resp->pgn, 130306u);
+	EXPECT_EQ(resp->mask, 0xFFFF0000u) << "the decoded mask must survive the round trip";
+
+	EXPECT_NE(txBytes().find("46 02 FD 01 00"), std::string::npos) << "Tx bytes: " << txBytes();
+}
+
+/* A device error on a getter is surfaced as BemDeviceError, not a decode failure
+   or a bogus value — mirrors the setter's error path (GIT-127). */
+TEST_F(SessionPgnEnablePublicApiTest, GetTxPgnEnableDeviceErrorSurfaces)
+{
+	auto promise = std::make_shared<std::promise<ErrorCode>>();
+	auto future = promise->get_future();
+
+	session_->getTxPgnEnable(126996, kTimeout,
+							 [promise](ErrorCode ec, std::string_view,
+									   std::optional<TxPgnEnableResponse>, ResponseOrigin) {
+								 promise->set_value(ec);
+							 });
+	/* -997 = ES9_N2000_PGN_NOT_IN_LIBRARY. */
+	injectAck(BemCommandId::GetSetTxPgnEnable, static_cast<uint32_t>(-997));
+
+	ASSERT_EQ(future.wait_for(kWait), std::future_status::ready);
+	const auto code = future.get();
+	EXPECT_NE(code, ErrorCode::Ok);
+	EXPECT_EQ(code, ErrorCode::BemDeviceError)
+		<< "got " << static_cast<int>(code);
 }
 
 /* ========================================================================== */

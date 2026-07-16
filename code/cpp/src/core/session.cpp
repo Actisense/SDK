@@ -65,6 +65,11 @@ namespace Actisense
 
 		/* PGN enable lists (GIT-136) ------------------------------------------- */
 
+		void Session::getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+									 RxPgnEnableCallback callback) {
+			impl_->getRxPgnEnable(pgn, timeout, std::move(callback));
+		}
+
 		void Session::setRxPgnEnable(uint32_t pgn, uint8_t enable,
 									 std::chrono::milliseconds timeout,
 									 BemResultCallback callback) {
@@ -75,6 +80,11 @@ namespace Actisense
 											 std::chrono::milliseconds timeout,
 											 BemResultCallback callback) {
 			impl_->setRxPgnEnableWithMask(pgn, enable, mask, timeout, std::move(callback));
+		}
+
+		void Session::getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+									 TxPgnEnableCallback callback) {
+			impl_->getTxPgnEnable(pgn, timeout, std::move(callback));
 		}
 
 		void Session::setTxPgnEnable(uint32_t pgn, uint8_t enable,

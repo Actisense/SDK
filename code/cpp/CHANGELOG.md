@@ -10,10 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **PGN enable-list verbs on `Session` (GIT-136).** `Session` can now configure
-  the PGN enable lists of the gateway it is connected to:
-  `setRxPgnEnable()`, `setRxPgnEnableWithMask()`, `setTxPgnEnable()`,
-  `setTxPgnEnableWithRate()`, `activatePgnEnableLists()`,
-  `defaultPgnEnableList()` and `getSupportedPgnList_All()`. These mirror the
+  and query the PGN enable lists of the gateway it is connected to:
+  `getRxPgnEnable()`, `setRxPgnEnable()`, `setRxPgnEnableWithMask()`,
+  `getTxPgnEnable()`, `setTxPgnEnable()`, `setTxPgnEnableWithRate()`,
+  `activatePgnEnableLists()`, `defaultPgnEnableList()` and
+  `getSupportedPgnList_All()`. These mirror the
   same-named `RemoteDevice` verbs, which act on a device reached over the
   NMEA 2000 bus; the new ones act on the locally-attached gateway. Previously
   this was possible only through SDK-internal headers, so a consumer of the

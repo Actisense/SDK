@@ -22,6 +22,8 @@
 #include "protocols/bem/bem_commands/echo.hpp"
 #include "protocols/bem/bem_commands/operating_mode.hpp"
 #include "protocols/bem/bem_commands/product_info.hpp"
+#include "protocols/bem/bem_commands/rx_pgn_enable.hpp"
+#include "protocols/bem/bem_commands/tx_pgn_enable.hpp"
 #include "protocols/bst/bst_frame.hpp"
 #include "util/endian.hpp"
 
@@ -113,6 +115,18 @@ namespace Actisense
 		   reply from the locally-connected gateway is stamped as local rather than
 		   carrying a bus source address. */
 
+		/* Typed getters forward to the raw BemResponseCallback overload of the same
+		   name via wrapTyped, exactly as getOperatingMode does. wrapTyped decodes the
+		   reply payload and stamps a local ResponseOrigin (kLocalSrcAddr). */
+
+		void Session::Impl::getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+										   RxPgnEnableCallback callback) {
+			getRxPgnEnable(pgn, timeout,
+						   wrapTyped<RxPgnEnableResponse>(*this, kLocalSrcAddr,
+														  &decodeRxPgnEnableResponse,
+														  std::move(callback)));
+		}
+
 		void Session::Impl::setRxPgnEnable(uint32_t pgn, uint8_t enable,
 										   std::chrono::milliseconds timeout,
 										   BemResultCallback callback) {
@@ -125,6 +139,14 @@ namespace Actisense
 												   BemResultCallback callback) {
 			setRxPgnEnableWithMask(pgn, enable, mask, timeout,
 								   wrapAck(*this, kLocalSrcAddr, std::move(callback)));
+		}
+
+		void Session::Impl::getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+										   TxPgnEnableCallback callback) {
+			getTxPgnEnable(pgn, timeout,
+						   wrapTyped<TxPgnEnableResponse>(*this, kLocalSrcAddr,
+														  &decodeTxPgnEnableResponse,
+														  std::move(callback)));
 		}
 
 		void Session::Impl::setTxPgnEnable(uint32_t pgn, uint8_t enable,

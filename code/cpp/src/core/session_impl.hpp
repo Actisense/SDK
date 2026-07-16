@@ -94,12 +94,18 @@ namespace Actisense
 			   resolution is unambiguous because BemResponseCallback is not
 			   constructible from BemResultCallback (their signatures differ). */
 
+			void getRxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+								RxPgnEnableCallback callback);
+
 			void setRxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
 								BemResultCallback callback);
 
 			void setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
 										std::chrono::milliseconds timeout,
 										BemResultCallback callback);
+
+			void getTxPgnEnable(uint32_t pgn, std::chrono::milliseconds timeout,
+								TxPgnEnableCallback callback);
 
 			void setTxPgnEnable(uint32_t pgn, uint8_t enable, std::chrono::milliseconds timeout,
 								BemResultCallback callback);
