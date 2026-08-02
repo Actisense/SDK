@@ -26,7 +26,7 @@
 
 /* Umbrella: every public header is aggregated here so that a single
    #include "public/api.hpp" exposes the complete public API. Keep this list in
-   sync with src/public/*.hpp (see the guard noted in the file header). */
+   sync with the headers in src/public (see the guard noted in the file header). */
 #include "public/bem_callbacks.hpp"
 #include "public/config.hpp"
 #include "public/ebl_writer.hpp"

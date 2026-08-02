@@ -50,6 +50,22 @@ if(ACTISENSE_BUILD_TESTS)
             GIT_SHALLOW TRUE
         )
         FetchContent_MakeAvailable(googletest)
+
+        # Treat the fetched googletest headers as system includes so that
+        # third-party warnings (e.g. new-compiler warnings inside
+        # gtest-printers.h) are not promoted to errors by our -Werror builds.
+        # find_package-imported GTest targets already behave this way.
+        foreach(gtest_target gtest gtest_main gmock gmock_main)
+            if(TARGET ${gtest_target})
+                get_target_property(gtest_target_includes
+                    ${gtest_target} INTERFACE_INCLUDE_DIRECTORIES)
+                if(gtest_target_includes)
+                    set_target_properties(${gtest_target} PROPERTIES
+                        INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
+                        "${gtest_target_includes}")
+                endif()
+            endif()
+        endforeach()
     else()
         message(STATUS "GTest found: ${GTest_DIR}")
     endif()
