@@ -10,6 +10,7 @@
 #include "transport/loopback/loopback_transport.hpp"
 
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <array>
 #include <vector>
 #include <span>

@@ -16,6 +16,7 @@
 #include "public/wire_trace.hpp"
 
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <memory>
