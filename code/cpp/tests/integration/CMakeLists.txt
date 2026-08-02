@@ -40,7 +40,10 @@ add_sdk_test(test_can_packet_mode test_can_packet_mode.cpp)
 # Headless NGX CAN Packet routing over a TCP host-link against the Product
 # Emulator (NGXSW-4208). Supplies a TCP ITransport; opt in with
 # ACTISENSE_EMU_ENABLE=1 (host/port via ACTISENSE_EMU_HOST/PORT); skips otherwise.
-add_sdk_test(test_can_packet_mode_emulator test_can_packet_mode_emulator.cpp)
+# Windows-only: the in-test TCP transport is implemented with Winsock.
+if(WIN32)
+    add_sdk_test(test_can_packet_mode_emulator test_can_packet_mode_emulator.cpp)
+endif()
 # Negative Ack (0xF4) cancels the in-flight BEM request — hermetic loopback,
 # no hardware required (GIT-100).
 add_sdk_test(test_negative_ack_loopback test_negative_ack_loopback.cpp)

@@ -55,6 +55,9 @@ if(ACTISENSE_BUILD_TESTS)
         # third-party warnings (e.g. new-compiler warnings inside
         # gtest-printers.h) are not promoted to errors by our -Werror builds.
         # find_package-imported GTest targets already behave this way.
+        # Also silence warnings when compiling googletest's own sources: the
+        # subproject inherits this project's directory-wide -Wall/-Werror, and
+        # third-party code must not fail our warning gate.
         foreach(gtest_target gtest gtest_main gmock gmock_main)
             if(TARGET ${gtest_target})
                 get_target_property(gtest_target_includes
@@ -63,6 +66,11 @@ if(ACTISENSE_BUILD_TESTS)
                     set_target_properties(${gtest_target} PROPERTIES
                         INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
                         "${gtest_target_includes}")
+                endif()
+                if(MSVC)
+                    target_compile_options(${gtest_target} PRIVATE /w)
+                else()
+                    target_compile_options(${gtest_target} PRIVATE -w)
                 endif()
             endif()
         endforeach()

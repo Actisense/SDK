@@ -158,7 +158,7 @@ TEST_F(BemWrapParlbTest, EncodedSentenceUsesOnlyLegalArmourCharacters) {
 	ASSERT_TRUE(wrapBemInParlb(inner, sentence, error)) << error;
 
 	const std::string_view body =
-		std::string_view{sentence}.substr(11, sentence.size() - 11 - 5); /* strip header/*hh/CRLF */
+		std::string_view{sentence}.substr(11, sentence.size() - 11 - 5); /* strip header, "*hh", CRLF */
 	for (const char ch : body) {
 		const auto c = static_cast<uint8_t>(ch);
 		const bool legal = ((c >= 0x30) && (c <= 0x57)) || ((c >= 0x60) && (c <= 0x77));
@@ -183,8 +183,8 @@ TEST_F(BemWrapParlbTest, DecodeToleratesAnyTerminator) {
 	/* Whether a captured sentence still carries its terminator depends on how
 	   it was captured; the codec owns the trim rather than the caller. */
 	const std::string base = kGoldenSentence;
-	for (const std::string suffix : {std::string{}, std::string{"\r\n"}, std::string{"\r"},
-									 std::string{"\n"}}) {
+	for (const std::string& suffix : {std::string{}, std::string{"\r\n"}, std::string{"\r"},
+									  std::string{"\n"}}) {
 		std::vector<uint8_t> out;
 		EXPECT_EQ(unwrapBemFromParlb(base + suffix, out), ParlbDecodeStatus::Ok)
 			<< "suffix size " << suffix.size();

@@ -27,11 +27,16 @@ function(add_sdk_test test_name test_file)
 
     target_compile_features(${test_name} PRIVATE cxx_std_20)
 
+    # PRE_TEST: discover at ctest time, not as a POST_BUILD step. CMake 4.4's
+    # build-time discovery shares one temp JSON file per directory, and the
+    # parallel MSBuild post-build steps race on it (empty reads / sharing
+    # violations). Pre-test discovery runs serially and avoids the race.
     gtest_discover_tests(${test_name}
         WORKING_DIRECTORY $<TARGET_FILE_DIR:${test_name}>
         PROPERTIES
             LABELS "unit"
         DISCOVERY_TIMEOUT 30
+        DISCOVERY_MODE PRE_TEST
     )
 endfunction()
 
@@ -124,6 +129,7 @@ gtest_discover_tests(test_api_umbrella
     WORKING_DIRECTORY $<TARGET_FILE_DIR:test_api_umbrella>
     PROPERTIES LABELS "unit"
     DISCOVERY_TIMEOUT 30
+    DISCOVERY_MODE PRE_TEST
 )
 
 message(STATUS "Tests configured (add test files in tests/unit/ and tests/integration/)")
