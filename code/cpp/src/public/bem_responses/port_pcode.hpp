@@ -26,11 +26,13 @@ namespace Actisense
 
 		/**************************************************************************/ /**
 		 \brief      Port P-Code response structure
-		 \details    Decoded response from Port P-Code command
+		 \details    Decoded response from Port P-Code command. Each byte is a
+					 per-port boolean enable for the device's P-Code output
+					 (0 = off, non-zero = on).
 		 *******************************************************************************/
 		struct PortPCodeResponse
 		{
-			std::vector<uint8_t> pCodes; ///< P-Code per port
+			std::vector<uint8_t> pCodes; ///< P-Code enable per port (0 = off, non-zero = on)
 		};
 
 	} /* namespace Sdk */

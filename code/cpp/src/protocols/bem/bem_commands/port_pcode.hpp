@@ -7,8 +7,9 @@
  \date       (Created) 27/01/2026
  \brief      Port P-Code BEM command types and helpers
  \details    Structures and functions for encoding/decoding Port P-Code
-			 (0x13) BEM commands. P-Codes define the communication protocol
-			 used on each device port.
+			 (0x13) BEM commands. Each port carries a boolean enable for the
+			 device's P-Code output: 0 = P-Codes off, 1 = P-Codes on. In a
+			 SET request 0xFF leaves a port unchanged.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -27,26 +28,25 @@ namespace Actisense
 	{
 		/* Constants ------------------------------------------------------------ */
 
-		/// Special P-Code value: Do not change (keep current value)
+		/// Special P-Code SET value: Do not change (keep current value)
 		static constexpr uint8_t kPCodeNoChange = 0xFF;
 
 		/* Enumerations --------------------------------------------------------- */
 
 		/**************************************************************************/ /**
-		 \brief      P-Code (Protocol Code) values
-		 \details    Defines the communication protocol used on a port.
-					 Values are device-specific; common values shown here.
+		 \brief      P-Code enable values
+		 \details    Each port's P-Code byte is a boolean enable for the
+					 device's P-Code output on that port: 0 = off, 1 = on.
+					 In a SET request 0xFF leaves the port unchanged. Current
+					 firmware only reports 0 or 1 in a GET response, but older
+					 firmware may report the raw stored value (e.g. a 0xFF
+					 factory default) - treat any non-zero value as enabled.
 		 *******************************************************************************/
 		enum class PCode : uint8_t
 		{
-			Bst = 0x00,		 ///< BST (Binary Standard Transport) Protocol
-			Nmea0183 = 0x01, ///< NMEA 0183 Protocol
-			Nmea2000 = 0x02, ///< NMEA 2000 Protocol
-			Ipv4 = 0x03,	 ///< IPv4 (reserved)
-			Ipv6 = 0x04,	 ///< IPv6 (reserved)
-			RawAscii = 0x05, ///< Raw ASCII (reserved)
-			N2kAscii = 0x06, ///< N2K ASCII (reserved)
-			NoChange = 0xFF	 ///< Do not change (keep current value)
+			Off = 0x00,		///< P-Code output disabled on this port
+			On = 0x01,		///< P-Code output enabled on this port
+			NoChange = 0xFF ///< SET only: do not change (keep current value)
 		};
 
 		/* Data Structures ------------------------------------------------------ */
@@ -59,7 +59,7 @@ namespace Actisense
 		 *******************************************************************************/
 		struct PortPCodeRequest
 		{
-			std::vector<uint8_t> pCodes; ///< P-Code per port (empty for GET)
+			std::vector<uint8_t> pCodes; ///< P-Code enable per port (empty for GET)
 		};
 
 		/* Helper Functions ----------------------------------------------------- */
@@ -121,30 +121,32 @@ namespace Actisense
 		}
 
 		/**************************************************************************/ /**
+		 \brief      Is a received per-port P-Code byte "enabled"?
+		 \details    Any non-zero value counts as enabled: the canonical 1, and
+					 the raw stored values (e.g. a 0xFF factory default) that
+					 older firmware may report in a GET response.
+		 \param[in]  pCode      Raw per-port P-Code byte from a response
+		 \return     True when P-Code output is enabled on the port
+		 *******************************************************************************/
+		[[nodiscard]] constexpr bool pCodeIsEnabled(uint8_t pCode) noexcept {
+			return pCode != 0;
+		}
+
+		/**************************************************************************/ /**
 		 \brief      Convert P-Code value to string
-		 \param[in]  pCode      P-Code value
-		 \return     Human-readable protocol name
+		 \param[in]  pCode      P-Code enable value
+		 \return     Human-readable enable state ("Off", "On" or "No Change")
 		 *******************************************************************************/
 		[[nodiscard]] inline const char* pCodeToString(uint8_t pCode) {
 			switch (pCode) {
-				case static_cast<uint8_t>(PCode::Bst):
-					return "BST";
-				case static_cast<uint8_t>(PCode::Nmea0183):
-					return "NMEA 0183";
-				case static_cast<uint8_t>(PCode::Nmea2000):
-					return "NMEA 2000";
-				case static_cast<uint8_t>(PCode::Ipv4):
-					return "IPv4";
-				case static_cast<uint8_t>(PCode::Ipv6):
-					return "IPv6";
-				case static_cast<uint8_t>(PCode::RawAscii):
-					return "Raw ASCII";
-				case static_cast<uint8_t>(PCode::N2kAscii):
-					return "N2K ASCII";
+				case static_cast<uint8_t>(PCode::Off):
+					return "Off";
 				case static_cast<uint8_t>(PCode::NoChange):
 					return "No Change";
 				default:
-					return "Unknown";
+					/* 1 is canonical, but any other non-zero value (from older
+					   firmware) also means enabled */
+					return "On";
 			}
 		}
 

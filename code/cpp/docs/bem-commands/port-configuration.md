@@ -1,6 +1,6 @@
 # Port Configuration Commands
 
-Commands that read or set serial-port behaviour (baud rate, parsing P-Code).
+Commands that read or set serial-port behaviour (baud rate, P-Code enable).
 On multi-port devices, `portNumber` is zero-based.
 
 | Command | BEM ID | C++ builders |
@@ -12,9 +12,10 @@ On multi-port devices, `portNumber` is zero-based.
 
 ## Get / Set Port P-Code (`0x13`)
 
-A *P-Code* is the device's parsing/protocol identifier for a port (e.g.
-"NMEA 0183 4800", "NMEA 0183 38400", "raw passthrough"). The exact code
-table is product-specific. Wire-protocol detail:
+A *P-Code* byte is a per-port boolean that enables or disables the device's
+P-Code output on that port: `0` = P-Codes off, `1` = P-Codes on. In a SET
+request `0xFF` (`kPCodeNoChange`) leaves that port unchanged. Wire-protocol
+detail:
 [port-pcode-config.md](../../../../docs/DataFormats/Binary/bem-detail/port-pcode-config.md).
 
 ```cpp
@@ -26,21 +27,22 @@ table is product-specific. Wire-protocol detail:
                                      std::string& outError);
 ```
 
-The set form takes one P-Code byte per port, in port order (port 0 first).
-The response payload is the resulting array of P-Codes (one per port). On
+The set form takes one enable byte per port, in port order (port 0 first).
+The response payload is the resulting array of enables (one per port). On
 rejection the device returns the current values with a non-zero error code.
 
 ```cpp
-/* Configure ports 0..3 on a four-port device */
-const std::array<uint8_t, 4> codes = {kPCodeN0183_4800,
-                                      kPCodeN0183_38400,
-                                      kPCodeN0183_4800,
-                                      kPCodeRawPassthrough};
+/* Enable P-Codes on port 1 of a four-port device, leave the rest unchanged */
+const std::array<uint8_t, 4> codes = {kPCodeNoChange,
+                                      static_cast<uint8_t>(PCode::On),
+                                      kPCodeNoChange,
+                                      kPCodeNoChange};
 bem.buildSetPortPCode(codes, frame, err);
 ```
 
-> The numeric P-Code values are defined per-product. Refer to the relevant
-> product manual for the canonical table.
+> Current firmware only reports `0` or `1` in a GET response, but older
+> firmware may report the raw stored value (e.g. a `0xFF` factory default).
+> Treat any non-zero byte as enabled — `pCodeIsEnabled()` does exactly that.
 
 ---
 
