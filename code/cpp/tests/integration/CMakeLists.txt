@@ -18,15 +18,17 @@ add_sdk_test(test_parlb_device test_parlb_device.cpp)
 # Requires ACTISENSE_TEST_PORT (local gateway) and optionally
 # ACTISENSE_TEST_REMOTE_ADDR (defaults to 200).
 add_sdk_test(test_bem_remote_device test_bem_remote_device.cpp)
-# Two-device Tx PGN filtering sweep, single-frame standard PGNs (GIT-89).
-# Requires ACTISENSE_TEST_PORT (DUT) AND ACTISENSE_TEST_RX_PORT (receiver).
-add_sdk_test(test_tx_pgn_blocking_singleframe test_tx_pgn_blocking_singleframe.cpp)
+# DB-driven two-device sweep of the Rx/Tx PGN enable filters for standard
+# PGNs, superseding the earlier hand-curated single-frame and fast-packet
+# Tx-blocking sweeps. Candidate PGNs and payload facts arrive from a runtime
+# manifest (ACTISENSE_TEST_PGN_MANIFEST); the rig is described by a config
+# outside this repository (ACTISENSE_TEST_RIG), with the legacy
+# ACTISENSE_TEST_PORT / ACTISENSE_TEST_RX_PORT variables still honoured.
+add_sdk_test(test_pgn_enable_sweep test_pgn_enable_sweep.cpp)
 # Two-device Tx PGN filtering sweep, single-frame proprietary PGNs (GIT-97).
 # Same rig as the standard sweep; exercises the NGXSW-3329 DP0 bitmap mechanic.
+# The proprietary PGN space is not database-enumerable, so these stay curated.
 add_sdk_test(test_tx_pgn_blocking_singleframe_proprietary test_tx_pgn_blocking_singleframe_proprietary.cpp)
-# Two-device Tx PGN filtering sweep, fast-packet standard PGNs (GIT-98).
-# Same rig as the standard sweep; exercises multi-frame (fast-packet) host-Tx.
-add_sdk_test(test_tx_pgn_blocking_fastpacket test_tx_pgn_blocking_fastpacket.cpp)
 # Two-device Tx PGN filtering sweep, fast-packet proprietary PGNs (GIT-99).
 # Combines the GIT-97 proprietary header with the GIT-98 multi-frame payload;
 # exercises the NGXSW-3329 DP1 bitmap mechanic across varied fast-packet lengths.
