@@ -273,8 +273,10 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Send Set Port Baudrate command
 			 \param[in]  portNumber   Port to configure (0-based)
-			 \param[in]  sessionBaud  Session baudrate (use kBaudRateNoChange to skip)
-			 \param[in]  storeBaud    Store baudrate (use kBaudRateNoChange to skip)
+			 \param[in]  sessionBaud  Session baudrate (kBaudRateNoChange to skip,
+									  kBaudRateAdoptAlternate to adopt the stored rate)
+			 \param[in]  storeBaud    Store baudrate (kBaudRateNoChange to skip,
+									  kBaudRateAdoptAlternate to persist the live rate)
 			 \param[in]  timeout      Timeout for response
 			 \param[in]  callback     Callback invoked on response or timeout
 			 *******************************************************************************/

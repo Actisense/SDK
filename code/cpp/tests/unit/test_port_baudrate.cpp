@@ -103,6 +103,43 @@ TEST_F(PortBaudrateTest, EncodeSetRequest_UseDefault)
 	EXPECT_TRUE(m_error.empty());
 }
 
+TEST_F(PortBaudrateTest, SpecialBaudrateValuesArePinned)
+{
+	/* Wire-protocol sentinels - never renumber */
+	EXPECT_EQ(kBaudRateNoChange, 0xFFFFFFFFu);
+	EXPECT_EQ(kBaudRateDefault, 0xFFFFFFFEu);
+	EXPECT_EQ(kBaudRateAdoptAlternate, 0xFFFFFFFCu);
+}
+
+TEST_F(PortBaudrateTest, EncodeSetRequest_AdoptSentinelBytes)
+{
+	/* Adopt in the session field + literal store rate: the "persist and
+	   force the new rate over the running link" frame. Byte-exact check of
+	   the data payload the sentinel produces. */
+	std::vector<uint8_t> data;
+	encodePortBaudrateSetRequest(1, kBaudRateAdoptAlternate, 115200, data);
+
+	ASSERT_EQ(data.size(), kPortBaudrateSetRequestSize);
+	EXPECT_EQ(data[0], 0x01);                       /* port 1 */
+	EXPECT_EQ(data[1], 0xFC);                       /* session = adopt (LE) */
+	EXPECT_EQ(data[2], 0xFF);
+	EXPECT_EQ(data[3], 0xFF);
+	EXPECT_EQ(data[4], 0xFF);
+	EXPECT_EQ(data[5], 0x00);                       /* store = 115200 (LE) */
+	EXPECT_EQ(data[6], 0xC2);
+	EXPECT_EQ(data[7], 0x01);
+	EXPECT_EQ(data[8], 0x00);
+}
+
+TEST_F(PortBaudrateTest, EncodeSetRequest_AdoptSentinelBothFields)
+{
+	/* Adopt in both fields = "persist the current live rate" */
+	EXPECT_TRUE(m_protocol.buildSetPortBaudrate(1, kBaudRateAdoptAlternate,
+											    kBaudRateAdoptAlternate, m_frame, m_error));
+	EXPECT_TRUE(m_error.empty());
+}
+
+
 TEST_F(PortBaudrateTest, EncodeSetRequest_CommonBaudrates)
 {
 	/* Test common baudrates */
@@ -252,6 +289,7 @@ TEST_F(PortBaudrateTest, FormatBaudrate_SpecialValues)
 {
 	EXPECT_EQ(formatBaudrate(kBaudRateNoChange), "No Change");
 	EXPECT_EQ(formatBaudrate(kBaudRateDefault), "Default");
+	EXPECT_EQ(formatBaudrate(kBaudRateAdoptAlternate), "Adopt Alternate");
 	EXPECT_EQ(formatBaudrate(115200), "115200 bps");
 	EXPECT_EQ(formatBaudrate(230400), "230400 bps");
 }

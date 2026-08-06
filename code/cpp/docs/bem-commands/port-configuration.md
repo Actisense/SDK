@@ -71,6 +71,15 @@ without altering the rate restored at next power-on).
 Pass `kBaudRateNoChange` (defined in the BEM types header) for either
 parameter to leave that value untouched on the device.
 
+Pass `kBaudRateAdoptAlternate` to adopt the other field's rate: in
+`sessionBaud` it applies the stored rate to the running link (so
+`{kBaudRateAdoptAlternate, newRate}` persists a rate *and* switches to it
+in one command, and `{kBaudRateAdoptAlternate, kBaudRateNoChange}` reverts
+a session-only override), while in `storeBaud` it persists the current
+live rate — a try-then-commit flow. Firmware without independent
+session/store support rejects the sentinel as an invalid literal rate;
+that deterministic error can drive a fallback to a plain write.
+
 ```cpp
 /* Bump port 0 to 230400 for the current session, leave NV-stored value alone */
 bem.buildSetPortBaudrate(/* portNumber */ 0,

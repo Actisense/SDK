@@ -152,8 +152,10 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Set a port's session and/or stored baudrate.
 			 \param[in]  portNumber   Port to configure (0-based)
-			 \param[in]  sessionBaud  Session baudrate (kBaudRateNoChange to skip)
-			 \param[in]  storeBaud    Stored baudrate (kBaudRateNoChange to skip)
+			 \param[in]  sessionBaud  Session baudrate (kBaudRateNoChange to skip,
+									  kBaudRateAdoptAlternate to adopt the stored rate)
+			 \param[in]  storeBaud    Stored baudrate (kBaudRateNoChange to skip,
+									  kBaudRateAdoptAlternate to persist the live rate)
 			 \param[in]  timeout      Response timeout
 			 \param[in]  callback     Invoked with the device's acknowledgement
 			 *******************************************************************************/
