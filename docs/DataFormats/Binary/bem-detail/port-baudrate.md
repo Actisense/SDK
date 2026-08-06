@@ -43,6 +43,11 @@ To change the baudrate configuration for a specific port:
 **Special Values**:
 - `0xFFFFFFFF` - Do not change this baudrate (use when setting only session or only store)
 - `0xFFFFFFFE` - Use device default for this baudrate
+- `0xFFFFFFFC` - Adopt the other field's rate:
+  - In the **session** field: adopt the stored rate as the live rate. Combined with a literal store rate in the same frame, this forces the new rate over the running link as well as persisting it; combined with `0xFFFFFFFF` in the store field, it reverts a session-only override without the host needing to know the stored rate.
+  - In the **store** field: persist the current live (session) rate — the "commit what I'm running" verb for a try-then-commit flow.
+
+**Note**: `0xFFFFFFFC` is only recognised by firmware that implements the independent session/store behaviour described above. Older firmware treats it as a literal baudrate and rejects the frame with an error response — a host can use that deterministic error to fall back to a legacy write.
 
 ### Response Data Block
 
