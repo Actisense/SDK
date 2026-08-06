@@ -90,6 +90,7 @@
 #include "public/received_frame.hpp"
 
 #include "../support/pgn_manifest.hpp"
+#include "../support/pgn_sweep_report.hpp"
 #include "../support/rig_config.hpp"
 
 #include <gtest/gtest.h>
@@ -141,46 +142,8 @@ static const std::unordered_set<uint32_t> kSkipPgns = {
 	127508,
 };
 
-/* Verdicts ----------------------------------------------------------------- */
-
-enum class Verdict
-{
-	Pass,			 ///< observed while enabled, not observed while disabled
-	FailLeak,		 ///< observed while disabled — the real filter bug
-	FailNoTx,		 ///< not observed while enabled
-	SkipSetRejected, ///< device rejected the enable-list SET for this PGN
-	SkipSendRejected,///< sendPgn errored (e.g. a length the firmware refuses)
-	SkipV2Unsupported,///< PGN absent from a v2-era device's library
-	SkipLengthUnknown ///< no usable payload length could be derived
-};
-
-[[nodiscard]] static const char* verdictToString(Verdict verdict)
-{
-	switch (verdict) {
-		case Verdict::Pass: return "PASS";
-		case Verdict::FailLeak: return "FAIL_LEAK";
-		case Verdict::FailNoTx: return "FAIL_NO_TX";
-		case Verdict::SkipSetRejected: return "SKIP_SET_REJECTED";
-		case Verdict::SkipSendRejected: return "SKIP_SEND_REJECTED";
-		case Verdict::SkipV2Unsupported: return "SKIP_V2_UNSUPPORTED";
-		case Verdict::SkipLengthUnknown: return "SKIP_LENGTH_UNKNOWN";
-	}
-	return "UNKNOWN";
-}
-
-/* One classified sweep outcome. */
-struct SweepRecord
-{
-	uint32_t pgn = 0;
-	std::string name;
-	std::string fixture;
-	std::string direction; ///< "a_to_b" or "b_to_a"
-	std::string list;	   ///< "tx" or "rx"
-	std::string enabledResult; ///< "observed" / "not-observed" / "" (skip)
-	std::string blockedResult;
-	Verdict verdict = Verdict::SkipLengthUnknown;
-	std::string note;
-};
+/* Verdict taxonomy, SweepRecord and the report artifacts live in
+   tests/support/pgn_sweep_report.hpp, shared with the hermetic unit tests. */
 
 /* Captured receive frame (owning copy of the event's payload view). */
 struct CapturedFrame
@@ -264,6 +227,25 @@ protected:
 		if (endpointA_.session) { endpointA_.session->close(); }
 		if (endpointB_.session) { endpointB_.session->close(); }
 		printSummary();
+		writeArtifacts();
+	}
+
+	/* Merge this sweep's records into the on-disk scorecard and regenerate
+	   the Markdown report (ACTISENSE_TEST_REPORT_DIR, default: cwd). */
+	void writeArtifacts()
+	{
+		if (records_.empty()) {
+			return;
+		}
+		SweepReportMeta meta;
+		meta.n2kLibVersion = manifest_.n2kLibVersion;
+		meta.manifestGenerated = manifest_.generated;
+		const std::string directory = reportDir();
+		if (!updateSweepArtifacts(directory, meta, records_)) {
+			ADD_FAILURE() << "Failed to write sweep artifacts to '" << directory << "'";
+			return;
+		}
+		std::cout << "  Scorecard + report updated in '" << directory << "'" << std::endl;
 	}
 
 	/* Rig/environment resolution ------------------------------------------- */
@@ -817,15 +799,7 @@ protected:
 			record.blockedResult = observedBlocked ? "observed" : "not-observed";
 
 			/* --- Classification -------------------------------------------- */
-			if (!observedEnabled) {
-				/* Self-check: with no proof the transmit path works, "nothing
-				   observed while disabled" proves nothing. */
-				record.verdict = Verdict::FailNoTx;
-			} else if (observedBlocked) {
-				record.verdict = Verdict::FailLeak;
-			} else {
-				record.verdict = Verdict::Pass;
-			}
+			record.verdict = classifyTwoPhase(observedEnabled, observedBlocked);
 
 			EXPECT_NE(record.verdict, Verdict::FailLeak)
 				<< "PGN " << entry.pgn << " (" << entry.name << ") observed at the"

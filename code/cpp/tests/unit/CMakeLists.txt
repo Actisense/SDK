@@ -109,3 +109,7 @@ add_sdk_test(test_abi_layout test_abi_layout.cpp)
 # PGN-sweep support: minimal JSON reader, manifest loader/selection rules,
 # rig-config loader (hermetic counterpart to the hardware enable sweep)
 add_sdk_test(test_pgn_sweep_support test_pgn_sweep_support.cpp)
+
+# PGN-sweep report: verdict taxonomy, two-phase classification, CSV scorecard
+# merge semantics and Markdown generation
+add_sdk_test(test_pgn_sweep_report test_pgn_sweep_report.cpp)
