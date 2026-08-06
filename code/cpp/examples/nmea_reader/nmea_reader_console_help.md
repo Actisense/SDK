@@ -57,7 +57,8 @@ On a clean exit the gateway is restored to the operating mode it had at startup.
 
 - The gateway reassembles fast-packet PGNs in firmware and delivers complete PGN payloads, so no SDK-side reassembly is needed.
 - In-place redraw uses ANSI escape sequences. On Windows the example enables virtual-terminal processing at startup; it works on Windows Terminal and modern conhost. On a legacy console that rejects VT mode the table still prints, just without the in-place cursor moves.
-- On an NGX gateway, Rx-All filters the ISO control PGNs 59904/59392 from the bus→host path — acceptable for a reader (see NGXSW-4280).
+- On an NGX gateway, Rx-All filters the ISO control PGNs 59904/59392 from the bus→host path — acceptable for a reader; NGT-class gateways
+  forward them.
 ```
 nmea_reader_console --list
 nmea_reader_console --port COM7

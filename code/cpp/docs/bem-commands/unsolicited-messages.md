@@ -121,7 +121,7 @@ The payload structs are public — include
 `public/bem_responses/unsolicited.hpp` (or the individual
 `public/bem_responses/<type>.hpp` headers) for `SystemStatusData`,
 `StartupStatusData`, `ErrorReportData` and `NegativeAckData`; no internal
-`protocols/` include is needed (GIT-130). The typed payloads do **not** carry
+`protocols/` include is needed. The typed payloads do **not** carry
 the BEM reply header, so the responding device's identity travels in
 `ParsedMessageEvent::origin` — an optional `ResponseOrigin` with `modelId`,
 `serialNumber`, and the receive path (`n2kSourceAddress` / `TransportPath`):
