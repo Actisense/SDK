@@ -1,0 +1,60 @@
+# Symbol-lint allowlist for tools/docs-checks/check_docs.py
+#
+# One identifier per line; '#' starts a comment. Only add a name here when it
+# is a *legitimate* mention that does not belong to the public API surface —
+# never to silence real documentation drift.
+
+# Internal implementation classes named descriptively in the architecture
+# overview (code/cpp/docs/message-flow.md). They are not part of the public
+# API and consumer code cannot include them; the doc labels them as internal.
+SessionImpl
+BemProtocol
+BemCommand
+BemResponse
+BstDecoder
+BstEncoder
+BstFrame
+BdtpProtocol
+SerialTransport
+BstDatagram
+
+# Example-local type defined by the nmea_reader example itself
+# (code/cpp/examples/nmea_reader/pgn_table_model.hpp), mentioned in its help.
+PgnTableModel
+
+# Build-system vocabulary mentioned in the build README (not C++ symbols).
+FetchContent
+
+# std library observer methods mentioned in prose (e.g. std::optional).
+has_value
+
+# Wire-protocol command/message names used in the BEM command tables
+# (code/cpp/docs/bem-commands/). They name protocol operations and
+# unsolicited message types (also the ParsedMessageEvent::messageType
+# strings), not C++ symbols.
+ReInitMainApp
+CommitToEeprom
+CommitToFlash
+GetSetOperatingMode
+GetSetTotalTime
+Echo
+GetSetPortPCode
+GetSetPortBaudrate
+GetProductInfo
+GetSetCanConfig
+GetSetCanInfoField1
+GetSetCanInfoField2
+GetSetCanInfoField3
+GetSupportedPgnList
+GetSetRxPgnEnable
+GetSetTxPgnEnable
+RxPgnEnableListF2
+TxPgnEnableListF2
+DeletePgnEnableLists
+ActivatePgnEnableLists
+DefaultPgnEnableList
+ParamsPgnEnableLists
+StartupStatus
+ErrorReport
+SystemStatus
+NegativeAck
