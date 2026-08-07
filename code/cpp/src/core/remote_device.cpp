@@ -84,6 +84,11 @@ namespace Actisense
 			impl_->getPortPCode(timeout, std::move(callback));
 		}
 
+		void RemoteDevice::getPortInventory(std::chrono::milliseconds timeout,
+											PortInventoryCallback callback) {
+			impl_->getPortInventory(timeout, std::move(callback));
+		}
+
 		void RemoteDevice::setPortPCode(std::span<const uint8_t> pCodes,
 										std::chrono::milliseconds timeout,
 										BemResultCallback callback) {

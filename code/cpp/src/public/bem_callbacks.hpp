@@ -37,6 +37,7 @@
 #include "public/bem_responses/pgn_enable_list_f2.hpp"
 #include "public/bem_responses/pgn_enable_lists.hpp"
 #include "public/bem_responses/port_baudrate.hpp"
+#include "public/bem_responses/port_inventory.hpp"
 #include "public/bem_responses/port_pcode.hpp"
 #include "public/bem_responses/product_info.hpp"
 #include "public/bem_responses/rx_pgn_enable.hpp"
@@ -95,6 +96,19 @@ namespace Actisense
 		using PortBaudrateCallback = std::function<void(
 			ErrorCode code, std::string_view errorMsg, std::optional<PortBaudrateResponse> response,
 			ResponseOrigin origin)>;
+
+		/**************************************************************************/ /**
+		 \brief      Port Inventory callback (Get Port Inventory replies).
+		 \details    Delivers one response message. In practice that is the whole
+					 inventory - a message holds eight port records and no current
+					 product presents more than seven ports - which
+					 PortInventoryResponse::isComplete() confirms. A device with
+					 more ports answers with further messages carrying the same
+					 transfer id; merge them with PortInventoryAccumulator.
+		 *******************************************************************************/
+		using PortInventoryCallback = std::function<void(
+			ErrorCode code, std::string_view errorMsg,
+			std::optional<PortInventoryResponse> response, ResponseOrigin origin)>;
 
 		/**************************************************************************/ /**
 		 \brief      Port P-Code callback (Get/Set Port P-Code replies).

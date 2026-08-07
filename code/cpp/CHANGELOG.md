@@ -9,6 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Port Inventory command (BEM 0x1B) — `RemoteDevice::getPortInventory()`.**
+  A device numbers its communication ports three unrelated ways and, until now,
+  a host could reconcile none of them from the wire: System Status reports
+  traffic statistics in numbered independent-buffer slots whose meaning was
+  never transmitted, Port Baudrate (0x17) addresses only port 0 (CAN) and
+  port 1 (the serial host UART) and rejects every other number, and a
+  multiplexer physically has up to seven labelled ports. One payload-free GET
+  now returns a record per port carrying its name as printed on the case
+  (`SERIAL`, `IN1`, `OUT1`, `CAN`), its media type, protocol, direction
+  capability and **both** its session and store baud rates — plus the System
+  Status slot and the Port Baudrate port number that reach it, or
+  `kPortIndexNone` (0xFF) where neither does. That makes it the only way to
+  read the rate of a port Port Baudrate cannot address, and the only way to
+  label a statistics slot. New public types `PortInventoryEntry`,
+  `PortInventoryResponse` and `PortInventoryResult` in
+  `public/bem_responses/port_inventory.hpp`, with the sentinels exposed as
+  predicates (`reportedInSystemStatus()`, `baudrateAddressable()`,
+  `canReceive()`, `canTransmit()`, `hasSessionOverride()`) so application code
+  never compares against `0xFF` directly. `PortInventoryAccumulator` merges an
+  inventory spanning more than one message; in practice one message carries the
+  whole list, which `PortInventoryResponse::isComplete()` confirms. See
+  `docs/DataFormats/Binary/bem-detail/port-inventory.md` and the
+  `docs/Guides/port-discovery-and-configuration.md` walkthrough.
+
+- **`kBaudRateAdoptAlternate` (0xFFFFFFFC) Port Baudrate sentinel.** A third
+  special value alongside `kBaudRateNoChange` and `kBaudRateDefault`, resolved
+  against whichever field it is *not* written to. In the session field it
+  adopts the stored rate as the live rate — combined with a literal store rate
+  it forces the new rate over the running link as well as persisting it, and
+  combined with `kBaudRateNoChange` in the store field it reverts a
+  session-only override without the host needing to know the stored rate. In
+  the store field it persists the current live rate: the "commit what I'm
+  running" verb for a try-then-commit flow. Firmware without independent
+  session/store behaviour rejects it as an invalid literal rate, which a host
+  can use as a deterministic fallback signal rather than sniffing versions.
+  `formatBaudrate()` renders it as "Adopt Alternate".
+
 - **PGN enable-list verbs on `Session`.** `Session` can now configure
   and query the PGN enable lists of the gateway it is connected to:
   `getRxPgnEnable()`, `setRxPgnEnable()`, `setRxPgnEnableWithMask()`,
@@ -103,6 +140,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by the public-API-only `nmea_reader_console` and `pgn_transmitter` examples,
   which are now the canonical references. (Supersedes an earlier unreleased
   rewrite of the same example.)
+
+### Documentation
+
+- **Corrected the Hardware Protocol value table on the Port Baudrate page.**
+  `docs/DataFormats/Binary/bem-detail/port-baudrate.md` listed `0` as BST, `1`
+  as NMEA 0183, `2` as NMEA 2000 and `3-6` as reserved. Devices emit a banded
+  enumeration instead — serial `0x00`-`0x1F`, CAN `0x20`-`0x3F`, Ethernet
+  `0x40`-`0x5F` — so a third-party host implemented from that table swapped the
+  two serial protocols and could not decode a CAN port at all. The SDK's own
+  `HardwareProtocol` enum was already correct (see *Changed* above); only the
+  specification was wrong. The page now carries the real table plus a note
+  recording what it used to say, so a reader who built against the old text
+  recognises their bug.
+- **Port Baudrate store changes documented as auto-committing.** The page
+  previously told hosts to follow a store change with Commit To EEPROM (0x01).
+  Current-generation firmware commits every persistent configuration change at
+  the point it is made, so that step is unnecessary; 0x01 remains registered
+  and always succeeds so existing hosts keep working.
+- **New `docs/Guides/` section**, linked from the documentation index, for
+  task-oriented walkthroughs that tie several commands together. First entry is
+  [Port discovery and configuration](../../docs/Guides/port-discovery-and-configuration.md):
+  discover a device's ports by name, label its live traffic statistics, and set
+  session or stored baud rates without hard-coding a port number.
 
 ### Guardrails
 

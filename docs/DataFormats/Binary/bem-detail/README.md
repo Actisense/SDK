@@ -22,6 +22,7 @@ Here is the table of implemented BST-BEM encoders & decoders for the Actisense S
 | [Hardware baud](Deprecated/hardware-baud.md) | A1H | A0H | 16H |
 | [Port baudrate](port-baudrate.md) | A1H | A0H | 17H |
 | [Echo](echo.md) | A1H | A0H | 18H |
+| [Port Inventory](port-inventory.md) | A1H | A0H | 1BH |
 | [Supported PGN List](supported-pgn-list.md) | A1H | A0H | 40H |
 | [Product Info](product-info.md) | A1H | A0H | 41H |
 | [CAN Config](can-config.md) | A1H | A0H | 42H |

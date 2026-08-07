@@ -161,6 +161,18 @@ namespace Actisense
 												 std::string& outError);
 
 			/**************************************************************************/ /**
+			 \brief      Build Get Port Inventory command
+			 \details    The request carries no payload; the device answers with
+						 its whole port list, split across as many messages as it
+						 needs.
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			 \return     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetPortInventory(std::vector<uint8_t>& outFrame,
+													 std::string& outError);
+
+			/**************************************************************************/ /**
 			 \brief      Build Set Port P-Code command
 			 \param[in]  pCodes      P-Code values for each port
 			 \param[out] outFrame    Complete BDTP-framed message

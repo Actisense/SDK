@@ -9,6 +9,14 @@ This is the main documentation repository for the SDK. It contains comprehensive
 
 ## Contents
 
+### [Guides](Guides/)
+
+Task-oriented walkthroughs that tie several commands together.
+
+- [Port discovery and configuration](Guides/port-discovery-and-configuration.md) — Discover a device's ports by name, label its traffic statistics, and set session or stored baud rates without hard-coding a port number
+
+---
+
 ### [Data Formats](DataFormats/)
 
 How data is structured and encoded on the wire.
@@ -77,4 +85,4 @@ File formats for logging and replay.
 
 In essence: **formats** describe *what* the data looks like, while **protocols** describe *how* to exchange it.
 
-Updated 13th Dec 2025
+Updated 7th Aug 2026

@@ -62,10 +62,22 @@ The response contains the full port configuration:
 | 7-10    | Store baudrate           | 4 bytes (uint32_t, LE) |
 
 **Hardware Protocol Values**:
-- `0` - BST protocol
-- `1` - NMEA 0183 protocol
-- `2` - NMEA 2000 protocol
-- `3-6` - Reserved for IPV4, IPV6, Raw ASCII, N2K ASCII
+
+The code is banded by physical media: serial protocols occupy `0x00`-`0x1F`, CAN protocols `0x20`-`0x3F` and Ethernet protocols `0x40`-`0x5F`. Values not listed are reserved for future protocols in the same band.
+
+| Value | Decimal | Protocol |
+| ----- | ------- | -------- |
+| `0x00` | 0 | Serial NMEA 0183 |
+| `0x01` | 1 | Serial BST |
+| `0x20` | 32 | CAN NMEA 2000 |
+| `0x21` | 33 | CAN J1939 |
+| `0x40` | 64 | Ethernet BST |
+| `0x41` | 65 | Ethernet NMEA 0183 |
+| `0x42` | 66 | Ethernet OneNet |
+
+> **Correction**: earlier revisions of this page listed `0` as BST, `1` as NMEA 0183 and `2` as NMEA 2000, with `3-6` reserved. That table never matched the values devices actually emit. A host built from it decodes a CAN port (32) as unknown and swaps the two serial protocols. The table above is the shipped firmware enumeration and matches the SDK's `HardwareProtocol` enum, whose enumerators are the on-wire codes.
+
+The same values appear in the [Port Inventory](port-inventory.md) response, which additionally reports the physical media as a separate field — useful because "BST" over a UART and "BST" over a socket need very different handling.
 
 **Common Baudrate Values** (in bps):
 - 9600, 19200, 38400, 57600, 115200, 230400 (standard serial rates)

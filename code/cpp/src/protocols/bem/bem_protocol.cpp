@@ -156,6 +156,13 @@ namespace Actisense
 									   outError);
 		}
 
+		bool BemProtocol::buildGetPortInventory(std::vector<uint8_t>& outFrame,
+												std::string& outError) {
+			/* GET request has no data payload */
+			return encodeSimpleCommand(BemCommandId::GetPortInventory, BstId::Bem_PG_A1, outFrame,
+									   outError);
+		}
+
 		bool BemProtocol::buildSetPortPCode(std::span<const uint8_t> pCodes,
 											std::vector<uint8_t>& outFrame, std::string& outError) {
 			if (pCodes.empty()) {
