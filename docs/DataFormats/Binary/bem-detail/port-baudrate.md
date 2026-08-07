@@ -6,9 +6,12 @@ This command supports both Get (read current configuration) and Set (write new c
 
 This command allows setting both:
 - **Session Baudrate**: Immediate baudrate for current session (changes hardware immediately)
-- **Store Baudrate**: Baudrate to save in EEPROM for future sessions (persistent across power cycles)
+- **Store Baudrate**: Baudrate to save in non-volatile storage for future sessions (persistent across power cycles)
 
-Changes to the session baudrate take effect immediately. Changes to the store baudrate require a follow-up [Commit To EEPROM](commit-to-eeprom.md) command to persist across device resets.
+The two values are independent:
+
+- Changes to the session baudrate take effect immediately and are never persisted — the port returns to the stored baudrate after a power cycle, a [ReInit Main App](reinit-main-app.md) (0x00), or an operating-mode change. Any device-side authoritative rate change (for example an auto-baud acquisition, or a configuration reload) also replaces an active session-only rate.
+- Changes to the store baudrate are committed automatically at the point they are made — no follow-up command is required — and do **not** disturb the running link. The new stored rate is adopted live at the next reset or re-initialisation.
 
 ## Command Ids
 
@@ -40,6 +43,11 @@ To change the baudrate configuration for a specific port:
 **Special Values**:
 - `0xFFFFFFFF` - Do not change this baudrate (use when setting only session or only store)
 - `0xFFFFFFFE` - Use device default for this baudrate
+- `0xFFFFFFFC` - Adopt the other field's rate:
+  - In the **session** field: adopt the stored rate as the live rate. Combined with a literal store rate in the same frame, this forces the new rate over the running link as well as persisting it; combined with `0xFFFFFFFF` in the store field, it reverts a session-only override without the host needing to know the stored rate.
+  - In the **store** field: persist the current live (session) rate — the "commit what I'm running" verb for a try-then-commit flow.
+
+**Note**: `0xFFFFFFFC` is only recognised by firmware that implements the independent session/store behaviour described above. Older firmware treats it as a literal baudrate and rejects the frame with an error response — a host can use that deterministic error to fall back to a legacy write.
 
 ### Response Data Block
 
@@ -115,7 +123,7 @@ Change port 0 to 115200 bps both immediately and persistently:
 | 10 | Store Baud Byte 2 | 01H | 115200 |
 | 11 | Store Baud Byte 3 | 00H | 115200 |
 
-**Important**: After setting the store baudrate, send a [Commit To EEPROM](commit-to-eeprom.md) command (0x01) to persist the changes. Without this commit, the new store baudrate will be lost on device reset.
+**Note**: The store baudrate is committed automatically — no [Commit To EEPROM](commit-to-eeprom.md) (0x01) is required. Because the session field carries the same rate here, the port also switches immediately; a store-only set (session field = `0xFFFFFFFF`) would leave the running link untouched.
 
 ### Response
 
@@ -140,10 +148,7 @@ This indicates port 1 is currently running at 230400 bps, but will revert to 115
 
 - **Baudrate Change Warning**: Changing the session baudrate will cause the port to immediately reconfigure. If you're communicating on that port, the connection will be interrupted. Applications must close the connection, wait briefly, then reconnect at the new baudrate.
 
-- **EEPROM Persistence**: Changes to the store baudrate only take effect after:
-  1. Sending this command with the desired store baudrate
-  2. Sending [Commit To EEPROM](commit-to-eeprom.md) (0x01)
-  3. Rebooting the device or sending [ReInit Main App](reinit-main-app.md) (0x00)
+- **Persistence**: A store baudrate change is committed automatically when the command is processed — [Commit To EEPROM](commit-to-eeprom.md) (0x01) is **not** required (the device still accepts 0x01 and responds with success for compatibility). The stored rate does not affect the running link; it is adopted live after a power cycle or [ReInit Main App](reinit-main-app.md) (0x00).
 
 - **Replaces Deprecated Commands**: This command supersedes:
   - BEMCMD_PortBaudCfg (0x12) - Old baud code-based config

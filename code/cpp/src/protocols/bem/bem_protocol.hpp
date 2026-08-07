@@ -138,8 +138,10 @@ namespace Actisense
 			/**************************************************************************/ /**
 			 \brief      Build Set Port Baudrate command
 			 \param[in]  portNumber   Port to configure (0-based)
-			 \param[in]  sessionBaud  Session baudrate (use kBaudRateNoChange to skip)
-			 \param[in]  storeBaud    Store baudrate (use kBaudRateNoChange to skip)
+			 \param[in]  sessionBaud  Session baudrate (kBaudRateNoChange to skip,
+									  kBaudRateAdoptAlternate to adopt the stored rate)
+			 \param[in]  storeBaud    Store baudrate (kBaudRateNoChange to skip,
+									  kBaudRateAdoptAlternate to persist the live rate)
 			 \param[out] outFrame     Complete BDTP-framed message
 			 \param[out] outError     Error message if encoding fails
 			 \return     True on success

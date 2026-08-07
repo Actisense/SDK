@@ -34,6 +34,17 @@ namespace Actisense
 		/// Special baudrate value: Use device default
 		static constexpr uint32_t kBaudRateDefault = 0xFFFFFFFE;
 
+		/// Special baudrate value: Adopt the other field's rate.
+		/// In the session field this adopts the stored rate as the live rate -
+		/// combined with a literal store rate it forces the new rate over the
+		/// running link as well as persisting it, and combined with
+		/// kBaudRateNoChange in the store field it reverts a session-only
+		/// override. In the store field it persists the current live rate.
+		/// Only recognised by firmware with independent session/store
+		/// behaviour; older firmware rejects it as an invalid literal rate,
+		/// which a host can use as a deterministic fallback signal.
+		static constexpr uint32_t kBaudRateAdoptAlternate = 0xFFFFFFFC;
+
 		/// Port Baudrate response data size (11 bytes)
 		static constexpr std::size_t kPortBaudrateResponseSize = 11;
 
@@ -93,8 +104,10 @@ namespace Actisense
 		/**************************************************************************/ /**
 		 \brief      Encode Port Baudrate SET request data
 		 \param[in]  portNumber   Port number to configure
-		 \param[in]  sessionBaud  Session baudrate (use kBaudRateNoChange to skip)
-		 \param[in]  storeBaud    Store baudrate (use kBaudRateNoChange to skip)
+		 \param[in]  sessionBaud  Session baudrate (kBaudRateNoChange to skip,
+								  kBaudRateAdoptAlternate to adopt the stored rate)
+		 \param[in]  storeBaud    Store baudrate (kBaudRateNoChange to skip,
+								  kBaudRateAdoptAlternate to persist the live rate)
 		 \param[out] outData      Encoded request data
 		 *******************************************************************************/
 		inline void encodePortBaudrateSetRequest(uint8_t portNumber, uint32_t sessionBaud,
@@ -155,6 +168,9 @@ namespace Actisense
 			}
 			if (baudrate == kBaudRateDefault) {
 				return "Default";
+			}
+			if (baudrate == kBaudRateAdoptAlternate) {
+				return "Adopt Alternate";
 			}
 			return std::to_string(baudrate) + " bps";
 		}

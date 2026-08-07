@@ -2,7 +2,7 @@
 
 Commits current configuration changes to EEPROM (Electrically Erasable Programmable Read-Only Memory). This command makes configuration changes persistent across power cycles by storing them in non-volatile memory.
 
-Many configuration commands modify settings in RAM only. This command writes those changes to EEPROM, ensuring they are retained after device restart or power loss.
+**Compatibility note**: On current-generation devices every persistent configuration change — including a [Port Baudrate](port-baudrate.md) store change — is committed automatically at the point it is made, so this command is not required. It remains registered and always responds with success so that existing host applications which send it keep working unchanged.
 
 **Note**: EEPROM has a limited number of write cycles. Avoid excessive commits to preserve device longevity.
 
