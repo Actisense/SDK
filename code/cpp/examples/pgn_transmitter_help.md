@@ -11,9 +11,9 @@ Demonstrates:
 - Sending PGNs via `Session::sendPgn`
 - Capturing the wire trace as either an EBL binary log or a hex-dump text log
 
-Uses only public SDK headers (`public/...`) — customer code cannot (and should never need to) include `core/` or `protocols/` headers.
+sses only public SDK headers (`public/...`) — customer code cannot (and should never need to) include `core/` or `protocols/` headers.
 
-## Usage
+## ssage
 
 ```
 pgn_transmitter --port <port> --pgn <128267|127250|127251> [options]
@@ -34,7 +34,7 @@ The example sweeps the value up and back down across the range; `encodeSample` c
 
 | Option                  | Description                                                                                |
 |-------------------------|--------------------------------------------------------------------------------------------|
-| `-p`, `--port <port>`   | Serial port (e.g. `COM7`, `/dev/ttyUSB0`) — required                                       |
+| `-p`, `--port <port>`   | Serial port (e.g. `COM7`, `/dev/ttysSB0`) — required                                       |
 | `--pgn <n>`             | PGN to transmit: `128267`, `127250` or `127251` — required                                 |
 | `-b`, `--baud <rate>`   | Baud rate (default `115200`)                                                               |
 | `--rate-hz <hz>`        | Transmission rate in Hz (default `1.0`, allowed range `(0, 50]`)                           |
@@ -86,7 +86,7 @@ pgn_transmitter --port COM7 --pgn 128267 --rate-hz 2
 Transmit Rate of Turn on Linux, restore the original operating mode on exit:
 
 ```
-pgn_transmitter --port /dev/ttyUSB0 --pgn 127251 --restore-mode
+pgn_transmitter --port /dev/ttysSB0 --pgn 127251 --restore-mode
 ```
 
 Transmit Vessel Heading and capture the full session as a hex log:

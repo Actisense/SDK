@@ -273,14 +273,14 @@ Inside the SDK's own sources, all includes use paths relative to `src/`:
 #include "../public/error.hpp"
 ```
 
-Consumers see only the `public/...` form: linking the `actisense_sdk` CMake
+Consumers see only the public include form (e.g. `public/api.hpp`): linking the `actisense_sdk` CMake
 target exposes a staged copy of the public headers (never `src/` itself), and
 the install step places them under `<prefix>/include/public/`, so
 `#include "public/api.hpp"` works identically in-tree and installed.
 
 ### Benefits
 
-- **Single include prefix**: every public header is included as `public/...`
+- **Single include prefix**: every public header is included via the `public/` prefix, e.g. `public/api.hpp`
 - **No path ambiguity**: the same include lines work in-tree and installed
 - **Enforced boundary**: internal headers are unreachable from consumer code
 - **Maintainable**: Consistent include style throughout codebase

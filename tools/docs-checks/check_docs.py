@@ -31,8 +31,16 @@ REPO_ROOT = SCRIPT_DIR.parent.parent
 PUBLIC_HEADERS_DIR = REPO_ROOT / "code" / "cpp" / "src" / "public"
 ALLOWLIST_FILE = SCRIPT_DIR / "symbol_allowlist.txt"
 
-# Directories never scanned.
-EXCLUDED_DIRS = {".git", "build", "build_linux", "build_macos", "node_modules"}
+# Directories never scanned. Local build trees use arbitrary "build*" names
+# (and vendor fetched dependencies under _deps), so exclusion is prefix-based
+# rather than an exact-name set - the checks must stay quiet on a working
+# checkout, not only on CI's fresh clone.
+EXCLUDED_DIR_NAMES = {".git", "node_modules", "_deps", "out"}
+EXCLUDED_DIR_PREFIXES = ("build",)
+
+
+def is_excluded_dir(name):
+    return name in EXCLUDED_DIR_NAMES or name.startswith(EXCLUDED_DIR_PREFIXES)
 
 # The docs whose API mentions are checked against the public headers.
 SYMBOL_LINT_SCOPES = [
@@ -55,7 +63,7 @@ NON_PUBLIC_HOST_RE = re.compile(
 def find_markdown_files(root):
     """Yield every .md file under root, skipping excluded directories."""
     for path in sorted(root.rglob("*.md")):
-        if any(part in EXCLUDED_DIRS for part in path.parts):
+        if any(is_excluded_dir(part) for part in path.parts):
             continue
         yield path
 
