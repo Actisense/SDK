@@ -176,6 +176,31 @@ namespace Actisense
 			void setPortPCode(std::span<const uint8_t> pCodes, std::chrono::milliseconds timeout,
 							  BemResultCallback callback);
 
+			/* Port Inventory ---------------------------------------------------- */
+
+			/**************************************************************************/ /**
+			 \brief      Get the device's full port inventory.
+			 \details    Returns one record per communication port: the name the
+						 device prints on its case, the media and protocol, whether
+						 the port receives, transmits or both, and both its live
+						 and stored baud rates.
+
+						 Each record also carries the two cross-references that
+						 make a device's other port numbering schemes usable: the
+						 System Status statistics slot that reports the port, and
+						 the port number to pass to getPortBaudrate/setPortBaudrate
+						 - the latter reaches only the CAN port and the serial host
+						 UART, so most ports report kPortIndexNone there.
+
+						 The reply is normally a single message carrying the whole
+						 inventory; check PortInventoryResponse::isComplete(), and
+						 merge any further messages with PortInventoryAccumulator.
+			 \param[in]  timeout   How long to wait for the reply
+			 \param[in]  callback  Invoked with the decoded inventory
+			 *******************************************************************************/
+			void getPortInventory(std::chrono::milliseconds timeout,
+								  PortInventoryCallback callback);
+
 			/* Rx PGN Enable ----------------------------------------------------- */
 
 			/**************************************************************************/ /**

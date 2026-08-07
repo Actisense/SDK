@@ -251,6 +251,11 @@ namespace Actisense
 			sendBemCommand(makeBemA1(BemCommandId::GetSetPortPCode), timeout, std::move(callback));
 		}
 
+		void Session::Impl::getPortInventory(std::chrono::milliseconds timeout,
+											 BemResponseCallback callback) {
+			sendBemCommand(makeBemA1(BemCommandId::GetPortInventory), timeout, std::move(callback));
+		}
+
 		void Session::Impl::setPortPCode(std::span<const uint8_t> pCodes,
 										 std::chrono::milliseconds timeout,
 										 BemResponseCallback callback) {

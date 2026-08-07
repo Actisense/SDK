@@ -291,6 +291,13 @@ namespace Actisense
 			void getPortPCode(std::chrono::milliseconds timeout, BemResponseCallback callback);
 
 			/**************************************************************************/ /**
+			 \brief      Send Get Port Inventory command
+			 \param[in]  timeout     Timeout for response
+			 \param[in]  callback    Callback invoked on response or timeout
+			 *******************************************************************************/
+			void getPortInventory(std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
 			 \brief      Send Set Port P-Code command
 			 \param[in]  pCodes      P-Code values for each port
 			 \param[in]  timeout     Timeout for response

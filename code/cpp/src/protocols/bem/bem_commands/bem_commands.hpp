@@ -23,6 +23,7 @@
 #include "protocols/bem/bem_commands/operating_mode.hpp"
 #include "protocols/bem/bem_commands/params_pgn_enable_lists.hpp"
 #include "protocols/bem/bem_commands/port_baudrate.hpp"
+#include "protocols/bem/bem_commands/port_inventory.hpp"
 #include "protocols/bem/bem_commands/port_pcode.hpp"
 #include "protocols/bem/bem_commands/product_info.hpp"
 #include "protocols/bem/bem_commands/reinit_main_app.hpp"
@@ -64,6 +65,11 @@ namespace Actisense
 			/* Port Configuration Commands */
 			GetSetPortPCode = 0x13,	   ///< Get/Set port P-Code configuration
 			GetSetPortBaudrate = 0x17, ///< Get/Set port baudrate configuration
+			/// Get the device's full port inventory: one record per port with
+			/// its name, media, protocol, direction and both baud rates, plus
+			/// the System Status slot and the Port Baudrate number that reach
+			/// it. Answered with one or more messages tied by a transfer id.
+			GetPortInventory = 0x1B,
 
 			/* NMEA 2000 Product Information Commands */
 			GetProductInfo = 0x41,		///< Get product information
