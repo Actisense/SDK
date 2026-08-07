@@ -182,6 +182,39 @@ TEST(SweepScorecardTest, UpdateArtifactsAccumulatesAcrossCalls)
 	EXPECT_NE(markdown.find("leak note"), std::string::npos);
 }
 
+TEST(SweepScorecardTest, MarkdownEscapesPipesInEveryField)
+{
+	const std::string path = ::testing::TempDir() + "report_pipes.md";
+	SweepReportMeta meta;
+	meta.n2kLibVersion = 30030;
+	meta.manifestGenerated = "2026-08-06";
+
+	auto tricky = makeRecord(126992, "fix|ture", "a|b", "t|x", Verdict::FailLeak, "no|te");
+	tricky.name = "Sys|tem Time";
+	ASSERT_TRUE(writeMarkdownReport(path, meta, {tricky}));
+
+	const std::string markdown = readFile(path);
+	EXPECT_EQ(markdown.find("fix|ture"), std::string::npos);
+	EXPECT_EQ(markdown.find("Sys|tem"), std::string::npos);
+	EXPECT_NE(markdown.find("fix/ture"), std::string::npos);
+	EXPECT_NE(markdown.find("Sys/tem Time"), std::string::npos);
+	EXPECT_NE(markdown.find("no/te"), std::string::npos);
+}
+
+TEST(SweepScorecardTest, LoadReportsOpenFailureDistinctFromAbsent)
+{
+	bool openFailed = false;
+	EXPECT_TRUE(loadScorecardCsv("Z:/no/such/scorecard.csv", nullptr, &openFailed).empty());
+	EXPECT_TRUE(openFailed) << "unopenable path must be distinguishable";
+
+	const std::string path = ::testing::TempDir() + "scorecard_present.csv";
+	SweepReportMeta meta;
+	ASSERT_TRUE(writeScorecardCsv(path, meta, {}));
+	openFailed = true;
+	EXPECT_TRUE(loadScorecardCsv(path, nullptr, &openFailed).empty());
+	EXPECT_FALSE(openFailed) << "an empty-but-readable scorecard is not a failure";
+}
+
 /* ========================================================================== */
 /* Report dir                                                                 */
 /* ========================================================================== */

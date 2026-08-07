@@ -34,12 +34,14 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 namespace Actisense
@@ -222,11 +224,18 @@ namespace Actisense
 						 bad line.
 			 *******************************************************************************/
 			[[nodiscard]] inline std::vector<SweepRecord>
-			loadScorecardCsv(const std::string& path, SweepReportMeta* metaOut = nullptr)
+			loadScorecardCsv(const std::string& path, SweepReportMeta* metaOut = nullptr,
+							 bool* openFailedOut = nullptr)
 			{
+				if (openFailedOut != nullptr) {
+					*openFailedOut = false;
+				}
 				std::vector<SweepRecord> records;
 				std::ifstream file(path);
 				if (!file.is_open()) {
+					if (openFailedOut != nullptr) {
+						*openFailedOut = true;
+					}
 					return records;
 				}
 				std::string line;
@@ -377,8 +386,16 @@ namespace Actisense
 				}
 				file << "\n";
 
-				const auto emitRows = [&file](const std::vector<SweepRecord>& rows,
-											  bool withResults) {
+				/* Every free-text field is escaped - the fixture id and
+				   direction/list labels come from external config too. */
+				const auto mdCell = [](std::string text) {
+					for (char& c : text) {
+						if (c == '|') { c = '/'; }
+					}
+					return text;
+				};
+				const auto emitRows = [&file, &mdCell](const std::vector<SweepRecord>& rows,
+													   bool withResults) {
 					file << "| PGN | Name | Fixture | Direction | List | Verdict | Note |\n";
 					file << "|---|---|---|---|---|---|---|\n";
 					for (const auto& record : rows) {
@@ -388,17 +405,11 @@ namespace Actisense
 								   record.blockedResult +
 								   (note.empty() ? "" : ("; " + note));
 						}
-						for (char& c : note) {
-							if (c == '|') { c = '/'; }
-						}
-						std::string name = record.name;
-						for (char& c : name) {
-							if (c == '|') { c = '/'; }
-						}
-						file << "| " << record.pgn << " | " << name << " | "
-							 << record.fixture << " | " << record.direction << " | "
-							 << record.list << " | " << verdictToString(record.verdict)
-							 << " | " << note << " |\n";
+						file << "| " << record.pgn << " | " << mdCell(record.name) << " | "
+							 << mdCell(record.fixture) << " | " << mdCell(record.direction)
+							 << " | " << mdCell(record.list) << " | "
+							 << verdictToString(record.verdict) << " | " << mdCell(note)
+							 << " |\n";
 					}
 					file << "\n";
 				};
@@ -438,11 +449,35 @@ namespace Actisense
 			{
 				const std::string csvPath = directory + "/" + kScorecardCsvName;
 				const std::string mdPath = directory + "/" + kReportMarkdownName;
-				const auto existing = loadScorecardCsv(csvPath);
+
+				/* An existing scorecard that cannot be READ must abort the
+				   update - merging against "empty" would silently discard
+				   every other fixture's accumulated rows. Absent is fine. */
+				bool openFailed = false;
+				const auto existing = loadScorecardCsv(csvPath, nullptr, &openFailed);
+				if (openFailed && std::filesystem::exists(csvPath)) {
+					return false;
+				}
 				const auto merged = mergeRecords(existing, fresh);
-				const bool csvOk = writeScorecardCsv(csvPath, meta, merged);
-				const bool mdOk = writeMarkdownReport(mdPath, meta, merged);
-				return csvOk && mdOk;
+
+				/* Write-temp-then-rename so a crash or full disk mid-write
+				   cannot destroy the accumulated scorecard, and the CSV is
+				   not replaced when the Markdown write fails. */
+				const std::string csvTemp = csvPath + ".tmp";
+				const std::string mdTemp = mdPath + ".tmp";
+				if (!writeScorecardCsv(csvTemp, meta, merged) ||
+					!writeMarkdownReport(mdTemp, meta, merged)) {
+					std::error_code cleanupError;
+					std::filesystem::remove(csvTemp, cleanupError);
+					std::filesystem::remove(mdTemp, cleanupError);
+					return false;
+				}
+				std::error_code renameError;
+				std::filesystem::rename(csvTemp, csvPath, renameError);
+				if (!renameError) {
+					std::filesystem::rename(mdTemp, mdPath, renameError);
+				}
+				return !renameError;
 			}
 
 		} /* namespace Test */

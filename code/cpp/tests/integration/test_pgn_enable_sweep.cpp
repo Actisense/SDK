@@ -128,6 +128,7 @@ static constexpr auto kSettleDelay = std::chrono::milliseconds(300);
 static constexpr auto kRxWaitTimeout = std::chrono::milliseconds(1500);
 static constexpr auto kRxWaitTimeoutFast = std::chrono::milliseconds(2500);
 static constexpr auto kModeChangeSettle = std::chrono::milliseconds(1500);
+static constexpr std::size_t kMaxCapturedFrames = 4096;
 
 /* PGNs excluded for firmware-behaviour reasons (not DB facts):
      126208  NMEA Group Function — control PGN, has its own handling
@@ -351,6 +352,12 @@ protected:
 		{
 			std::lock_guard<std::mutex> lock(endpoint.mutex);
 			endpoint.frames.push_back(std::move(captured));
+			/* Both endpoints capture, but only the current observer is ever
+			   drained - bound the queue so a long full sweep on a chatty bus
+			   cannot grow the transmitter side without limit. */
+			while (endpoint.frames.size() > kMaxCapturedFrames) {
+				endpoint.frames.pop_front();
+			}
 		}
 		endpoint.cv.notify_one();
 	}
@@ -437,38 +444,39 @@ protected:
 		std::this_thread::sleep_for(kModeChangeSettle);
 	}
 
+	/* Best-effort restore. These waits deliberately give up after the
+	   timeout (a dead device must not hang TearDown), so the completion
+	   state is heap-held and captured by value: a callback that fires
+	   after the wait was abandoned - the SDK's timeout tick or close()'s
+	   cancellation can both land later than our own deadline - writes to
+	   still-live state instead of a destroyed stack promise. */
 	void restoreEndpoint(Endpoint& endpoint)
 	{
 		if (!endpoint.session) {
 			return;
 		}
+		const auto awaitBestEffort = [](auto issueCall) {
+			auto done = std::make_shared<std::promise<void>>();
+			auto future = done->get_future();
+			issueCall([done](ErrorCode, std::string_view, ResponseOrigin) {
+				done->set_value();
+			});
+			(void)future.wait_for(kDefaultTimeout);
+		};
 		if (endpoint.listsTouched) {
-			std::promise<void> listDone;
-			auto listFuture = listDone.get_future();
-			endpoint.session->defaultPgnEnableList(
-				DeletePgnListSelector::Both, kDefaultTimeout,
-				[&listDone](ErrorCode, std::string_view, ResponseOrigin) {
-					listDone.set_value();
-				});
-			(void)listFuture.wait_for(kDefaultTimeout);
-
-			std::promise<void> activateDone;
-			auto activateFuture = activateDone.get_future();
-			endpoint.session->activatePgnEnableLists(
-				kDefaultTimeout, [&activateDone](ErrorCode, std::string_view, ResponseOrigin) {
-					activateDone.set_value();
-				});
-			(void)activateFuture.wait_for(kDefaultTimeout);
+			awaitBestEffort([&](auto callback) {
+				endpoint.session->defaultPgnEnableList(DeletePgnListSelector::Both,
+													   kDefaultTimeout, callback);
+			});
+			awaitBestEffort([&](auto callback) {
+				endpoint.session->activatePgnEnableLists(kDefaultTimeout, callback);
+			});
 		}
 		if (endpoint.savedMode.has_value()) {
-			std::promise<void> modeDone;
-			auto modeFuture = modeDone.get_future();
-			endpoint.session->setOperatingMode(
-				*endpoint.savedMode, kDefaultTimeout,
-				[&modeDone](ErrorCode, std::string_view, ResponseOrigin) {
-					modeDone.set_value();
-				});
-			(void)modeFuture.wait_for(kDefaultTimeout);
+			awaitBestEffort([&](auto callback) {
+				endpoint.session->setOperatingMode(*endpoint.savedMode, kDefaultTimeout,
+												   callback);
+			});
 		}
 	}
 

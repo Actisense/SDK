@@ -21,7 +21,7 @@
 				"fixtures": [
 				  {
 					"id": "fixture-1",
-					"device_a": {"port": "COM10", "baud": 115200,
+					"device_a": {"port": "COM90", "baud": 115200,
 								 "expected_model": "NGX-1",
 								 "rewrites_sid_byte0": false,
 								 "v2_device": false},

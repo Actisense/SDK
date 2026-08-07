@@ -353,9 +353,18 @@ namespace Actisense
 											return std::nullopt;
 										}
 										uint32_t codepoint = *unit;
-										/* Combine a UTF-16 surrogate pair. */
-										if (codepoint >= 0xD800u && codepoint <= 0xDBFFu &&
-											consumeLiteral("\\u")) {
+										/* Combine a UTF-16 surrogate pair. A lone
+										   surrogate would encode invalid UTF-8 that
+										   could flow into report artifacts - reject. */
+										if (codepoint >= 0xDC00u && codepoint <= 0xDFFFu) {
+											error_ = "lone low surrogate";
+											return std::nullopt;
+										}
+										if (codepoint >= 0xD800u && codepoint <= 0xDBFFu) {
+											if (!consumeLiteral("\\u")) {
+												error_ = "lone high surrogate";
+												return std::nullopt;
+											}
 											const auto low = parseHex4();
 											if (!low.has_value() || *low < 0xDC00u ||
 												*low > 0xDFFFu) {

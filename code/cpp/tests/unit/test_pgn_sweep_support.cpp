@@ -112,6 +112,9 @@ TEST(MiniJsonTest, RejectsMalformedDocuments)
 		R"({"a": 1} extra)",  /* trailing content */
 		R"({"a": 01x})",	  /* malformed number */
 		R"({"a": "unclosed)", /* unterminated string */
+		R"({"a": "\uD800"})", /* lone high surrogate */
+		R"({"a": "\uDC00x"})",/* lone low surrogate */
+		R"({"a": "\uD800A"})", /* high surrogate + non-surrogate */
 	};
 	for (const char* text : cases) {
 		std::string error;
@@ -227,6 +230,40 @@ TEST(PgnManifestTest, SmokeSubsetSelectionIsDeterministicAndSkipsExclusions)
 	ASSERT_EQ(again.size(), smoke.size());
 	EXPECT_EQ(again[0].pgn, smoke[0].pgn);
 	EXPECT_EQ(again[1].pgn, smoke[1].pgn);
+}
+
+TEST(PgnManifestTest, SmokeSubsetHonoursItsCounters)
+{
+	/* Build a manifest big enough to exercise both smoke limits: 20
+	   single-frame + 10 fixed-length fast-packet entries. */
+	std::string pgns;
+	for (int32_t i = 0; i < 20; ++i) {
+		pgns += R"({"pgn": )" + std::to_string(127000 + i) +
+				R"(, "name": "sf", "fast": false, "size_bytes": 8, "min_bytes": 8,
+				 "sid_index": 255, "instance_index": 255, "v2_supported": true},)";
+	}
+	for (int32_t i = 0; i < 10; ++i) {
+		pgns += R"({"pgn": )" + std::to_string(128000 + i) +
+				R"(, "name": "fp", "fast": true, "size_bytes": 20, "min_bytes": 20,
+				 "sid_index": 255, "instance_index": 255, "v2_supported": true},)";
+	}
+	pgns.pop_back(); /* trailing comma */
+	const std::string path = writeTempFile(
+		"manifest_counters.json",
+		R"({"n2k_lib_version": 30030, "generated": "2026-08-06", "pgns": [)" + pgns + "]}");
+	std::string error;
+	const auto manifest = loadPgnManifest(path, error);
+	ASSERT_TRUE(manifest.has_value()) << error;
+
+	const auto smoke = selectSweepCandidates(*manifest, /*fullSweep=*/false, {});
+	std::size_t singles = 0;
+	std::size_t fasts = 0;
+	for (const auto& entry : smoke) {
+		(entry.fast ? fasts : singles)++;
+	}
+	EXPECT_EQ(singles, 16u) << "smoke subset takes the first 16 single-frame PGNs";
+	EXPECT_EQ(fasts, 8u) << "smoke subset takes the first 8 fixed-length fast-packet PGNs";
+	EXPECT_EQ(smoke.size(), 24u);
 }
 
 /* ========================================================================== */
