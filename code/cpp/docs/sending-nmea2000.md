@@ -80,4 +80,4 @@ pgn_transmitter --port COM7 --pgn 127250
 - The Actisense gateway handles CAN arbitration and timing. You only need to provide the PGN, addresses, priority, and payload.
 - For multi-frame PGNs (>8 bytes), the gateway handles ISO 11783 Transport Protocol segmentation automatically.
 - Source address management (address claiming) is handled by the gateway device.
-- If `sendPgn()` succeeds but nothing reaches the bus, check that the chosen PGN is enabled in the device's Tx PGN list. The Actisense Toolkit can configure that list, and the SDK exposes the underlying BEM commands on the internal `SessionImpl` interface.
+- If `sendPgn()` succeeds but nothing reaches the bus, check that the chosen PGN is enabled in the device's Tx PGN list. The Actisense Toolkit can configure that list, and the SDK exposes it directly through the `Session` PGN enable-list verbs (`getTxPgnEnable()`, `setTxPgnEnable()`, `activatePgnEnableLists()`, …) — see [PGN Enable Lists](bem-commands/pgn-enable-lists.md).

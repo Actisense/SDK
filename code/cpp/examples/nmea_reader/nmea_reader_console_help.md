@@ -9,7 +9,7 @@ Demonstrates:
 - A framework-agnostic table model (`PgnTableModel`) fed from the SDK event callback, designed so the same model can later back a Qt or native GUI
 - Setting the gateway to Rx-All (`OperatingMode::NgTransferRxAllMode`) on connect and restoring the prior mode on exit, through the public `Session` interface
 
-Uses only public SDK headers (`src/public/...`) — customer code should never need to include `core/` or `protocols/` headers directly.
+Uses only public SDK headers (`public/...`) — customer code cannot (and should never need to) include `core/` or `protocols/` headers.
 
 ## Usage
 

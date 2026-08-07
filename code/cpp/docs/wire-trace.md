@@ -56,9 +56,14 @@ What gets written:
 
 1. On `setWireTrace(...)`, a one-off **preamble**: `EBLT_TimeUtc`
    (anchor timestamp) followed by `EBLT_Version` (`1002` = "1.002").
-2. On every wire event: `EBLT_TimeUtc` (current time) &rarr;
-   `EBLT_DirectionMarker` (`0x00` for Rx, `0x01` for Tx) &rarr; the raw
-   captured bytes with EBL ESC-stuffing applied.
+2. On every **Tx** event: `EBLT_TimeUtc` (current time) &rarr;
+   `EBLT_DirectionMarker` (`0x01`) &rarr; the raw sent bytes with EBL
+   ESC-stuffing applied.
+3. On **Rx**, transport reads can split a frame across chunks, so the
+   trace reassembles them and emits one `EBLT_BstRawFrame` record per
+   complete BST message (each preceded by `EBLT_TimeUtc` and
+   `EBLT_DirectionMarker` `0x00`); bytes arriving outside any frame are
+   written as a raw ESC-stuffed stream.
 
 ```cpp
 std::ofstream f("capture.ebl", std::ios::binary);
@@ -117,13 +122,12 @@ The trace hooks sit at the transport boundary, so it captures every
 byte regardless of which protocol layer wraps it:
 
 - **TX**: bytes given to `Session::asyncSend(...)`, after any BDTP
-  framing that the session adds. For BEM commands constructed via
-  `BemProtocol::buildXxx(...)` the buffer is already BDTP-framed; the
-  trace shows exactly what hits the wire.
-- **RX**: bytes returned from the transport's `asyncRecv` callback, in
-  the chunks the transport delivered them. For serial transports this
-  is typically a small read at a time; for TCP/UDP this is one
-  datagram per event.
+  framing that the session adds — including the BEM command frames the
+  typed session verbs construct internally. The trace shows exactly
+  what hits the wire.
+- **RX**: bytes returned from the transport's receive callback, in the
+  chunks the transport delivered them. For serial transports this is
+  typically a small read at a time.
 
 ---
 

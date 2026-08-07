@@ -11,7 +11,7 @@ Demonstrates:
 - Sending PGNs via `Session::sendPgn`
 - Capturing the wire trace as either an EBL binary log or a hex-dump text log
 
-Uses only public SDK headers (`src/public/...`) — customer code should never need to include `core/` or `protocols/` headers directly.
+Uses only public SDK headers (`public/...`) — customer code cannot (and should never need to) include `core/` or `protocols/` headers.
 
 ## Usage
 
