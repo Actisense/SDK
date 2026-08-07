@@ -19,7 +19,7 @@ graph TB
         BDTP["BDTP<br/>Binary Data Transfer Protocol<br/>(DLE/STX/ETX framing + checksum)"]
     end
     subgraph "Transport"
-        TRANS["ITransport<br/>(Serial / TCP / UDP / Loopback)"]
+        TRANS["ITransport<br/>(Serial / Loopback / custom)"]
     end
     subgraph "Physical"
         WIRE["Wire / USB / Network"]
@@ -39,7 +39,7 @@ graph TB
 | **BEM** | Device command/response encoding, correlation, timeouts | `BemProtocol`, `BemCommand`, `BemResponse` |
 | **BST** | Message type identification, N2K header fields, payload | `BstDecoder`, `BstEncoder`, `BstFrame` |
 | **BDTP** | Byte-stream framing, DLE escaping, checksum | `BdtpProtocol` |
-| **Transport** | Raw byte I/O over serial, TCP, UDP, or loopback | `ITransport`, `SerialTransport` |
+| **Transport** | Raw byte I/O over serial, loopback, or a caller-supplied transport | `ITransport` (public), `SerialTransport` (internal) |
 
 ### 1.1 Command Streams
 
@@ -85,7 +85,7 @@ sequenceDiagram
     participant BDTP as BdtpProtocol
     participant Trans as ITransport
 
-    App->>Sess: asyncSend("bst", payload)
+    App->>Sess: asyncSend(SendProtocol::Bst, payload)
     Sess->>BDTP: encodeFrame(payload)
     Note over BDTP: Add DLE/STX prefix<br/>Escape 0x10 bytes<br/>Add DLE/ETX suffix
     BDTP-->>Sess: framed bytes
@@ -589,10 +589,11 @@ classDiagram
     }
 
     class Session {
-        <<interface>>
-        +asyncSend(protocol, payload, completion)*
-        +close()*
-        +isConnected()*
+        <<final, pimpl handle>>
+        -impl_ : unique_ptr~Impl~
+        +asyncSend(protocol, payload, completion)
+        +close()
+        +isConnected()
     }
 
     class SessionImpl {
@@ -644,7 +645,7 @@ classDiagram
     }
 
     Api ..> SessionImpl : creates
-    Session <|-- SessionImpl
+    Session o-- SessionImpl : forwards to (pimpl)
     SessionImpl o-- ITransport
     SessionImpl o-- BdtpProtocol
     SessionImpl o-- BstDecoder

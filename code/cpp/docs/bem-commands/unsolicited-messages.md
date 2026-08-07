@@ -2,28 +2,22 @@
 
 Devices in the `0xF0`-range emit messages that are **not** replies to a
 host command: they arrive whenever the device decides they're warranted.
-The C++ SDK has no `buildXxx()` for these &mdash; instead, recognise them
-in your `EventCallback` after `BemProtocol::correlateResponse()` returns
-`false`, then dispatch on `BemResponse::header.bemId`.
+There is no verb to call for these &mdash; the session recognises and
+decodes them for you and delivers each one as a *typed*
+`ParsedMessageEvent` through the event callback passed to `Api::open()`.
+Dispatch on `ParsedMessageEvent::messageType`:
 
-| Message | BEM ID | Trigger |
-| ------- | ------ | ------- |
-| Startup Status | `0xF0` | Device has booted/initialised |
-| Error Report | `0xF1` | Device has detected a fault condition |
-| System Status | `0xF2` | Periodic / on-change device status |
-| Negative Ack | `0xF4` | A previous command was rejected |
+| Message | BEM ID | `messageType` | Payload type | Trigger |
+| ------- | ------ | ------------- | ------------ | ------- |
+| Startup Status | `0xF0` | `"StartupStatus"` | `StartupStatusData` | Device has booted/initialised |
+| Error Report | `0xF1` | `"ErrorReport"` | `ErrorReportData` | Device has detected a fault condition |
+| System Status | `0xF2` | `"SystemStatus"` | `SystemStatusData` | Periodic / on-change device status |
+| Negative Ack | `0xF4` | `"NegativeAck"` | `NegativeAckData` | A previous command was rejected |
 
-A free helper is available for dispatch:
-
-```cpp
-#include "protocols/bem/bem_commands/bem_commands.hpp"
-
-if (isBemUnsolicited(static_cast<BemCommandId>(rsp->header.bemId))) {
-    /* dispatch */
-}
-```
-
-`bemCommandIdToString(...)` maps each unsolicited ID to a printable name.
+The payload structs are declared in `public/bem_responses/unsolicited.hpp`
+(also reachable via the `public/api.hpp` umbrella). See
+[Putting it together](#putting-it-together) below for a complete
+dispatcher.
 
 ---
 
@@ -35,25 +29,29 @@ Useful as a signal that the device has fully come back up after a reboot.
 Wire-protocol detail:
 [startup-status.md](../../../../docs/DataFormats/Binary/bem-detail/startup-status.md).
 
-The payload (`BemResponse::data`) carries device-defined status flags.
-See the wire-protocol page for the bit layout per product.
+The decoded `StartupStatusData` carries the detected wire format
+(legacy 3-byte vs modern 6-byte, as `StartupStatusFormat`), the
+startup/boot mode value, and an error code (`0` = clean start). See the
+wire-protocol page for the per-product bit layout.
 
 ---
 
 ## Error Report (`0xF1`)
 
 Sent when the device detects a fault (e.g. CAN bus off, EEPROM CRC
-mismatch, configuration parse error). The payload contains an error code
-plus optional context. Wire-protocol detail:
+mismatch, configuration parse error). Wire-protocol detail:
 [error-report.md](../../../../docs/DataFormats/Binary/bem-detail/error-report.md).
 
-`BemResponseHeader::errorCode` carries the same ARL error code as the
-unsolicited payload &mdash; check it first for a quick triage:
+The decoded `ErrorReportData` carries the structure-variant ID
+(`ErrorReportVariant`: standard / extended / timestamped), the primary
+error code, an optional timestamp, and any additional context bytes:
 
 ```cpp
-if (rsp->header.bemId == static_cast<uint8_t>(BemCommandId::ErrorReport) &&
-    rsp->header.errorCode != 0) {
-    /* log + notify upstream */
+if (msg->messageType == "ErrorReport") {
+    const auto& report = std::any_cast<const ErrorReportData&>(msg->payload);
+    if (report.errorCode != 0) {
+        /* log + notify upstream; report.contextData has extra detail */
+    }
 }
 ```
 
@@ -96,17 +94,15 @@ out of range, write-protected setting without passkey, etc.). Wire-protocol
 detail:
 [negative-ack.md](../../../../docs/DataFormats/Binary/bem-detail/negative-ack.md).
 
-The payload typically contains the rejected BEM ID plus a reason code.
-NegativeAck arrives **in addition to** any normal response; if you have
-registered a request via `BemProtocol::registerRequest()`, that request
-will also time out unless you explicitly cancel it on the NegativeAck.
+The decoded `NegativeAckData` carries a `uniqueId` field that helps
+correlate the rejection with the offending command; the ARL reason code
+travels in the delivery context.
 
-```cpp
-if (rsp->header.bemId == static_cast<uint8_t>(BemCommandId::NegativeAck)) {
-    /* rsp->data[0] is typically the rejected BEM ID */
-    /* cancel any in-flight request keyed on that ID */
-}
-```
+When the rejected command was issued through a typed session/remote verb,
+the SDK handles the NegativeAck for you: the verb's callback fires with
+`ErrorCode::BemNegativeAck` and the device's rejection reason. The
+unsolicited event is what you see for rejections of traffic the SDK is not
+correlating (for example commands issued by another host on a shared bus).
 
 ---
 
@@ -121,7 +117,7 @@ The payload structs are public — include
 `public/bem_responses/unsolicited.hpp` (or the individual
 `public/bem_responses/<type>.hpp` headers) for `SystemStatusData`,
 `StartupStatusData`, `ErrorReportData` and `NegativeAckData`; no internal
-`protocols/` include is needed (GIT-130). The typed payloads do **not** carry
+`protocols/` include is needed. The typed payloads do **not** carry
 the BEM reply header, so the responding device's identity travels in
 `ParsedMessageEvent::origin` — an optional `ResponseOrigin` with `modelId`,
 `serialNumber`, and the receive path (`n2kSourceAddress` / `TransportPath`):

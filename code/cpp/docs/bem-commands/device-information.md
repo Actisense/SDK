@@ -2,98 +2,99 @@
 
 Commands that read or write basic device-level state.
 
-| Command | BEM ID | C++ builders |
-| ------- | ------ | ------------ |
-| Get/Set Operating Mode | `0x11` | `buildGetOperatingMode()`, `buildSetOperatingMode()` |
-| Get/Set Total Time | `0x15` | `buildGetTotalTime()`, `buildSetTotalTime()` |
-| Echo | `0x18` | `buildEcho()` |
+| Command | BEM ID | Public verbs | Handles |
+| ------- | ------ | ------------ | ------- |
+| Get/Set Operating Mode | `0x11` | `getOperatingMode()`, `setOperatingMode()` | `Session`, `RemoteDevice` |
+| Get/Set Total Time | `0x15` | `getTotalTime()`, `setTotalTime()` | `RemoteDevice` |
+| Echo | `0x18` | `echo()` | `RemoteDevice` |
 
 ---
 
 ## Get / Set Operating Mode (`0x11`)
 
 Reads or sets the device operating mode (e.g. `NgTransferNormalMode`,
-`NgTransferRxAllMode`, `NgConvertNormalMode`). Wire-protocol detail:
+`NgTransferRxAllMode`, `NgConvertNormalMode` — see the `OperatingMode` enum in
+`public/operating_mode.hpp`). Wire-protocol detail:
 [operating-mode.md](../../../../docs/DataFormats/Binary/bem-detail/operating-mode.md).
 
 ```cpp
-[[nodiscard]] bool buildGetOperatingMode(std::vector<uint8_t>& outFrame,
-                                         std::string& outError);
+void getOperatingMode(std::chrono::milliseconds timeout,
+                      OperatingModeCallback callback);
 
-[[nodiscard]] bool buildSetOperatingMode(uint16_t mode,
-                                         std::vector<uint8_t>& outFrame,
-                                         std::string& outError);
+void setOperatingMode(OperatingMode mode, std::chrono::milliseconds timeout,
+                      BemResultCallback callback);
 ```
-
-The set form takes a 16-bit operating-mode value, encoded little-endian on
-the wire. Use the `OperatingMode` enum from
-`protocols/bem/bem_commands/operating_mode.hpp` for readability:
 
 ```cpp
-#include "protocols/bem/bem_commands/operating_mode.hpp"
+session->getOperatingMode(std::chrono::seconds(3),
+    [](ErrorCode code, std::string_view errorMsg,
+       std::optional<OperatingMode> mode, ResponseOrigin) {
+        if (code == ErrorCode::Ok && mode) {
+            std::printf("Mode: %s\n", std::string{OperatingModeName(*mode)}.c_str());
+        }
+    });
 
-bem.buildSetOperatingMode(static_cast<uint16_t>(OperatingMode::NgTransferRxAllMode),
-                          frame, err);
+session->setOperatingMode(OperatingMode::NgTransferRxAllMode,
+                          std::chrono::seconds(3),
+    [](ErrorCode code, std::string_view errorMsg, ResponseOrigin) {
+        /* ErrorCode::Ok = mode accepted */
+    });
 ```
 
-The response payload is the resulting 16-bit operating mode (little-endian)
-at offset `kBemGP_Off_OperatingMode = 12` from the start of the BST payload.
-On rejection, the device returns the current mode unchanged with a non-zero
-`errorCode` in the response header.
+On rejection the device reports a non-zero error, surfaced as
+`ErrorCode::BemDeviceError` with the description in `errorMsg`; the device's
+mode is left unchanged.
 
 `OperatingModeName(OperatingMode)` returns a human-readable string for
 logging.
+
+> **Note:** Some devices restart their protocol stacks when the mode changes;
+> expect a brief gap in received traffic after a successful set.
 
 ---
 
 ## Get / Set Total Time (`0x15`)
 
-Reads or writes the device's lifetime running-hours counter (seconds).
-Wire-protocol detail:
+Reads or writes the device's lifetime running-time counter (seconds).
+Exposed on `RemoteDevice`. Wire-protocol detail:
 [total-time.md](../../../../docs/DataFormats/Binary/bem-detail/total-time.md).
 
 ```cpp
-[[nodiscard]] bool buildGetTotalTime(std::vector<uint8_t>& outFrame,
-                                     std::string& outError);
+void getTotalTime(std::chrono::milliseconds timeout, TotalTimeCallback callback);
 
-[[nodiscard]] bool buildSetTotalTime(uint32_t totalTime,
-                                     uint32_t passkey,
-                                     std::vector<uint8_t>& outFrame,
-                                     std::string& outError);
+void setTotalTime(uint32_t totalTime, uint32_t passkey,
+                  std::chrono::milliseconds timeout, BemResultCallback callback);
 ```
 
 > **Write protected.** The set form requires a `passkey` matching the
 > device's expected secret to prevent accidental modification. Get is
 > unrestricted.
 
-The response payload is the 32-bit total-time value little-endian.
+The get callback delivers a `TotalTimeResponse` whose `totalTime` field is
+the 32-bit counter value in seconds.
 
 ---
 
 ## Echo (`0x18`)
 
-Loopback diagnostic. Whatever bytes you send back from the device.
-Wire-protocol detail:
+Loopback diagnostic — whatever bytes you send, the device sends back.
+Exposed on `RemoteDevice`. Wire-protocol detail:
 [echo.md](../../../../docs/DataFormats/Binary/bem-detail/echo.md).
 
 ```cpp
-[[nodiscard]] bool buildEcho(std::span<const uint8_t> data,
-                             std::vector<uint8_t>& outFrame,
-                             std::string& outError);
-
-[[nodiscard]] bool buildEcho(const std::vector<uint8_t>& data,
-                             std::vector<uint8_t>& outFrame,
-                             std::string& outError);
+void echo(std::span<const uint8_t> data, std::chrono::milliseconds timeout,
+          EchoCallback callback);
 ```
-
-Up to **254 bytes** of payload (the BST `storeLength` is 8-bit and includes
-the BEM ID byte). Echo is useful as a connectivity sanity check or for
-measuring round-trip latency.
 
 ```cpp
 const std::array<uint8_t, 4> ping = {0xDE, 0xAD, 0xBE, 0xEF};
-bem.buildEcho(std::span<const uint8_t>{ping}, frame, err);
-session->asyncSend("raw", frame, /* ... */);
+remote->echo(ping, std::chrono::seconds(2),
+    [](ErrorCode code, std::string_view,
+       std::optional<EchoResponse> rsp, ResponseOrigin) {
+        /* rsp->data should equal the request payload */
+    });
 ```
 
-The response payload is identical to the request payload.
+Echo is useful as a connectivity sanity check or for measuring round-trip
+latency. The `EchoResponse::data` payload is identical to the request
+payload.

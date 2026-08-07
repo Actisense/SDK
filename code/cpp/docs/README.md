@@ -1,6 +1,6 @@
 # Actisense C++ SDK
 
-A modern C++20 SDK for Actisense device communication, supporting serial and UDP transports with BST/BEM/BDTP protocols.
+A modern C++20 SDK for Actisense device communication over serial links, speaking the BST/BEM/BDTP protocols. A caller-supplied custom transport can be used via `Api::openWithTransport()`; TCP/UDP transport kinds are declared in the configuration but not yet implemented.
 
 ## Prerequisites
 
@@ -262,26 +262,27 @@ is enforced at build time by the public-header and examples include guards.
 
 ### Include Path Rules
 
-All includes throughout the SDK use paths relative to `src/`:
+Inside the SDK's own sources, all includes use paths relative to `src/`:
 
 ```cpp
 // ✅ Correct - relative to src/
 #include "public/error.hpp"
-#include "protocols/bem/bem_protocol.hpp"  
-#include "transport/serial/serial_transport.hpp"
-#include "util/ring_buffer.hpp"
 
 // ❌ Incorrect - relative paths
 #include "error.hpp"
-#include "../bem/bem_protocol.hpp"
-#include "../../util/ring_buffer.hpp"
+#include "../public/error.hpp"
 ```
+
+Consumers see only the `public/...` form: linking the `actisense_sdk` CMake
+target exposes a staged copy of the public headers (never `src/` itself), and
+the install step places them under `<prefix>/include/public/`, so
+`#include "public/api.hpp"` works identically in-tree and installed.
 
 ### Benefits
 
-- **Single include path**: All headers derive from `src/` root
-- **No path ambiguity**: Clear, absolute paths relative to project root  
-- **Easy integration**: Users only need to add `src/` to include directories
+- **Single include prefix**: every public header is included as `public/...`
+- **No path ambiguity**: the same include lines work in-tree and installed
+- **Enforced boundary**: internal headers are unreachable from consumer code
 - **Maintainable**: Consistent include style throughout codebase
 - **IDE friendly**: Better autocomplete and navigation
 

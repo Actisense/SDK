@@ -10,7 +10,7 @@ raw traffic and inject frames of your own.
 
 It complements the `n2ksender` / `n2kreceiver` utilities in this folder and
 reuses the same BDTP framing approach. It exists to exercise the raw-CAN
-pass-through added by NGXSW-4206 (NGX firmware 3.078+).
+pass-through added in NGX firmware 3.078 and later.
 
 ## Operating modes
 
@@ -33,8 +33,9 @@ current mode back — even while raw CAN traffic is flowing.
   destination, length and data bytes.
 - Binary (mode 5) and ASCII (mode 6) frames are shown identically.
 - BEM traffic interleaved in the stream is recognised and skipped (BEM mode
-  responses update the mode dropdown; other BST ids are ignored). Per NGXSW-4206,
-  BEM frames never straddle a CAN frame, so frame boundaries are reliable.
+  responses update the mode dropdown; other BST ids are ignored). The firmware
+  guarantees BEM frames never straddle a CAN frame, so frame boundaries are
+  reliable.
 
 ### Packet builder
 Labelled fields — **PGN, Priority, Source, Dest, Length** and 8 data bytes —

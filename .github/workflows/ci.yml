@@ -158,6 +158,23 @@ jobs:
       run: ctest --output-on-failure --parallel
 
   # ===========================================================================
+  # Documentation Checks (links, internal refs, public-symbol drift)
+  # ===========================================================================
+  docs:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Run documentation checks
+      run: python tools/docs-checks/check_docs.py
+
+  # ===========================================================================
   # Code Quality Checks
   # ===========================================================================
   code-quality:

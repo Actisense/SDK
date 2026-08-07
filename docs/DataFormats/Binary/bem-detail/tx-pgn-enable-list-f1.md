@@ -6,7 +6,7 @@
 >
 > - F1 was discontinued as of firmware v2.500; every firmware that supports F1 also supports F2.
 > - AMKLib-based products (NGX-1, W2K-1) never implemented F1 and will NegativeAck a request.
-> - The Actisense C++ SDK no longer provides F1 builders, decoders, or session helpers (removed in GIT-91); this page is kept as wire-format reference for legacy hosts only.
+> - The Actisense C++ SDK no longer provides F1 builders, decoders, or session helpers; this page is kept as wire-format reference for legacy hosts only.
 
 ---
 

@@ -24,15 +24,38 @@ add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE actisense_sdk)
 ```
 
-This automatically adds the correct include paths. All SDK headers are relative to `src/`:
+Linking the `actisense_sdk` target automatically adds the correct include
+paths. The target deliberately exposes **only the public headers** (a staged
+copy of `src/public/`); the SDK's internal directories (`core/`, `protocols/`,
+`transport/`, `util/`, `platform/`) are private to the library and cannot be
+included from your code. Every public header is reached through the `public/`
+prefix:
 
 ```cpp
 #include "public/api.hpp"
 ```
 
+`public/api.hpp` is an umbrella header that exposes the entire public surface;
+you can also include individual headers such as `public/session.hpp` or
+`public/bem_responses/product_info.hpp` directly.
+
 ### Manual Integration
 
-If not using CMake, add `src/` to your include path and compile all `.cpp` files under `src/`.
+The SDK is designed to be consumed as the `actisense_sdk` CMake target. If you
+cannot use `add_subdirectory`, build and install the SDK once with CMake:
+
+```bash
+cmake -B build -S path/to/actisense-sdk
+cmake --build build --config Release
+cmake --install build --prefix /your/install/prefix
+```
+
+Then add `<prefix>/include` to your compiler's include path and link the
+installed `actisense_sdk` static library. The install step places the headers
+under `<prefix>/include/public/`, so `#include "public/api.hpp"` works exactly
+as in the CMake case. Do not add the SDK's `src/` directory to your include
+path or compile its `.cpp` files into your own project — that would expose the
+internal headers, which are not part of the stable API.
 
 ## Connecting to a Device
 
@@ -106,5 +129,5 @@ session->close();
 
 ## Next Steps
 
-- [Receiving NMEA 2000 Data](receiving-nmea2000.md) — Parse incoming N2K messages using `BstFrame`
+- [Receiving NMEA 2000 Data](receiving-nmea2000.md) — Parse incoming N2K messages using `asReceivedFrame()`
 - [Sending NMEA 2000 Data](sending-nmea2000.md) — Transmit N2K PGNs to the bus

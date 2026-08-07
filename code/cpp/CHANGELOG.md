@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **PGN enable-list verbs on `Session` (GIT-136).** `Session` can now configure
+- **PGN enable-list verbs on `Session`.** `Session` can now configure
   and query the PGN enable lists of the gateway it is connected to:
   `getRxPgnEnable()`, `setRxPgnEnable()`, `setRxPgnEnableWithMask()`,
   `getTxPgnEnable()`, `setTxPgnEnable()`, `setTxPgnEnableWithRate()`,
@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   via a `RemoteDevice` regardless of the stream, since that is a property of
   the target rather than the local link. See
   `docs/nmea0183-encapsulation.md`.
-- **Public unsolicited BEM payload headers (GIT-130).** The four typed
+- **Public unsolicited BEM payload headers.** The four typed
   unsolicited payloads and their enums now live in dedicated public headers —
   `public/bem_responses/system_status.hpp` (`SystemStatusData` +
   `IndividualBufferStats` / `UnifiedBufferStats` / `CanExtendedStatus`),
@@ -53,9 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   name the payload type delivered with a typed unsolicited `ParsedMessageEvent`
   without reaching into internal `protocols/bem/bem_commands/*` headers. The
   wire-format decode/format helpers stay internal; **type names and namespaces
-  are unchanged — only the include path is new** (mirrors the GIT-112
+  are unchanged — only the include path is new** (mirrors the earlier
   relocation of the correlated-response structs).
-- **`ParsedMessageEvent::origin` (GIT-130).** Typed unsolicited BEM events
+- **`ParsedMessageEvent::origin`.** Typed unsolicited BEM events
   (`messageType` "StartupStatus" / "ErrorReport" / "SystemStatus" /
   "NegativeAck", plus the generic "BEM_Response_*" fallback) now carry an
   optional `ResponseOrigin` describing the responding device — `modelId` /
@@ -78,14 +78,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decodes correctly. **Source-breaking rename of the public enumerators** —
   shipped in the 1.x line as a bug-fix correction, since the prior values never
   matched any device and so could not have been relied upon.
-- **`public/api.hpp` is now a true umbrella header (GIT-131).** A single
+- **`public/api.hpp` is now a true umbrella header.** A single
   `#include "public/api.hpp"` now exposes the *entire* public surface — it
   aggregates every `src/public/*.hpp`, including the previously-omitted
   `pgn_encoders.hpp`, `remote_device.hpp`, `logging.hpp` and `ebl_writer.hpp` —
   matching the README's "single include gives access to the entire SDK" promise.
   A `public_api_umbrella_complete` guard test and a `test_api_umbrella`
   compile-proof keep it complete as new public headers are added.
-- **Installed headers keep their `public/` path prefix (GIT-131).** The install
+- **Installed headers keep their `public/` path prefix.** The install
   step now maps `src/public/` → `include/public/` (previously
   `include/actisense/`), so an installed consumer adds `<prefix>/include` to the
   include path and writes `#include "public/api.hpp"` exactly as documented, and
@@ -95,18 +95,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- **`actisense_console` example removed (GIT-131).** The console demo was built
+- **`actisense_console` example removed.** The console demo was built
   against the private `SessionImpl` interface and internal `core/`, `protocols/`
   and `util/` headers, so it could not be reproduced by an external consumer and
   broke silently when public callback signatures changed. Its demonstrable
   surface (frame display, Get/Set operating mode, EBL capture) is already covered
   by the public-API-only `nmea_reader_console` and `pgn_transmitter` examples,
-  which are now the canonical references. (Supersedes the unreleased GIT-130
+  which are now the canonical references. (Supersedes an earlier unreleased
   rewrite of the same example.)
 
 ### Guardrails
 
-- **Example/public-header boundary is now enforced at build time (GIT-131).**
+- **Example/public-header boundary is now enforced at build time.**
   Four checks, run under `ctest`, prevent the two boundary defects above from
   recurring: (a) a generalized static guard (`public_headers_no_internal_include`)
   rejects any internal include — `core/`, `transport/`, `platform/`, `util/`,
@@ -116,16 +116,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`public_headers_selfcontained`) compiles every public header standalone; and
   (d) examples and the sweeps build against a public-only include path so
   internal headers are physically unreachable, not merely discouraged. Broadens
-  the GIT-112 `protocols/`-only guard.
+  the earlier `protocols/`-only guard.
 
 ### Changed (breaking)
 
 - **`ParsedMessageEvent` gained a trailing `std::optional<ResponseOrigin>
-  origin` member (GIT-130).** Source-additive — existing code compiles
+  origin` member.** Source-additive — existing code compiles
   unchanged — but it changes the layout/size of `ParsedMessageEvent` and the
   `EventVariant` that wraps it, so it is a binary-ABI break for consumers
   linking a pre-built SDK binary. Bump the binary version on the next release,
-  per the GIT-115 ABI-break precedent.
+  per the precedent set by the 1.0.0 pimpl-handle ABI break.
 
 ### Migration
 
@@ -149,25 +149,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 First public, SemVer-stable release. From 1.0.0 the `src/public/` API is
 covered by Semantic Versioning; this release consolidates all accumulated
-pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
+pre-1.0 breaking changes.
 
 ### Added
 
-- **Public received-frame accessor `asReceivedFrame()` (GIT-128).** New
+- **Public received-frame accessor `asReceivedFrame()`.** New
   `public/received_frame.hpp` exposes a `ReceivedFrame` (PGN, source,
   destination, priority, length, and a `std::span<const uint8_t>` data view)
   from a `ParsedMessageEvent`, returning `std::nullopt` for non-NMEA-2000
   events. Customer code can now read received PGN fields without reaching into
   internal `protocols/` headers. The data span is valid only for the duration
   of the event callback — copy the bytes to retain them.
-- **New example: `nmea_reader_console` (GIT-128).** A minimal "NMEA Reader"
+- **New example: `nmea_reader_console`.** A minimal "NMEA Reader"
   built on `asReceivedFrame()`: it connects to a serial gateway, switches it to
   Rx-All (restoring the prior mode on exit), and renders a live, in-place table
   of received PGNs — one row per PGN+source — with Src/Dst/PGN/Priority/Length/
   Data(hex) columns. Includes a framework-agnostic `PgnTableModel` designed to
   back a future Qt or native GUI.
-- **`Api::openWithTransport()` lets callers supply their own transport
-  (GIT-108).** The transport abstraction `ITransport` is now part of the public
+- **`Api::openWithTransport()` lets callers supply their own transport.**
+  The transport abstraction `ITransport` is now part of the public
   surface (`public/transport.hpp`); `openWithTransport(options, transport, …)`
   opens a session over a caller-provided `ITransport` instead of the built-in
   `TransportKind` selection, so the SDK can be driven over a custom transport
@@ -176,8 +176,8 @@ pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
   `ErrorCode::InvalidArgument`; a failed transport open propagates the failure
   code. The change is additive — existing `Api::open()` behaviour is unchanged.
 - **`CanPacket` (5) and `CanPacketAscii` (6) added to the public
-  `OperatingMode` enum (NGXSW-4207).** These let an SDK client request the NGX
-  raw-CAN modes the firmware implements (NGXSW-4206), in which the device
+  `OperatingMode` enum.** These let an SDK client request the NGX
+  raw-CAN modes the firmware implements (firmware 3.078 and later), in which the device
   bridges `SystemNames::CAN` ↔ the serial host link as BST-95 (`CanPacket`)
   or CAN-ASCII (`CanPacketAscii`). The values match firmware
   `OperatingModeCodes.h`, and `OperatingModeName()` now returns
@@ -192,7 +192,7 @@ pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
 ### Changed
 
 - **BEM device errors now report `ErrorCode::BemDeviceError` instead of
-  `ErrorCode::UnsupportedOperation` (GIT-127).** When a device answers a BEM
+  `ErrorCode::UnsupportedOperation`.** When a device answers a BEM
   command with a non-zero ARL error code in the response header, the callback
   now receives `ErrorCode::BemDeviceError` with the raw signed ARL code and its
   description in the message (e.g. `"Device error -995 (PGN not on enable list
@@ -204,7 +204,7 @@ pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
   firmware responses that were being mis-reported. `bemDeviceErrorMessage()`
   gains descriptions for the PGN-enable-list ARL codes. Callers branching on
   `UnsupportedOperation` for BEM replies should switch to `BemDeviceError`.
-- **`NgTransferRxAllMode` (Rx-All) documentation clarified for NGX (GIT-107).**
+- **`NgTransferRxAllMode` (Rx-All) documentation clarified for NGX.**
   Current NGX firmware (verified on fw 3.085) silently drops the ISO control
   PGNs 59904 (ISO Request) and 59392 (ISO ACK) from the bus-to-host stream in
   Rx-All mode, despite the mode being documented as forwarding "all PGNs"; an
@@ -217,8 +217,8 @@ pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
 
 ### Changed (breaking)
 
-- **BEM response data structures relocated to `public/bem_responses/`
-  (GIT-112).** The public header `public/bem_callbacks.hpp` no longer pulls in
+- **BEM response data structures relocated to `public/bem_responses/`.**
+  The public header `public/bem_callbacks.hpp` no longer pulls in
   any internal `protocols/bem/bem_commands/*` headers. The decoded
   response/result structs it references (`ProductInfoResponse`,
   `PortBaudrateResponse`, `RxPgnEnableListF2Result`, `EchoResponse`, …) now
@@ -229,13 +229,13 @@ pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
   into the internal `protocols/bem/bem_commands/*` headers for those structs
   needs to switch to the matching `public/bem_responses/*` header. See the
   Upgrading guide below.
-- **`OperatingMode` enumerators renamed `OM_*` → PascalCase (GIT-114).** Clean
+- **`OperatingMode` enumerators renamed `OM_*` → PascalCase.** Clean
   break — the old `OM_*` names are removed outright, with no deprecation
   aliases. The enum type (`OperatingMode`), its scoping, and every numeric
   value are unchanged, so this is a pure compile-time rename with no wire or
   ABI impact (persisted/wire numeric mode codes stay valid). The full old→new
   mapping is in the Upgrading guide below.
-- **Single unified `ErrorCode` surface (GIT-113).** The separate
+- **Single unified `ErrorCode` surface.** The separate
   `TransportErrorCode` and `ProtocolErrorCode` enums — each with its own
   `std::error_category` — have been removed. Their fine-grained diagnostics are
   appended to the single public `ErrorCode` enum in `public/error.hpp`, behind
@@ -245,7 +245,7 @@ pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
   `ErrorCode` is append-only from here. Public callbacks already delivered
   `ErrorCode`, so consumers using only public headers are unaffected.
 - **ABI hardening: `Session` and `RemoteDevice` are now `final`, non-polymorphic
-  pimpl handles (GIT-115).** Both classes were pure-abstract interfaces (14 and
+  pimpl handles.** Both classes were pure-abstract interfaces (14 and
   36 pure virtuals); they are now move-only `final` classes whose only data
   member is a `std::unique_ptr<Impl>`, with non-virtual methods that forward to
   the implementation. This gives the MIT binary SDK a stable ABI — adding a verb
@@ -272,7 +272,7 @@ pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
   `sendBemCommand`). The generic path may return once a real correlator is
   implemented for non-BEM protocols.
 
-### Changed (breaking) — GIT-104 review cleanup
+### Changed (breaking) — API review cleanup
 
 - **`Session::asyncSend()` now takes a `Session::SendProtocol` enum
   (`Bst`/`Raw`) instead of a `const std::string&` selector.** The stringly-typed
@@ -294,7 +294,7 @@ pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
   stub that always reports `ErrorCode::UnsupportedOperation`; kept (not removed)
   because the symbol is compiled by internal consumers.
 
-### Fixed — GIT-104 review cleanup
+### Fixed — API review cleanup
 
 - **`Session::metrics()` now reflects real activity.** The `MetricsCollector`
   `record*` methods were never called, so the public metrics surface always read
@@ -321,7 +321,7 @@ pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
 
 ### Tests
 
-- **Black-box NGX CAN Packet routing integration test (NGXSW-4207).** New
+- **Black-box NGX CAN Packet routing integration test.** New
   `tests/integration/test_can_packet_mode.cpp` drives a real NGX into each CAN
   Packet mode via the SDK and proves the device behaviour as a black box: GET
   baseline → scope-guarded SET → GET-verify → CAN→serial (await a BST-95
@@ -329,22 +329,22 @@ pre-1.0 breaking changes. (Version bump tracked by GIT-123.)
   frame via `asyncSend("bst", …)`) → BEM Echo (0x18) in-mode → restore the
   baseline, for both `CanPacket` and `CanPacketAscii`. Opt-in via
   `ACTISENSE_TEST_PORT` (a real NGX on a live N2K bus); skips cleanly headless
-  so CI stays green. A no-hardware run against the Product Emulator is tracked
-  as a DESKTOP-160 follow-up. Unit coverage for the two new modes (encode +
+  so CI stays green. A no-hardware run against the Product Emulator is planned
+  as a follow-up. Unit coverage for the two new modes (encode +
   `OperatingModeName`) added to `tests/unit/test_operating_mode.cpp`.
 
-- **Remote BEM sweep: re-enabled NGX-only cases against an NGX-as-remote rig
-  (GIT-94).** `test_bem_remote_device.cpp` now ports the two NGX-gated
-  cases that GIT-92 deliberately deferred — `OperatingMode_NGConvertNormalMode_RoundTrip`
+- **Remote BEM sweep: re-enabled NGX-only cases against an NGX-as-remote rig.**
+  `test_bem_remote_device.cpp` now ports the two NGX-gated
+  cases that the original baseline sweep deliberately deferred — `OperatingMode_NGConvertNormalMode_RoundTrip`
   (NGW-style 2000→0183 conversion-mode round-trip) and
   `SetOperatingMode_RejectsBuffer1OnNgx` (firmware must reject buffer/combiner
   modes on NGX-class hardware). The fixture gains
   `expectedRemoteHardwarePortCount()` so `GetPortBaudrate` now checks the
   remote's reported port count against the model's canonical hardware
-  count (NGXSW-3623 contract); currently emits a diagnostic rather than
-  asserting because NGX-as-remote hits a wrap-path mismatch tracked under
-  NGXSW-4193. Both new NGX-only tests skip-gate on `remoteIsNgx()` so the
-  GIT-92 baseline rig (NGT-as-remote) is unaffected. Default `ACTISENSE_TEST_PORT` is now `COM5` (the dev bench's
+  count; currently emits a diagnostic rather than
+  asserting because NGX-as-remote hits a wrap-path mismatch tracked
+  separately as a firmware issue. Both new NGX-only tests skip-gate on
+  `remoteIsNgx()` so the baseline rig (NGT-as-remote) is unaffected. Default `ACTISENSE_TEST_PORT` is now `COM5` (the dev bench's
   local-NGX); override as before for other rigs. File-header rig
   documentation rewritten to enumerate both supported topologies.
 
@@ -354,7 +354,7 @@ This is the SemVer baseline. If you were building against a pre-1.0 beta SDK,
 apply these one-time source changes; after that the public API is stable under
 SemVer.
 
-**1. BEM response struct includes (GIT-112)** — only if you `#include`d the
+**1. BEM response struct includes** — only if you `#include`d the
 internal command headers directly:
 
 ```cpp
@@ -368,7 +368,7 @@ Type names are unchanged (`ProductInfoResponse`, etc.). If you only include
 `public/bem_callbacks.hpp` (or `session.hpp` / `remote_device.hpp`), no change
 is needed.
 
-**2. `OperatingMode` enumerator rename (GIT-114)** — replace every
+**2. `OperatingMode` enumerator rename** — replace every
 `OperatingMode::OM_*` with its PascalCase name. Values are unchanged.
 
 | Old (`OM_*`)             | New (PascalCase)       | Value      |
@@ -407,7 +407,7 @@ is needed.
 Note: `NgTransferRawMode` (3) is retained but legacy — mode 3 is no longer raw
 CAN; use `CanPacket` (5) / `CanPacketAscii` (6) for raw CAN transfer.
 
-**3. Error codes (GIT-113)** — only if you referenced the removed
+**3. Error codes** — only if you referenced the removed
 `TransportErrorCode` / `ProtocolErrorCode` enums or their categories; switch to
 `ErrorCode` and `sdkErrorCategory()`:
 
@@ -422,7 +422,7 @@ ErrorCode::BdtpFrameCorrupted
 
 All callbacks already deliver `ErrorCode`; no signature changes.
 
-**4. Session / RemoteDevice ABI (GIT-115)** — rebuild your application against
+**4. Session / RemoteDevice ABI** — rebuild your application against
 the 1.0.0 headers (one-time ABI break). Idiomatic use via
 `std::unique_ptr<Session>` and `->` needs no source change; do not attempt to
 subclass `Session` / `RemoteDevice` (now `final`).
