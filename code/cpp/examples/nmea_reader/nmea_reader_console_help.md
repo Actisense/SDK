@@ -6,12 +6,12 @@ Demonstrates:
 
 - Synchronous serial-session creation via `Api::createSerialSession`
 - Reading received NMEA 2000 frame fields through the public `asReceivedFrame()` accessor (`public/received_frame.hpp`) — no internal `protocols/` or `core/` includes
-- A framework-agnostic table model (`PgnTableModel`) fed from the SDK event callback, designed so the same model can later back a Qt or native GsI
+- A framework-agnostic table model (`PgnTableModel`) fed from the SDK event callback, designed so the same model can later back a Qt or native GUI
 - Setting the gateway to Rx-All (`OperatingMode::NgTransferRxAllMode`) on connect and restoring the prior mode on exit, through the public `Session` interface
 
-sses only public SDK headers (`public/...`) — customer code cannot (and should never need to) include `core/` or `protocols/` headers.
+Uses only public SDK headers (e.g. `public/api.hpp`) — customer code cannot (and should never need to) include `core/` or `protocols/` headers.
 
-## ssage
+## Usage
 
 ```
 nmea_reader_console [--port <port>] [--baud <rate>]
@@ -24,7 +24,7 @@ With no `--port`, the program lists the available serial ports and prompts for a
 
 | Option                | Description                                            |
 |-----------------------|--------------------------------------------------------|
-| `-p`, `--port <port>` | Serial port (e.g. `COM7`, `/dev/ttysSB0`)              |
+| `-p`, `--port <port>` | Serial port (e.g. `COM7`, `/dev/ttyUSB0`)              |
 | `-b`, `--baud <rate>` | Baud rate (default `115200`)                           |
 | `-l`, `--list`        | List available serial ports and exit                   |
 | `-h`, `--help`        | Show help and exit                                     |
@@ -62,5 +62,5 @@ On a clean exit the gateway is restored to the operating mode it had at startup.
 ```
 nmea_reader_console --list
 nmea_reader_console --port COM7
-nmea_reader_console --port /dev/ttysSB0 --baud 115200
+nmea_reader_console --port /dev/ttyUSB0 --baud 115200
 ```
