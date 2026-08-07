@@ -24,6 +24,7 @@
 #include "core/session_impl.hpp"
 #include "protocols/bdtp/bdtp_protocol.hpp"
 #include "protocols/bem/bem_commands/bem_commands.hpp"
+#include "protocols/bem/bem_commands/product_info.hpp"
 #include "protocols/bem/bem_commands/rx_pgn_enable_list_f2.hpp"
 #include "protocols/bem/bem_commands/supported_pgn_list.hpp"
 #include "protocols/bem/bem_commands/tx_pgn_enable_list_f2.hpp"
@@ -777,6 +778,99 @@ TEST_F(RemoteBemLoopbackTest, GetRxPgnEnableListF2_TimeoutDeliversPartialResult)
 	EXPECT_EQ(result->entries[1].rxMask, kRxPgnMaskEnabled);
 	/* Slots 2..4 are zero-initialised; never received. */
 	EXPECT_EQ(result->entries[4].rxMask, 0);
+}
+
+/* Product Info reassembly over the PGN 126720 wrap -------------------------- */
+
+namespace
+{
+	/** One 32-byte 0xFF-padded string field, as a Format-1 part carries it. */
+	std::vector<uint8_t> legacyStringPart(const std::string& text)
+	{
+		std::vector<uint8_t> part(kProductInfoStringMaxLen, 0xFF);
+		encodePaddedString(text, part);
+		return part;
+	}
+} /* namespace */
+
+TEST_F(RemoteBemLoopbackTest, GetHardwareInfo_LegacyFiveMessageReply_AssemblesOverWrappedPath)
+{
+	/* The fix lives in the shared BEM layer, so a legacy device reached over
+	   PGN 126720 must reassemble exactly as the locally connected one does. */
+	auto remote = session_->openRemote(kRemoteAddr);
+
+	std::promise<std::tuple<ErrorCode, std::optional<HardwareInfo>>> promise;
+	remote->getHardwareInfo(std::chrono::seconds(2),
+		[&](ErrorCode ec, std::string_view, const std::optional<HardwareInfo>& info,
+		    ResponseOrigin) {
+			promise.set_value({ec, info});
+		});
+
+	auto sent = gateway_->waitForSent(std::chrono::seconds(1));
+	ASSERT_TRUE(sent.has_value()) << "Session did not send anything";
+
+	const std::array<uint8_t, 6> mainPart = {0x34, 0x08, 0x65, 0x00, 0x01, 0x02};
+	gateway_->injectRx(buildWrappedReply(kRemoteAddr, BstId::Bem_GP_A0,
+										 BemCommandId::GetProductInfo, 1, 0, 0, 0, mainPart));
+	gateway_->injectRx(buildWrappedReply(kRemoteAddr, BstId::Bem_GP_A0,
+										 BemCommandId::GetProductInfo, 2, 0, 0, 0,
+										 legacyStringPart("NGT-1")));
+	gateway_->injectRx(buildWrappedReply(kRemoteAddr, BstId::Bem_GP_A0,
+										 BemCommandId::GetProductInfo, 3, 0, 0, 0,
+										 legacyStringPart("v2.500")));
+	gateway_->injectRx(buildWrappedReply(kRemoteAddr, BstId::Bem_GP_A0,
+										 BemCommandId::GetProductInfo, 4, 0, 0, 0,
+										 legacyStringPart("Rev B")));
+	gateway_->injectRx(buildWrappedReply(kRemoteAddr, BstId::Bem_GP_A0,
+										 BemCommandId::GetProductInfo, 5, 0, 0, 0,
+										 legacyStringPart("001234")));
+
+	auto fut = promise.get_future();
+	ASSERT_EQ(fut.wait_for(std::chrono::seconds(3)), std::future_status::ready);
+	auto [ec, info] = fut.get();
+	EXPECT_EQ(ec, ErrorCode::Ok);
+	ASSERT_TRUE(info.has_value());
+	EXPECT_EQ(info->modelId, "NGT-1");
+	EXPECT_EQ(info->softwareVersion, "v2.500");
+	EXPECT_EQ(info->modelVersion, "Rev B");
+	EXPECT_EQ(info->modelSerialCode, "001234");
+	EXPECT_EQ(info->nmea2000Version, 2100);
+	EXPECT_EQ(info->certificationLevel, 1);
+}
+
+TEST_F(RemoteBemLoopbackTest, GetProductInfo_LegacyReply_ReportsStructureVariantZero)
+{
+	/* The typed remote getProductInfo assembles too, and a legacy-assembled
+	   result is distinguished from a Format-2 one by structureVariantId == 0 —
+	   the agreed signal, chosen so the public structure did not have to change. */
+	auto remote = session_->openRemote(kRemoteAddr);
+
+	std::promise<std::tuple<ErrorCode, std::optional<ProductInfoResponse>>> promise;
+	remote->getProductInfo(std::chrono::seconds(2),
+		[&](ErrorCode ec, std::string_view, std::optional<ProductInfoResponse> info,
+		    ResponseOrigin) {
+			promise.set_value({ec, std::move(info)});
+		});
+
+	auto sent = gateway_->waitForSent(std::chrono::seconds(1));
+	ASSERT_TRUE(sent.has_value());
+
+	const std::array<uint8_t, 6> mainPart = {0x34, 0x08, 0x65, 0x00, 0x01, 0x02};
+	gateway_->injectRx(buildWrappedReply(kRemoteAddr, BstId::Bem_GP_A0,
+										 BemCommandId::GetProductInfo, 1, 0, 0, 0, mainPart));
+	for (uint8_t part = 2; part <= 5; ++part) {
+		gateway_->injectRx(buildWrappedReply(kRemoteAddr, BstId::Bem_GP_A0,
+											 BemCommandId::GetProductInfo, part, 0, 0, 0,
+											 legacyStringPart("NGT-1")));
+	}
+
+	auto fut = promise.get_future();
+	ASSERT_EQ(fut.wait_for(std::chrono::seconds(3)), std::future_status::ready);
+	auto [ec, info] = fut.get();
+	EXPECT_EQ(ec, ErrorCode::Ok);
+	ASSERT_TRUE(info.has_value());
+	EXPECT_EQ(info->structureVariantId, 0u) << "legacy results must not claim a Format-2 variant";
+	EXPECT_EQ(info->modelId, "NGT-1");
 }
 
 } /* namespace Test */

@@ -118,6 +118,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   internal headers are physically unreachable, not merely discouraged. Broadens
   the earlier `protocols/`-only guard.
 
+### Fixed
+
+- **`getHardwareInfo()` / `getProductInfo()` now work on NGT-1 and NGW-1
+  gateways.** Those devices answer Product Info (BEM `0x41`) in the legacy
+  five-message form, which the SDK understood only as a malformed
+  single-message reply: the first 6-byte part failed the 138-byte length
+  check and the remaining four parts were discarded by the one-shot response
+  correlator, so the call returned `ErrorCode::MalformedFrame` and no device
+  identity at all. The reply train is now reassembled by a new
+  `ProductInfoAssembler`, placing each part by the BEM header Sequence ID
+  (with a fallback to arrival order for firmware that leaves that byte at
+  zero). Modern single-message devices are unaffected — they still complete
+  on their single reply — and a result assembled from the legacy form is
+  identified by `structureVariantId == 0`. Both the local `Session` verbs and
+  the `RemoteDevice` ones reached over PGN 126720 are covered, as is the
+  NMEA 0183 (`!PARLB`) command stream.
+
+  One behavioural note for callers: because the legacy form has no
+  end-of-train marker, the `timeout` argument now acts as the gap allowed
+  *between* messages. A device that stops replying part-way through takes
+  that timeout to report, where it previously failed immediately — and it now
+  reports `ErrorCode::Timeout` with the fields that did arrive instead of
+  nothing. A complete reply still completes as soon as its last part lands.
+
 ### Changed (breaking)
 
 - **`ParsedMessageEvent` gained a trailing `std::optional<ResponseOrigin>

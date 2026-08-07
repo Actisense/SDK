@@ -31,6 +31,8 @@
 
 #include "core/session_impl.hpp"
 #include "protocols/bem/bem_types.hpp"
+#include "public/bem_responses/product_info.hpp"
+#include "public/hardware_info.hpp"
 
 namespace Actisense
 {
@@ -72,6 +74,26 @@ namespace Actisense
 												const BemResponse& response) noexcept {
 				origin.modelId = response.header.modelId;
 				origin.serialNumber = response.header.serialNumber;
+			}
+
+			/**************************************************************************/ /**
+			 \brief      Project a decoded Product Info reply onto the public
+						 HardwareInfo structure.
+			 \details    Shared by the local and remote getHardwareInfo paths so
+						 the two cannot drift; HardwareInfo deliberately omits
+						 structureVariantId, which is an on-wire detail.
+			 *******************************************************************************/
+			[[nodiscard]] inline HardwareInfo toHardwareInfo(const ProductInfoResponse& info) {
+				HardwareInfo out;
+				out.nmea2000Version = info.nmea2000Version;
+				out.productCode = info.productCode;
+				out.modelId = info.modelId;
+				out.softwareVersion = info.softwareVersion;
+				out.modelVersion = info.modelVersion;
+				out.modelSerialCode = info.modelSerialCode;
+				out.certificationLevel = info.certificationLevel;
+				out.loadEquivalency = info.loadEquivalency;
+				return out;
 			}
 
 			/**************************************************************************/ /**

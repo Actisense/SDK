@@ -177,43 +177,28 @@ namespace Actisense
 
 		void Session::Impl::getHardwareInfo(std::chrono::milliseconds timeout,
 											HardwareInfoCallback callback) {
-			getProductInfo(timeout, [this, cb = std::move(callback)](
-										const std::optional<BemResponse>& response, ErrorCode code,
-										std::string_view errorMsg) {
-				if (!cb) {
-					return;
-				}
-				ResponseOrigin origin = makeLocalOrigin();
-				if (response) {
-					origin.modelId = response->header.modelId;
-					origin.serialNumber = response->header.serialNumber;
-				}
-				if (code != ErrorCode::Ok || !response) {
-					cb(code, errorMsg, std::nullopt, std::move(origin));
-					return;
-				}
-				if (response->header.errorCode != 0) {
-					cb(ErrorCode::MalformedFrame, "Device returned BEM error code", std::nullopt,
+			/* Routed through the assembling verb so a legacy Format-1 gateway
+			   (NGT-1 / NGW-1), whose reply arrives as five messages, yields a
+			   populated result instead of failing on the first 6-byte part.
+			   `timeout` becomes the per-part inactivity window; a Format-2
+			   device still completes on its single reply. A truncated train
+			   surfaces as Timeout with the fields that did arrive, rather than
+			   as MalformedFrame with nothing. */
+			getProductInfoAssembled(
+				kLocalSrcAddr, timeout,
+				[cb = std::move(callback)](ErrorCode code, std::string_view errorMsg,
+										   std::optional<ProductInfoResponse> info,
+										   ResponseOrigin origin) {
+					if (!cb) {
+						return;
+					}
+					if (!info) {
+						cb(code, errorMsg, std::nullopt, std::move(origin));
+						return;
+					}
+					cb(code, errorMsg, std::make_optional(detail::toHardwareInfo(*info)),
 					   std::move(origin));
-					return;
-				}
-				ProductInfoResponse decoded;
-				std::string decodeError;
-				if (!decodeProductInfoResponse(response->data, decoded, decodeError)) {
-					cb(ErrorCode::MalformedFrame, decodeError, std::nullopt, std::move(origin));
-					return;
-				}
-				HardwareInfo info;
-				info.nmea2000Version = decoded.nmea2000Version;
-				info.productCode = decoded.productCode;
-				info.modelId = decoded.modelId;
-				info.softwareVersion = decoded.softwareVersion;
-				info.modelVersion = decoded.modelVersion;
-				info.modelSerialCode = decoded.modelSerialCode;
-				info.certificationLevel = decoded.certificationLevel;
-				info.loadEquivalency = decoded.loadEquivalency;
-				cb(ErrorCode::Ok, {}, std::make_optional(std::move(info)), std::move(origin));
-			});
+				});
 		}
 
 		/* Internal uint16_t / BemResponseCallback overload --------------------- */

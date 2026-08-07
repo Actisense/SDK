@@ -1,8 +1,10 @@
 /**************************************************************************//**
 \file       test_nmea2000_product_info.cpp
 \brief      Unit tests for NMEA 2000 Product Info BEM commands
-\details    Tests encode/decode for Product Info (0x41, single-message
-            form only), CAN Config (0x42), and CAN Info Fields (0x43-0x45)
+\details    Tests encode/decode for Product Info (0x41 — the Format-2
+            single-message decoder), CAN Config (0x42), and CAN Info Fields
+            (0x43-0x45). Reassembly of the legacy Format-1 five-message form
+            is covered in test_product_info_legacy_assembly.cpp.
 
 \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
 *******************************************************************************/
@@ -127,16 +129,30 @@ TEST_F(Nmea2000ProductInfoTest, ProductInfo_DecodeTooShort)
 	EXPECT_FALSE(m_error.empty());
 }
 
-TEST_F(Nmea2000ProductInfoTest, ProductInfo_RejectsLegacyMultiMessage)
+TEST_F(Nmea2000ProductInfoTest, ProductInfo_RejectsUnknownStructureVariant)
 {
-	/* Anything other than the supported structure-variant ID at bytes 0-3 is
-	   treated as the deprecated legacy multi-message form and rejected. */
+	/* This decoder is the Format-2 decoder: anything other than the Format-2
+	   structure-variant ID at bytes 0-3 is rejected. */
 	std::vector<uint8_t> data(138, 0xFF);
 	data[0] = 0x00; data[1] = 0x00; data[2] = 0x00; data[3] = 0x00;
 
 	ProductInfoResponse response;
 	EXPECT_FALSE(decodeProductInfoResponse(data, response, m_error));
 	EXPECT_FALSE(m_error.empty());
+}
+
+TEST_F(Nmea2000ProductInfoTest, ProductInfo_RejectsBareLegacyPart)
+{
+	/* A single Format-1 part is not decodable on its own and must stay
+	   rejected here — the decoder is deliberately strict, and a whole legacy
+	   train goes to ProductInfoAssembler instead (see
+	   test_product_info_legacy_assembly.cpp). This is the failure the SDK used
+	   to surface to callers of getHardwareInfo on an NGT-1. */
+	const std::vector<uint8_t> part1 = {0x34, 0x08, 0x65, 0x00, 0x01, 0x02};
+
+	ProductInfoResponse response;
+	EXPECT_FALSE(decodeProductInfoResponse(part1, response, m_error));
+	EXPECT_NE(m_error.find("too short"), std::string::npos) << m_error;
 }
 
 TEST_F(Nmea2000ProductInfoTest, ProductInfo_ConvertPaddedString)

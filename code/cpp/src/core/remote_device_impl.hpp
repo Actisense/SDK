@@ -163,6 +163,9 @@ namespace Actisense
 			/* Aggregated PGN-list verbs (GIT-86 / GIT-90) live above as
 			   public virtuals — no internal-only mirror needed. */
 
+			/* One-shot: delivers a single raw BEM reply. A legacy Format-1
+			   device answers 0x41 with five messages, of which this surfaces
+			   only the first — the typed overload above assembles them. */
 			void getProductInfo(std::chrono::milliseconds timeout, BemResponseCallback callback);
 
 			void getCanConfig(std::chrono::milliseconds timeout, BemResponseCallback callback);

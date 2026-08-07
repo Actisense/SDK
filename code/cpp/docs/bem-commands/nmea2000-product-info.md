@@ -53,11 +53,20 @@ struct ProductInfoResponse
 };
 ```
 
-The SDK supports the modern single-message response form only: a payload
-whose structure-variant ID is `0x00000011`. All current Actisense gateway
-firmware (NGT/NGW/NGX) responds in this form; the deprecated legacy
-multi-message Product Info form is **not supported** and is rejected during
-decode.
+Devices answer in one of two forms, and the SDK handles both — the call
+looks the same either way, and the callback still fires exactly once:
+
+- **Format 2** — a single 138-byte message whose structure-variant ID is
+  `0x00000011`. NGX-1 and other current-generation gateways use this.
+- **Format 1** — five smaller messages carrying the part number in the BEM
+  header's Sequence ID. NGT-1 and NGW-1 gateways use this, including on
+  their final firmware.
+
+A result assembled from the legacy form reports `structureVariantId == 0`,
+which is how a caller tells the two apart. `timeout` is the gap allowed
+*between* messages, not a whole-request budget: a truncated Format-1 train
+reports `ErrorCode::Timeout` together with whichever fields did arrive,
+rather than discarding them.
 
 ```cpp
 remote->getProductInfo(std::chrono::seconds(3),

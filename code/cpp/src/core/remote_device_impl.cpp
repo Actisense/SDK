@@ -364,41 +364,24 @@ namespace Actisense
 
 		void RemoteDevice::Impl::getHardwareInfo(std::chrono::milliseconds timeout,
 												 HardwareInfoCallback callback) {
-			getProductInfo(
-				timeout, BemResponseCallback{[&session = session_, srcAddr = src_addr_,
-											  cb = std::move(callback)](
-												 const std::optional<BemResponse>& response,
-												 ErrorCode code, std::string_view errorMsg) {
+			/* Same assembling path as the local gateway verb, so a legacy
+			   Format-1 device reached over the PGN 126720 wrap reassembles too
+			   rather than failing on its first 6-byte part. */
+			session_.getProductInfoAssembled(
+				src_addr_, timeout,
+				[cb = std::move(callback)](ErrorCode code, std::string_view errorMsg,
+										   std::optional<ProductInfoResponse> info,
+										   ResponseOrigin origin) {
 					if (!cb) {
 						return;
 					}
-					ResponseOrigin origin = session.makeRemoteOrigin(srcAddr);
-					if (code != ErrorCode::Ok || !response) {
+					if (!info) {
 						cb(code, errorMsg, std::nullopt, std::move(origin));
 						return;
 					}
-					if (response->header.errorCode != 0) {
-						cb(ErrorCode::MalformedFrame, "Device returned BEM error code",
-						   std::nullopt, std::move(origin));
-						return;
-					}
-					ProductInfoResponse decoded;
-					std::string decodeError;
-					if (!decodeProductInfoResponse(response->data, decoded, decodeError)) {
-						cb(ErrorCode::MalformedFrame, decodeError, std::nullopt, std::move(origin));
-						return;
-					}
-					HardwareInfo info;
-					info.nmea2000Version = decoded.nmea2000Version;
-					info.productCode = decoded.productCode;
-					info.modelId = decoded.modelId;
-					info.softwareVersion = decoded.softwareVersion;
-					info.modelVersion = decoded.modelVersion;
-					info.modelSerialCode = decoded.modelSerialCode;
-					info.certificationLevel = decoded.certificationLevel;
-					info.loadEquivalency = decoded.loadEquivalency;
-					cb(ErrorCode::Ok, {}, std::make_optional(info), std::move(origin));
-				}});
+					cb(code, errorMsg, std::make_optional(detail::toHardwareInfo(*info)),
+					   std::move(origin));
+				});
 		}
 
 		/* Public typed-callback overrides (GIT-93) -------------------------------
@@ -514,9 +497,11 @@ namespace Actisense
 
 		void RemoteDevice::Impl::getProductInfo(std::chrono::milliseconds timeout,
 												ProductInfoCallback callback) {
-			getProductInfo(timeout, wrapTyped<ProductInfoResponse>(session_, src_addr_,
-																   &decodeProductInfoResponse,
-																   std::move(callback)));
+			/* Not wrapTyped: that decodes one reply, which is only ever the
+			   whole answer on a Format-2 device. The assembling verb covers
+			   both response forms and still completes in one reply for
+			   Format 2. */
+			session_.getProductInfoAssembled(src_addr_, timeout, std::move(callback));
 		}
 
 		void RemoteDevice::Impl::getCanConfig(std::chrono::milliseconds timeout,

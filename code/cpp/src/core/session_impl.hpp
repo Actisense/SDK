@@ -450,11 +450,41 @@ namespace Actisense
 										 SupportedPgnListResultCallback callback);
 
 			/**************************************************************************/ /**
-			 \brief      Send Get Product Info command
+			 \brief      Send Get Product Info command, delivering a single raw
+						 BEM response.
+			 \details    One-shot: the callback fires on the first reply. A
+						 legacy Format-1 device answers with five messages, of
+						 which this overload surfaces only the first — use
+						 getProductInfoAssembled() unless a raw single reply is
+						 genuinely what is wanted.
 			 \param[in]  timeout   Timeout for response
 			 \param[in]  callback  Callback invoked on response or timeout
 			 *******************************************************************************/
 			void getProductInfo(std::chrono::milliseconds timeout, BemResponseCallback callback);
+
+			/**************************************************************************/ /**
+			 \brief      Send Get Product Info and assemble whichever response
+						 form the device answers with.
+			 \details    Registers a multi-reply request driven by
+						 ProductInfoAssembler, so a Format-2 device completes on
+						 its single reply and a legacy Format-1 device (NGT-1 /
+						 NGW-1) completes once all five parts have arrived. The
+						 send path is selected by @p srcAddr, so one
+						 implementation covers both the local gateway and a
+						 device reached through the PGN 126720 wrap.
+
+						 A truncated Format-1 train reports ErrorCode::Timeout
+						 with the parts that did arrive, mirroring the partial
+						 delivery the aggregated PGN-list verbs perform.
+			 \param[in]  srcAddr            kLocalSrcAddr for the locally
+											connected gateway, otherwise the
+											remote device's N2K source address.
+			 \param[in]  inactivityTimeout  Max gap between successive parts.
+			 \param[in]  callback           Invoked exactly once.
+			 *******************************************************************************/
+			void getProductInfoAssembled(uint8_t srcAddr,
+										 std::chrono::milliseconds inactivityTimeout,
+										 ProductInfoCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Send Get CAN Config command (NMEA 2000 NAME)
@@ -664,6 +694,28 @@ namespace Actisense
 				BemCommandId cmdId, BstId bstId, std::chrono::milliseconds inactivityTimeout,
 				bool (*decodeFn)(std::span<const uint8_t>, DecodedResponse&, std::string&),
 				ResultCallback userCallback, uint8_t srcAddr = kLocalSrcAddr);
+
+			/**************************************************************************/ /**
+			 \brief      Register the multi-reply correlation that assembles a
+						 Product Info reply train.
+			 \details    The sibling of registerAggregatedReply for the 0x41
+						 verb, and deliberately not an instantiation of it:
+						 that template's decodeFn sees only the payload span,
+						 whereas Format-1 part numbering lives in the reply
+						 *header* (Sequence ID). It copies the same
+						 delivered-once discipline — any non-Ok code is
+						 terminal, so a device error fails fast instead of
+						 stalling until the inactivity timeout.
+
+						 Registration only: the caller sends afterwards, so a
+						 reply can never arrive before the pending entry exists.
+			 \param[in]  srcAddr            kLocalSrcAddr or a remote N2K address.
+			 \param[in]  inactivityTimeout  Max gap between successive parts.
+			 \param[in]  callback           Invoked exactly once.
+			 *******************************************************************************/
+			void registerProductInfoAssembly(uint8_t srcAddr,
+											 std::chrono::milliseconds inactivityTimeout,
+											 ProductInfoCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Factory for the 0x40 SupportedPgnList chunked walk.

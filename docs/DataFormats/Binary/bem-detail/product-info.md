@@ -63,7 +63,11 @@ Modern devices (firmware v2.500+) return all information in a single 138-byte me
 
 #### Format 1 (Legacy - Five Messages)
 
-Older devices return product information split across 5 sequential messages due to message length constraints:
+Older devices return product information split across 5 messages due to message length constraints. NGT-1 and NGW-1 gateways answer this way on current firmware, so a host that understands only Format 2 cannot read their identity at all.
+
+**Which message is which**: the part number is carried in the BEM response header's **Sequence ID** byte. Values 1-5 are the Format-1 part numbers below; a Format-2 single-message reply carries **6**. (Firmware reference: the Product Info BEM command handler stamps Sequence ID 6 for Format 2 and documents 1-5 as the deprecated Format-1 part numbers.)
+
+The two forms are also distinguishable by size alone — a Format-1 part carries 6 or 32 data bytes and can never reach Format 2's 138 — so a decoder can use the size to pick the format and the Sequence ID to place the part. A device that leaves the Sequence ID at zero must be reassembled by arrival order instead; the messages are emitted in part order.
 
 **Message 1 - Main Information** (6 bytes):
 
@@ -125,31 +129,31 @@ Example showing a complete Format 2 response for an NGT-1 device with firmware v
 | Offset | Field | Value | Description |
 |--------|-------|-------|-------------|
 | 0 | BST ID | A0H | BEM response message |
-| 1 | BST Length | 95H | 149 bytes total (1 + 11 + 138) |
+| 1 | BST Length | 96H | 150 bytes follow (1 + 11 + 138) |
 | 2 | BEM Id | 41H | Product Info identifier |
 | **3-13** | **BEM Header** | ... | **11-byte standard BEM response header** |
-| 3-6 | SequenceID | 00 00 00 00 | No sequence |
-| 7-10 | ModelID | 01 00 00 00 | Device Model ID |
-| 11-14 | SerialID | 39 30 00 00 | Device Serial ID |
-| 15-18 | Error Code | 00 00 00 00 | ES_NoError = 0 (success) |
-| **19-156** | **Data Block** | ... | **138 bytes: complete product information** |
-| 19-22 | Structure Variant | 11 00 00 00 | SV_AppProdInfo = 0x00000011 (LE) |
-| 23-24 | NMEA Version | 34 08 | 2100 = v2.100 (LE) |
-| 25-26 | Product Code | 65 00 | Product Code 101 (LE) |
-| **27-58** | **Model ID** | 4E 47 54 2D 31 FF ... | "NGT-1" + padding |
-| 27-31 | Model (first 5) | 4E 47 54 2D 31 | "NGT-1" (ASCII) |
-| 32-58 | Model (padding) | FF FF FF ... FF | Padding (27 bytes of 0xFF) |
-| **59-90** | **SW Version** | 76 32 2E 33 34 35 FF ... | "v2.345" + padding |
-| 59-64 | SW Ver (first 6) | 76 32 2E 33 34 35 | "v2.345" (ASCII) |
-| 65-90 | SW Ver (padding) | FF FF FF ... FF | Padding (26 bytes of 0xFF) |
-| **91-122** | **HW Version** | 52 65 76 20 42 FF ... | "Rev B" + padding |
-| 91-95 | HW Ver (first 5) | 52 65 76 20 42 | "Rev B" (ASCII) |
-| 96-122 | HW Ver (padding) | FF FF FF ... FF | Padding (27 bytes of 0xFF) |
-| **123-154** | **Serial Number** | 30 30 31 32 33 34 FF ... | "001234" + padding |
-| 123-128 | Serial (first 6) | 30 30 31 32 33 34 | "001234" (ASCII) |
-| 129-154 | Serial (padding) | FF FF FF ... FF | Padding (26 bytes of 0xFF) |
-| 155 | Cert Level | 00H | Level A (fully certified) |
-| 156 | LEN | 02H | 100 mA (2 × 50 mA) |
+| 3 | SequenceID | 06H | 6 = Format 2 (single message) |
+| 4-5 | ModelID | 01 00 | Device Model ID (uint16_t, LE) |
+| 6-9 | SerialID | 39 30 00 00 | Device Serial ID (uint32_t, LE) |
+| 10-13 | Error Code | 00 00 00 00 | ES_NoError = 0 (success) |
+| **14-151** | **Data Block** | ... | **138 bytes: complete product information** |
+| 14-17 | Structure Variant | 11 00 00 00 | SV_AppProdInfo = 0x00000011 (LE) |
+| 18-19 | NMEA Version | 34 08 | 2100 = v2.100 (LE) |
+| 20-21 | Product Code | 65 00 | Product Code 101 (LE) |
+| **22-53** | **Model ID** | 4E 47 54 2D 31 FF ... | "NGT-1" + padding |
+| 22-26 | Model (first 5) | 4E 47 54 2D 31 | "NGT-1" (ASCII) |
+| 27-53 | Model (padding) | FF FF FF ... FF | Padding (27 bytes of 0xFF) |
+| **54-85** | **SW Version** | 76 32 2E 33 34 35 FF ... | "v2.345" + padding |
+| 54-59 | SW Ver (first 6) | 76 32 2E 33 34 35 | "v2.345" (ASCII) |
+| 60-85 | SW Ver (padding) | FF FF FF ... FF | Padding (26 bytes of 0xFF) |
+| **86-117** | **HW Version** | 52 65 76 20 42 FF ... | "Rev B" + padding |
+| 86-90 | HW Ver (first 5) | 52 65 76 20 42 | "Rev B" (ASCII) |
+| 91-117 | HW Ver (padding) | FF FF FF ... FF | Padding (27 bytes of 0xFF) |
+| **118-149** | **Serial Number** | 30 30 31 32 33 34 FF ... | "001234" + padding |
+| 118-123 | Serial (first 6) | 30 30 31 32 33 34 | "001234" (ASCII) |
+| 124-149 | Serial (padding) | FF FF FF ... FF | Padding (26 bytes of 0xFF) |
+| 150 | Cert Level | 00H | Level A (fully certified) |
+| 151 | LEN | 02H | 100 mA (2 × 50 mA) |
 
 **NMEA Version Calculation**:
 - Raw value: 0x0834 (little-endian) = 2100 decimal
@@ -172,18 +176,18 @@ Example showing the first message of Format 1 (Main Information):
 | Offset | Field | Value | Description |
 |--------|-------|-------|-------------|
 | 0 | BST ID | A0H | BEM response message |
-| 1 | BST Length | 12H | 18 bytes total (1 + 11 + 6) |
+| 1 | BST Length | 12H | 18 bytes follow (1 + 11 + 6) |
 | 2 | BEM Id | 41H | Product Info identifier |
 | **3-13** | **BEM Header** | ... | **11-byte standard BEM response header** |
-| 3-6 | SequenceID | 00 00 00 00 | No sequence |
-| 7-10 | ModelID | 01 00 00 00 | Device Model ID |
-| 11-14 | SerialID | 39 30 00 00 | Device Serial ID |
-| 15-18 | Error Code | 00 00 00 00 | ES_NoError = 0 (success) |
-| **19-24** | **Data Block** | ... | **6 bytes: main info** |
-| 19-20 | NMEA Version | 34 08 | 2100 = v2.100 (LE) |
-| 21-22 | Product Code | 65 00 | Product Code 101 (LE) |
-| 23 | Cert Level | 00H | Level A |
-| 24 | LEN | 02H | 100 mA |
+| 3 | SequenceID | 01H | Part 1 of 5 |
+| 4-5 | ModelID | 01 00 | Device Model ID (uint16_t, LE) |
+| 6-9 | SerialID | 39 30 00 00 | Device Serial ID (uint32_t, LE) |
+| 10-13 | Error Code | 00 00 00 00 | ES_NoError = 0 (success) |
+| **14-19** | **Data Block** | ... | **6 bytes: main info** |
+| 14-15 | NMEA Version | 34 08 | 2100 = v2.100 (LE) |
+| 16-17 | Product Code | 65 00 | Product Code 101 (LE) |
+| 18 | Cert Level | 00H | Level A |
+| 19 | LEN | 02H | 100 mA |
 
 ### Example - Product Info Response (Format 1, Message 2)
 
@@ -194,7 +198,8 @@ Example showing the second message of Format 1 (Model ID String):
 | 0 | BST ID | A0H | BEM response message |
 | 1 | BST Length | 2CH | 44 bytes total (1 + 11 + 32) |
 | 2 | BEM Id | 41H | Product Info identifier |
-| 3-13 | BEM Header | ... | Standard response header |
+| 3 | SequenceID | 02H | Part 2 of 5 |
+| 4-13 | BEM Header (rest) | ... | ModelID, SerialID, Error Code |
 | **14-45** | **Data Block** | 4E 47 54 2D 31 FF ... | **32 bytes: Model ID** |
 | 14-18 | Model (first 5) | 4E 47 54 2D 31 | "NGT-1" (ASCII) |
 | 19-45 | Model (padding) | FF FF FF ... FF | Padding (27 bytes of 0xFF) |
@@ -210,10 +215,12 @@ Each message has BST Length = 0x2C (44 bytes total) and contains the full 32-byt
 
 ## Notes
 
-- **Format Detection**: Applications should check the response message size:
-  - 149 bytes (0x95): Format 2 (single message with Structure Variant ID)
-  - 18 bytes (0x12): Format 1 Message 1 (first of 5 messages)
-  - 44 bytes (0x2C): Format 1 Messages 2-5 (string messages)
+- **Format Detection**: Applications should check the size of the **data block** (everything after the 12-byte BEM header, i.e. the BST store length minus 12):
+  - 138 bytes: Format 2 (single message; confirm the Structure Variant ID is 0x00000011)
+  - 6 bytes: Format 1 Message 1 (BST Length 0x12)
+  - 32 bytes: Format 1 Messages 2-5 (BST Length 0x2C)
+
+  Size alone is sufficient to pick the format; the Sequence ID then says which Format-1 part has arrived.
 
 - **Format 2 Advantages**:
   - Single message transaction (faster, more efficient)
@@ -222,10 +229,11 @@ Each message has BST Length = 0x2C (44 bytes total) and contains the full 32-byt
   - Recommended for all new designs
 
 - **Format 1 Legacy Support**:
-  - Required for compatibility with older devices (firmware < v2.500)
-  - Applications must reassemble 5 sequential messages
-  - No explicit linking mechanism (messages arrive in order)
-  - Each message has identical BEM header (same ModelID, SerialID)
+  - Required for compatibility with the NGT-1 / NGW-1 device class, including on current firmware
+  - Applications must reassemble 5 messages into one result
+  - The BEM header **Sequence ID** identifies the part (1-5); Format 2 uses 6
+  - Otherwise each message has an identical BEM header (same ModelID, SerialID)
+  - A truncated train has no terminator to wait for: time out on inactivity and report whichever parts arrived
 
 - **String Handling**: When parsing ASCII strings:
   - Scan for first 0xFF or 0x00 byte to find string end
@@ -278,16 +286,16 @@ Each message has BST Length = 0x2C (44 bytes total) and contains the full 32-byt
 
 - **Message Reassembly** (Format 1): To reassemble multi-message Product Info:
   1. Send Get Product Info request
-  2. Receive Message 1 (6 bytes), store Version, ProductCode, CertLevel, LEN
-  3. Receive Message 2 (32 bytes), store Model ID string
-  4. Receive Message 3 (32 bytes), store Software Version string
-  5. Receive Message 4 (32 bytes), store Hardware Version string
-  6. Receive Message 5 (32 bytes), store Serial Number string
-  7. All messages have identical BEM header fields (ModelID, SerialID)
-  8. Messages arrive in order with no gaps
+  2. Receive a reply; if its data block is 138 bytes it is Format 2 and the answer is complete
+  3. Otherwise take the part number from the header Sequence ID (1-5), falling back to arrival order if the device leaves it at zero
+  4. Part 1 (6 bytes): store Version, ProductCode, CertLevel, LEN
+  5. Parts 2-5 (32 bytes each): store Model ID, Software Version, Hardware Version, Serial Number
+  6. The result is complete once all five parts have been stored
+  7. All messages carry identical BEM header ModelID / SerialID fields
+  8. There is no end-of-train marker: a stalled sequence must be closed out by an inactivity timeout
 
 - **Fast Packet Requirement**: Format 2 responses (138 bytes) exceed single CAN frame capacity:
-  - Total message: 149 bytes (2 BST + 12 BEM header + 1 BEM ID + 138 data)
+  - Total message: 152 bytes (2 BST framing + 1 BEM ID + 11 BEM header + 138 data)
   - Uses NMEA 2000 Fast Packet protocol (multi-frame)
   - Automatically handled by BST-BEM transport layer
   - Applications receive complete assembled message

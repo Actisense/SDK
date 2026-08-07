@@ -64,6 +64,8 @@ add_sdk_test(test_session_metrics test_session_metrics.cpp)
 
 # Phase 2c NMEA 2000 Product Info tests
 add_sdk_test(test_nmea2000_product_info test_nmea2000_product_info.cpp)
+add_sdk_test(test_session_nmea2000_product_info test_session_nmea2000_product_info.cpp)
+add_sdk_test(test_product_info_legacy_assembly test_product_info_legacy_assembly.cpp)
 
 # PGN 126720 BEM wrap/unwrap helpers (GIT-88)
 add_sdk_test(test_bem_wrap_126720 test_bem_wrap_126720.cpp)

@@ -16,14 +16,19 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include "core/session_impl.hpp"
+#include "protocols/bem/bem_commands/bem_commands.hpp"
+#include "protocols/bem/bem_commands/product_info.hpp"
 #include "protocols/bem/bem_wrap_parlb.hpp"
 #include "public/config.hpp"
+#include "public/hardware_info.hpp"
 #include "transport/loopback/loopback_transport.hpp"
 
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <thread>
 #include <variant>
@@ -141,6 +146,41 @@ protected:
 		return raw;
 	}
 
+	/**
+	 * Build a complete !PARLB sentence carrying one BEM response, so a test can
+	 * synthesise a reply train the bench fixtures do not cover. The inner bytes
+	 * are the same BST ID + store length + BEM header + payload a binary link
+	 * would carry.
+	 */
+	static std::string parlbBemReply(BemCommandId bemId, uint8_t sequenceId, uint16_t modelId,
+									 uint32_t serialNumber, std::span<const uint8_t> payload) {
+		std::vector<uint8_t> inner;
+		inner.reserve(payload.size() + 14);
+		inner.push_back(static_cast<uint8_t>(BstId::Bem_GP_A0));
+		inner.push_back(static_cast<uint8_t>(kBemGP_OffData + payload.size()));
+		inner.push_back(static_cast<uint8_t>(bemId));
+		inner.push_back(sequenceId);
+		inner.push_back(static_cast<uint8_t>(modelId & 0xFF));
+		inner.push_back(static_cast<uint8_t>((modelId >> 8) & 0xFF));
+		for (int shift = 0; shift < 32; shift += 8) {
+			inner.push_back(static_cast<uint8_t>((serialNumber >> shift) & 0xFF));
+		}
+		inner.insert(inner.end(), 4, 0x00); /* error code = 0 */
+		inner.insert(inner.end(), payload.begin(), payload.end());
+
+		std::string sentence;
+		std::string error;
+		EXPECT_TRUE(wrapBemInParlb(inner, sentence, error)) << error;
+		return sentence;
+	}
+
+	/** One 32-byte 0xFF-padded string field, as a Format-1 part carries it. */
+	static std::vector<uint8_t> legacyStringPart(const std::string& text) {
+		std::vector<uint8_t> part(kProductInfoStringMaxLen, 0xFF);
+		encodePaddedString(text, part);
+		return part;
+	}
+
 	/** Push bytes at the session as though the device had sent them. */
 	void injectFromDevice(std::string_view text) {
 		/* Wait for a parked recv so the injection drains promptly rather than
@@ -222,6 +262,47 @@ TEST_F(ParlbLoopbackTest, NegativeAckOverParlbFailsThePendingRequest) {
 
 	ASSERT_TRUE(resultCode.has_value()) << "negative-ack did not reach the pending request";
 	EXPECT_NE(*resultCode, ErrorCode::Ok);
+}
+
+TEST_F(ParlbLoopbackTest, LegacyProductInfoTrainReassemblesOverParlb) {
+	/* An NGW-1 speaks NMEA 0183 and answers Get Product Info with five
+	   messages. Reassembly belongs above the framing layer, so the same five
+	   parts must produce one populated result whether they arrive as binary
+	   BST frames or as !PARLB sentences. */
+	openSession(CommandStream::N183);
+
+	std::optional<ErrorCode> resultCode;
+	std::optional<HardwareInfo> info;
+	session_->getHardwareInfo(
+		kRequestTimeout,
+		[&](ErrorCode code, std::string_view, const std::optional<HardwareInfo>& hw,
+			ResponseOrigin) {
+			resultCode = code;
+			info = hw;
+		});
+
+	const std::vector<uint8_t> mainPart = {0x34, 0x08, 0x65, 0x00, 0x01, 0x02};
+	injectFromDevice(parlbBemReply(BemCommandId::GetProductInfo, 1, 1, 12345, mainPart));
+	injectFromDevice(
+		parlbBemReply(BemCommandId::GetProductInfo, 2, 1, 12345, legacyStringPart("NGW-1")));
+	injectFromDevice(
+		parlbBemReply(BemCommandId::GetProductInfo, 3, 1, 12345, legacyStringPart("v2.760")));
+	injectFromDevice(
+		parlbBemReply(BemCommandId::GetProductInfo, 4, 1, 12345, legacyStringPart("Rev A")));
+	injectFromDevice(
+		parlbBemReply(BemCommandId::GetProductInfo, 5, 1, 12345, legacyStringPart("004321")));
+
+	waitFor([&] { return resultCode.has_value(); });
+
+	ASSERT_TRUE(resultCode.has_value()) << "the reply train never completed";
+	EXPECT_EQ(*resultCode, ErrorCode::Ok);
+	ASSERT_TRUE(info.has_value());
+	EXPECT_EQ(info->modelId, "NGW-1");
+	EXPECT_EQ(info->softwareVersion, "v2.760");
+	EXPECT_EQ(info->modelVersion, "Rev A");
+	EXPECT_EQ(info->modelSerialCode, "004321");
+	EXPECT_EQ(info->nmea2000Version, 2100);
+	EXPECT_EQ(info->productCode, 101);
 }
 
 /* Plain NMEA 0183 data ----------------------------------------------------- */

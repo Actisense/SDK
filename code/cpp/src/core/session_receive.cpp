@@ -4,8 +4,9 @@
  \details    Split from session_impl.cpp by concern (GIT-116). Holds the
 			 registerAggregatedReply template together with all of its callers
 			 (the F2 / supported-PGN-list verbs, local and remote — co-located
-			 so the template instantiates in this TU), runSupportedPgnListWalk,
-			 and the receive loop + BST/BEM dispatch.
+			 so the template instantiates in this TU), the Product Info
+			 reply-train assembly that shares the same multi-reply correlation,
+			 runSupportedPgnListWalk, and the receive loop + BST/BEM dispatch.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -22,6 +23,7 @@
 
 #include "core/bem_helpers.hpp"
 #include "core/supported_pgn_list_walk.hpp"
+#include "protocols/bem/bem_commands/product_info.hpp"
 #include "protocols/bem/bem_wrap_126720.hpp"
 #include "protocols/bem/bem_wrap_parlb.hpp"
 #include "protocols/bst/bst_frame.hpp"
@@ -132,6 +134,141 @@ namespace Actisense
 
 			bem_.registerMultiReplyRequest(cmdId, bstId, inactivityTimeout, std::move(isComplete),
 										   std::move(perResponseCallback), srcAddr);
+		}
+
+		void Session::Impl::registerProductInfoAssembly(uint8_t srcAddr,
+														std::chrono::milliseconds inactivityTimeout,
+														ProductInfoCallback callback) {
+			struct State
+			{
+				ProductInfoAssembler assembler;
+				ProductInfoCallback userCallback;
+				bool delivered = false;
+				bool haveIdentity = false;
+				uint16_t modelId = 0;
+				uint32_t serialNumber = 0;
+			};
+			auto state = std::make_shared<State>();
+			state->userCallback = std::move(callback);
+
+			/* The responder's identity comes off the reply header rather than
+			   the payload, so a partial (timed-out) result still names the
+			   device it came from. */
+			auto makeStampedOrigin = [this, srcAddr, state]() {
+				ResponseOrigin origin = detail::makeOrigin(*this, srcAddr);
+				if (state->haveIdentity) {
+					origin.modelId = state->modelId;
+					origin.serialNumber = state->serialNumber;
+				}
+				return origin;
+			};
+
+			auto isComplete = [state, makeStampedOrigin](const BemResponse& response) -> bool {
+				if (state->delivered) {
+					return true;
+				}
+				std::string feedError;
+				const auto status = state->assembler.feed(
+					response.header.sequenceId,
+					std::span<const uint8_t>(response.data.data(), response.data.size()),
+					feedError);
+				if (status == ProductInfoAssemblyStatus::Mismatch) {
+					if (state->userCallback) {
+						state->userCallback(ErrorCode::MalformedFrame, feedError, std::nullopt,
+											makeStampedOrigin());
+					}
+					state->delivered = true;
+					return true;
+				}
+				if (status == ProductInfoAssemblyStatus::Done) {
+					if (state->userCallback) {
+						state->userCallback(ErrorCode::Ok, std::string_view{},
+											std::make_optional(state->assembler.result()),
+											makeStampedOrigin());
+					}
+					state->delivered = true;
+					return true;
+				}
+				return false;
+			};
+
+			auto perResponseCallback = [state, makeStampedOrigin](
+										   const std::optional<BemResponse>& response, ErrorCode ec,
+										   std::string_view errMsg) {
+				/* Fires before isComplete for the same reply, so the identity
+				   recorded here is always current when the origin is stamped. */
+				if (response) {
+					state->modelId = response->header.modelId;
+					state->serialNumber = response->header.serialNumber;
+					state->haveIdentity = true;
+				}
+				if (state->delivered) {
+					return;
+				}
+				/* Any non-Ok outcome is terminal — a timeout, or a correlated
+				   device error. A truncated reply train surfaces as Timeout
+				   carrying whatever parts did arrive. */
+				if (ec != ErrorCode::Ok || !response) {
+					if (state->userCallback) {
+						std::optional<ProductInfoResponse> partial;
+						if (state->assembler.initialised()) {
+							partial = state->assembler.result();
+						}
+						state->userCallback(ec, errMsg, std::move(partial), makeStampedOrigin());
+					}
+					state->delivered = true;
+				}
+				/* Successful per-response delivery is handled in isComplete. */
+			};
+
+			bem_.registerMultiReplyRequest(BemCommandId::GetProductInfo, BstId::Bem_PG_A1,
+										   inactivityTimeout, std::move(isComplete),
+										   std::move(perResponseCallback), srcAddr);
+		}
+
+		void Session::Impl::getProductInfoAssembled(uint8_t srcAddr,
+													std::chrono::milliseconds inactivityTimeout,
+													ProductInfoCallback callback) {
+			const BemCommand cmd = makeBemA1(BemCommandId::GetProductInfo);
+			const bool isLocal = (srcAddr == kLocalSrcAddr);
+
+			/* Encode before registering so an encode failure cannot leave a
+			   pending entry behind with no send to satisfy it. */
+			std::string encodeError;
+			std::vector<uint8_t> localFrame;
+			std::optional<BstFrame> remoteFrame;
+			bool encoded = false;
+			if (isLocal) {
+				encoded = bem_.encodeCommand(cmd, localFrame, encodeError);
+			} else {
+				remoteFrame = buildRemoteBemFrame(srcAddr, cmd, encodeError);
+				encoded = remoteFrame.has_value();
+			}
+			if (!encoded) {
+				if (callback) {
+					callback(ErrorCode::InvalidArgument, encodeError, std::nullopt,
+							 detail::makeOrigin(*this, srcAddr));
+				}
+				return;
+			}
+
+			registerProductInfoAssembly(srcAddr, inactivityTimeout, std::move(callback));
+			metricsCollector_.recordBemCommand();
+
+			if (isLocal) {
+				asyncSendRaw(localFrame, [this](ErrorCode code, std::size_t /*written*/) {
+					if (code != ErrorCode::Ok && errorCallback_) {
+						errorCallback_(code, "Failed to send Get Product Info");
+					}
+				});
+				return;
+			}
+
+			asyncSend(SendProtocol::Bst, remoteFrame->rawData(), [this](ErrorCode code) {
+				if (code != ErrorCode::Ok && errorCallback_) {
+					errorCallback_(code, "Failed to send remote Get Product Info");
+				}
+			});
 		}
 
 		void
