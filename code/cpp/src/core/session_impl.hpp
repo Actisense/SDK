@@ -296,6 +296,8 @@ namespace Actisense
 			 \param[in]  callback    Callback invoked on response or timeout
 			 *******************************************************************************/
 			void getPortInventory(std::chrono::milliseconds timeout, BemResponseCallback callback);
+			void getAnalogueChannelInventory(std::chrono::milliseconds timeout,
+											 BemResponseCallback callback);
 
 			/**************************************************************************/ /**
 			 \brief      Send Set Port P-Code command

@@ -30,6 +30,7 @@
 #include <optional>
 #include <string_view>
 
+#include "public/bem_responses/analogue_channel_inventory.hpp"
 #include "public/bem_responses/can_config.hpp"
 #include "public/bem_responses/can_info_fields.hpp"
 #include "public/bem_responses/echo.hpp"
@@ -109,6 +110,18 @@ namespace Actisense
 		using PortInventoryCallback = std::function<void(
 			ErrorCode code, std::string_view errorMsg,
 			std::optional<PortInventoryResponse> response, ResponseOrigin origin)>;
+
+		/**************************************************************************/ /**
+		 rief      Analogue Channel Inventory callback.
+		 \details    Delivers one response message. A device with more analogue
+					 inputs than fit in a single message answers with further
+					 messages carrying the same transfer id; merge them with
+					 AnalogueChannelInventoryAccumulator. Unlike the port inventory,
+					 more than one message is the normal case.
+		 *******************************************************************************/
+		using AnalogueChannelInventoryCallback = std::function<void(
+			ErrorCode code, std::string_view errorMsg,
+			std::optional<AnalogueChannelInventoryResponse> response, ResponseOrigin origin)>;
 
 		/**************************************************************************/ /**
 		 \brief      Port P-Code callback (Get/Set Port P-Code replies).

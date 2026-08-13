@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Analogue Channel Inventory command (BEM 0x63) — `RemoteDevice::getAnalogueChannelInventory()`.**
+  A device exposes its analogue inputs only as a count and a lookup by id, and
+  those ids are sparse, so nothing on the wire described which inputs actually
+  existed, what any of them measured, or what range they covered. An
+  application had to carry a hard-coded table per product, which drifted from
+  the firmware and in practice only ever existed for one product — every other
+  device yielded no channel list at all. One payload-free GET now returns a
+  record per analogue input carrying the device's own name for it, the physical
+  quantity it measures (volts, current, resistance or frequency), its nominal
+  range as an exact integer pair plus a power-of-ten exponent, whether it is
+  configured and calibrated, the channel it is acquired alongside where inputs
+  come in pairs, and the converter that samples it. Crucially each record
+  carries the channel id that the Analogue Channel Range (0x60), I-Feed (0x61)
+  and sample request (0x62) commands take, so discovery leads straight into
+  reading a channel. New public types `AnalogueChannelEntry`,
+  `AnalogueChannelInventoryResponse` and `AnalogueChannelInventoryResult` in
+  `public/bem_responses/analogue_channel_inventory.hpp`, with the flag bits
+  exposed as predicates (`isConfigured()`, `hasCalibration()`, `isCalibrated()`,
+  `isPaired()`) and lookups by id, by name and by partner, so application code
+  never compares against raw bits or `0xFF`. `AnalogueChannelInventoryAccumulator`
+  merges an inventory spanning several messages, which — unlike the port
+  inventory — is the normal case here. Note the name reported is the device's
+  *engineering* name: some products name their inputs readably, others tersely
+  after their internal wiring, so an application that recognises a product may
+  wish to substitute its own label and fall back to this one otherwise. See
+  `docs/DataFormats/Binary/bem-detail/analogue-channel-inventory.md`.
+
 - **Port Inventory command (BEM 0x1B) — `RemoteDevice::getPortInventory()`.**
   A device numbers its communication ports three unrelated ways and, until now,
   a host could reconcile none of them from the wire: System Status reports

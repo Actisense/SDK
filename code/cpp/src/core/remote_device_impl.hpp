@@ -57,6 +57,8 @@ namespace Actisense
 			void getPortPCode(std::chrono::milliseconds timeout, PortPCodeCallback callback);
 			void getPortInventory(std::chrono::milliseconds timeout,
 								  PortInventoryCallback callback);
+			void getAnalogueChannelInventory(std::chrono::milliseconds timeout,
+											 AnalogueChannelInventoryCallback callback);
 			void setPortPCode(std::span<const uint8_t> pCodes, std::chrono::milliseconds timeout,
 							  BemResultCallback callback);
 
@@ -134,6 +136,8 @@ namespace Actisense
 
 			void getPortPCode(std::chrono::milliseconds timeout, BemResponseCallback callback);
 			void getPortInventory(std::chrono::milliseconds timeout, BemResponseCallback callback);
+			void getAnalogueChannelInventory(std::chrono::milliseconds timeout,
+											 BemResponseCallback callback);
 			void setPortPCode(std::span<const uint8_t> pCodes, std::chrono::milliseconds timeout,
 							  BemResponseCallback callback);
 

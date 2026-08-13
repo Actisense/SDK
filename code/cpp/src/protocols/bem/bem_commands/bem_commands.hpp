@@ -11,6 +11,7 @@
 
 /* Dependent includes ------------------------------------------------------- */
 #include "protocols/bem/bem_commands/activate_pgn_enable_lists.hpp"
+#include "protocols/bem/bem_commands/analogue_channel_inventory.hpp"
 #include "protocols/bem/bem_commands/can_config.hpp"
 #include "protocols/bem/bem_commands/can_info_fields.hpp"
 #include "protocols/bem/bem_commands/commit_to_eeprom.hpp"
@@ -70,6 +71,13 @@ namespace Actisense
 			/// the System Status slot and the Port Baudrate number that reach
 			/// it. Answered with one or more messages tied by a transfer id.
 			GetPortInventory = 0x1B,
+
+			/* Analogue Commands */
+			/// Get the device's full analogue channel inventory: one record per
+			/// analogue input with the device's name for it, the quantity it
+			/// measures, its nominal range and its configured and calibrated
+			/// state. Answered with one or more messages tied by a transfer id.
+			GetAnalogueChannelInventory = 0x63,
 
 			/* NMEA 2000 Product Information Commands */
 			GetProductInfo = 0x41,		///< Get product information

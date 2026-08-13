@@ -173,6 +173,18 @@ namespace Actisense
 													 std::string& outError);
 
 			/**************************************************************************/ /**
+			 rief      Build Get Analogue Channel Inventory command
+			 \details    A GET with no payload. The device answers with its whole
+						 analogue channel list, split across as many messages as it
+						 needs.
+			 \param[out] outFrame   Complete BDTP-framed message
+			 \param[out] outError   Error message if encoding fails
+			  eturn     True on success
+			 *******************************************************************************/
+			[[nodiscard]] bool buildGetAnalogueChannelInventory(std::vector<uint8_t>& outFrame,
+																std::string& outError);
+
+			/**************************************************************************/ /**
 			 \brief      Build Set Port P-Code command
 			 \param[in]  pCodes      P-Code values for each port
 			 \param[out] outFrame    Complete BDTP-framed message

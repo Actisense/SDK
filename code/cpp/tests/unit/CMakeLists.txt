@@ -46,6 +46,7 @@ add_sdk_test(test_pgn_table_model
 # BEM Command tests
 add_sdk_test(test_operating_mode test_operating_mode.cpp)
 add_sdk_test(test_port_baudrate test_port_baudrate.cpp)
+add_sdk_test(test_analogue_channel_inventory test_analogue_channel_inventory.cpp)
 add_sdk_test(test_port_inventory test_port_inventory.cpp)
 add_sdk_test(test_port_pcode test_port_pcode.cpp)
 add_sdk_test(test_rx_pgn_enable test_rx_pgn_enable.cpp)

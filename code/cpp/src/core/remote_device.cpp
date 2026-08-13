@@ -89,6 +89,11 @@ namespace Actisense
 			impl_->getPortInventory(timeout, std::move(callback));
 		}
 
+		void RemoteDevice::getAnalogueChannelInventory(std::chrono::milliseconds timeout,
+													   AnalogueChannelInventoryCallback callback) {
+			impl_->getAnalogueChannelInventory(timeout, std::move(callback));
+		}
+
 		void RemoteDevice::setPortPCode(std::span<const uint8_t> pCodes,
 										std::chrono::milliseconds timeout,
 										BemResultCallback callback) {

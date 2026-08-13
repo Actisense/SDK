@@ -127,6 +127,12 @@ namespace Actisense
 			sendBemCommand(makeBemA1(BemCommandId::GetPortInventory), timeout, std::move(callback));
 		}
 
+		void RemoteDevice::Impl::getAnalogueChannelInventory(std::chrono::milliseconds timeout,
+															 BemResponseCallback callback) {
+			sendBemCommand(makeBemA1(BemCommandId::GetAnalogueChannelInventory), timeout,
+						   std::move(callback));
+		}
+
 		void RemoteDevice::Impl::setPortPCode(std::span<const uint8_t> pCodes,
 											  std::chrono::milliseconds timeout,
 											  BemResponseCallback callback) {
@@ -417,6 +423,15 @@ namespace Actisense
 			getPortInventory(timeout, wrapTyped<PortInventoryResponse>(session_, src_addr_,
 																	   &decodePortInventoryResponse,
 																	   std::move(callback)));
+		}
+
+		void
+		RemoteDevice::Impl::getAnalogueChannelInventory(std::chrono::milliseconds timeout,
+														AnalogueChannelInventoryCallback callback) {
+			getAnalogueChannelInventory(timeout, wrapTyped<AnalogueChannelInventoryResponse>(
+													 session_, src_addr_,
+													 &decodeAnalogueChannelInventoryResponse,
+													 std::move(callback)));
 		}
 
 		void RemoteDevice::Impl::getPortPCode(std::chrono::milliseconds timeout,

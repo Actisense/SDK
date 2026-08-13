@@ -201,6 +201,27 @@ namespace Actisense
 			void getPortInventory(std::chrono::milliseconds timeout,
 								  PortInventoryCallback callback);
 
+			/* Analogue Channel Inventory ---------------------------------------- */
+			/**************************************************************************/ /**
+			 rief      Get the device's analogue channel inventory
+			 \details    Answers which analogue inputs the device has. Nothing else
+						 can tell you: a device exposes only a channel count and a
+						 lookup by id, and the ids are sparse, so without this an
+						 application has to carry a hard-coded table per product.
+
+						 Each entry carries the channel id taken by getAnalogueRange,
+						 getAnalogueIFeed and the analogue sample request, so discovery
+						 leads straight into reading a channel.
+
+						 A device with many inputs answers with several messages; check
+						 AnalogueChannelInventoryResponse::isComplete() and merge with
+						 AnalogueChannelInventoryAccumulator.
+			 \param[in]  timeout   How long to wait for the reply
+			 \param[in]  callback  Invoked with the decoded inventory
+			 *******************************************************************************/
+			void getAnalogueChannelInventory(std::chrono::milliseconds timeout,
+											 AnalogueChannelInventoryCallback callback);
+
 			/* Rx PGN Enable ----------------------------------------------------- */
 
 			/**************************************************************************/ /**
