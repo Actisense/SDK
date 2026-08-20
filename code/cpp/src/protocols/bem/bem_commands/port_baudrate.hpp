@@ -28,22 +28,11 @@ namespace Actisense
 	{
 		/* Constants ------------------------------------------------------------ */
 
-		/// Special baudrate value: Do not change this baudrate
-		static constexpr uint32_t kBaudRateNoChange = 0xFFFFFFFF;
-
-		/// Special baudrate value: Use device default
-		static constexpr uint32_t kBaudRateDefault = 0xFFFFFFFE;
-
-		/// Special baudrate value: Adopt the other field's rate.
-		/// In the session field this adopts the stored rate as the live rate -
-		/// combined with a literal store rate it forces the new rate over the
-		/// running link as well as persisting it, and combined with
-		/// kBaudRateNoChange in the store field it reverts a session-only
-		/// override. In the store field it persists the current live rate.
-		/// Only recognised by firmware with independent session/store
-		/// behaviour; older firmware rejects it as an invalid literal rate,
-		/// which a host can use as a deterministic fallback signal.
-		static constexpr uint32_t kBaudRateAdoptAlternate = 0xFFFFFFFC;
+		/* The special baudrate values a caller passes to the session/store
+		   fields - kBaudRateNoChange, kBaudRateDefault and
+		   kBaudRateAdoptAlternate - are part of the public API and are declared
+		   in public/bem_responses/port_baudrate.hpp, included above. The sizes
+		   below are wire-format detail and stay internal. */
 
 		/// Port Baudrate response data size (11 bytes)
 		static constexpr std::size_t kPortBaudrateResponseSize = 11;

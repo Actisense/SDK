@@ -8,9 +8,10 @@
  \brief      Public Port Baudrate request/response data structures
  \details    Decoded payload of the Port Baudrate (0x17) BEM command, surfaced
 			 through PortBaudrateCallback, plus the HardwareProtocol enum
-			 embedded in the response and the request struct. The wire-format
-			 constants and decode/encode/format helpers live in the internal
-			 protocols/bem/bem_commands/port_baudrate.hpp.
+			 embedded in the response, the request struct and the special
+			 baudrate values a caller may pass to
+			 RemoteDevice::setPortBaudrate(). The decode/encode/format helpers
+			 live in the internal protocols/bem/bem_commands/port_baudrate.hpp.
 
  \copyright  <h2>&copy; COPYRIGHT 2026 Active Research Limited<br>ALL RIGHTS RESERVED</h2>
  *******************************************************************************/
@@ -23,6 +24,25 @@ namespace Actisense
 {
 	namespace Sdk
 	{
+		/* Constants ------------------------------------------------------------ */
+
+		/// Special baudrate value: Do not change this baudrate
+		static constexpr uint32_t kBaudRateNoChange = 0xFFFFFFFF;
+
+		/// Special baudrate value: Use device default
+		static constexpr uint32_t kBaudRateDefault = 0xFFFFFFFE;
+
+		/// Special baudrate value: Adopt the other field's rate.
+		/// In the session field this adopts the stored rate as the live rate -
+		/// combined with a literal store rate it forces the new rate over the
+		/// running link as well as persisting it, and combined with
+		/// kBaudRateNoChange in the store field it reverts a session-only
+		/// override. In the store field it persists the current live rate.
+		/// Only recognised by firmware with independent session/store
+		/// behaviour; older firmware rejects it as an invalid literal rate,
+		/// which a host can use as a deterministic fallback signal.
+		static constexpr uint32_t kBaudRateAdoptAlternate = 0xFFFFFFFC;
+
 		/* Enumerations --------------------------------------------------------- */
 
 		/**************************************************************************/ /**

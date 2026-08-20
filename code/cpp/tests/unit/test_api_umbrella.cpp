@@ -92,6 +92,20 @@ namespace
 		EXPECT_NE(&Session::defaultPgnEnableList, nullptr);
 		EXPECT_NE(&Session::getSupportedPgnList_All, nullptr);
 	}
+
+	// GIT-143: the Port Baudrate special values must be nameable by a consumer.
+	// public/remote_device.hpp documents setPortBaudrate()'s two rate parameters
+	// in terms of kBaudRateNoChange and kBaudRateAdoptAlternate, but the
+	// constants themselves were declared only in the internal
+	// protocols/bem/bem_commands/port_baudrate.hpp — so a consumer following that
+	// Doxygen got "undeclared identifier". Naming them in this public-only TU is
+	// what proves the documented call is actually writable; the value assertions
+	// pin the wire sentinels, which must never be renumbered.
+	TEST(ApiUmbrella, PortBaudrateSentinelsAreReachableThroughApiHpp) {
+		EXPECT_EQ(kBaudRateNoChange, 0xFFFFFFFFu);
+		EXPECT_EQ(kBaudRateDefault, 0xFFFFFFFEu);
+		EXPECT_EQ(kBaudRateAdoptAlternate, 0xFFFFFFFCu);
+	}
 } // namespace
 
 /**************** (C) COPYRIGHT Active Research Limited  ** END OF FILE **/

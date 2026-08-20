@@ -44,7 +44,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   running" verb for a try-then-commit flow. Firmware without independent
   session/store behaviour rejects it as an invalid literal rate, which a host
   can use as a deterministic fallback signal rather than sniffing versions.
-  `formatBaudrate()` renders it as "Adopt Alternate".
+  `formatBaudrate()` renders it as "Adopt Alternate". Declared alongside
+  `kBaudRateNoChange` and `kBaudRateDefault` in
+  `public/bem_responses/port_baudrate.hpp`, so all three are reachable through
+  `public/api.hpp` alone — previously they lived in an internal header, and a
+  consumer following the `RemoteDevice::setPortBaudrate()` documentation could
+  not name the value it told them to pass.
 
 - **PGN enable-list verbs on `Session`.** `Session` can now configure
   and query the PGN enable lists of the gateway it is connected to:
