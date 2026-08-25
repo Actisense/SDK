@@ -66,8 +66,8 @@ a single sub-list if you need to drive the walk yourself.
 
 ## Per-PGN: Rx PGN Enable (`0x46`)
 
-Reads or sets the enable flag for a single Rx PGN. The mask form lets you
-define an instance/group match. Wire-protocol detail:
+Reads or sets the enable flag for a single Rx PGN. The mask form widens the match
+from one PGN to a block of 256, 4096 or 65536. Wire-protocol detail:
 [rx-pgn-enable.md](../../../../docs/DataFormats/Binary/bem-detail/rx-pgn-enable.md).
 
 ```cpp
@@ -84,18 +84,35 @@ void setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
 
 `pgn` is the 24-bit PGN value. `enable` is `0` = disabled, `1` = enabled,
 `2` = respond mode (matching the `RxPgnEnableFlag` enum delivered in the
-get response, `public/bem_responses/rx_pgn_enable.hpp`). The mask form is
-useful for instance/group filtering; consult the wire-protocol reference for
-the exact semantics of the mask bits. Sets take effect on the next
-`activatePgnEnableLists()` call.
+get response, `public/bem_responses/rx_pgn_enable.hpp`).
+
+`mask` takes one of four values, which select how wide the PGN match is —
+Source Address is always "do not care":
+
+| Mask | Fields matched | PGNs covered |
+| ------ | -------------- | ------------ |
+| `0x03FFFF00` | R, DP, PDU Format, PDU Specific | 1 |
+| `0x03FF0000` | R, DP, PDU Format | 256 |
+| `0x03F00000` | R, DP, top 4 bits of PDU Format | 4096 |
+| `0x03000000` | R, DP | 65536 |
+
+Plus the two standard unsigned 32-bit BEM parameter values: `0xFFFFFFFE` to
+restore this PGN's library-defined default mask, and `0xFFFFFFFF` to leave the
+current mask unchanged. Any other value is rejected. Sets take effect on the
+next `activatePgnEnableLists()` call.
 
 ---
 
 ## Per-PGN: Tx PGN Enable (`0x47`)
 
-Mirror of the Rx variant for transmit. The "with rate" form sets a
-transmission interval (milliseconds) for periodic PGNs. Wire-protocol
-detail:
+The transmit counterpart, but **not** a mirror of the Rx variant: there is no
+mask form, because a Tx PGN Enable is always for exactly one PGN. Every
+transmitted PGN needs its own control object for its fast-packet sequence ID,
+transmit rate and transmit priority, so a block of PGNs cannot be enabled in one
+call — each must be enabled individually, proprietary PGNs included. Enabling
+`0x0FF00` (65280) enables only 65280, not the 65280-65535 block. The "with rate"
+form sets a transmission interval (milliseconds) for periodic PGNs.
+Wire-protocol detail:
 [tx-pgn-enable.md](../../../../docs/DataFormats/Binary/bem-detail/tx-pgn-enable.md).
 
 ```cpp

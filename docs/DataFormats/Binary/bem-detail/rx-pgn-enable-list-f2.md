@@ -60,7 +60,9 @@ The device returns the Rx PGN Enable List as one or more messages, depending on 
 
 **PGN Index**: Index into the Supported PGN List (0-254). Use the [Supported PGN List](supported-pgn-list.md) command to convert to actual PGN ID.
 
-**Rx Mask**: 8-bit enumeration controlling which message sources are received:
+**Rx Mask**: 8-bit enumeration controlling which message *sources* are received.
+
+> **Note**: despite the shared name, this is a different field from the 32-bit "Rx Mask" in [Rx PGN Enable](rx-pgn-enable.md) and [Format 1](rx-pgn-enable-list-f1.md), which selects how wide the PGN match is. This 8-bit field says nothing about match width; the 32-bit field says nothing about sources.
 - 0x00: Disabled - PGN not received
 - 0x01: CAN Only - Receive from NMEA 2000 bus only
 - 0x02: Virtual Only - Receive from virtual/internal sources only
