@@ -60,11 +60,49 @@ The device returns the Rx PGN Enable List as one or more messages, depending on 
 
 **PGN Index**: Index into the Supported PGN List (0-254). Use the [Supported PGN List](supported-pgn-list.md) command to convert to actual PGN ID.
 
-**Rx Mask**: 8-bit enumeration controlling which message sources are received:
-- 0x00: Disabled - PGN not received
-- 0x01: CAN Only - Receive from NMEA 2000 bus only
-- 0x02: Virtual Only - Receive from virtual/internal sources only
-- 0x03: CAN and Virtual - Receive from both sources
+**Rx Mask**: 8-bit enumeration giving how **wide** the entry's receive match is - how many
+PGNs the one list entry covers. It does **not** select a message source, and an entry's
+presence in this list is what says it is enabled; the mask says how much it enables.
+
+| Value | Name | Matches on | PGNs covered |
+|-------|------|------------|--------------|
+| 0x00 | Match PGN | R, DP, PDU Format and PDU Specific | 1 |
+| 0x01 | Match PDU Format | R, DP and PDU Format | 256 |
+| 0x02 | Match MSN PDU Format | R, DP and the top 4 bits of PDU Format | 4096 |
+| 0x03 | Match Data Page | R and DP | 65536 |
+
+Source Address is "do not care" in every case, and the 3-bit priority is always ignored.
+These are the same four masks [Rx PGN Enable](rx-pgn-enable.md) (0x46) carries as full
+32-bit values - `0x03FFFF00`, `0x03FF0000`, `0x03F00000` and `0x03000000` respectively.
+This list reports them in their compact enumerated form.
+
+Most entries report 0x00, because most PGN definitions describe a single PGN - 187 of the
+200 definitions in the NMEA 2000 library. The other 13 report a wider mask:
+
+| Reports | Entries | Which, and what the width means |
+|---------|---------|---------------------------------|
+| 0x01 | 2 | The manufacturer proprietary **ranges**, PGN 65280 (`0x0FF00`-`0x0FFFF`) and PGN 130816 (`0x1FF00`-`0x1FFFF`). 256 genuinely distinct PGNs each. |
+| 0x01 | 9 | **PDU1 addressed** PGNs - ISO Request 59904, ISO Address Claim 60928, the ISO Transport Protocol pair, the two addressed proprietary PGNs, the NMEA Request group function 126208, PGN List 126464 and ISO Acknowledgment 59392. |
+| 0x02 | 1 | J1939 "Catch All Data", PGN 61440 (`0x0F000`-`0x0FED7`). |
+| 0x03 | 1 | J1939 "Catch All Control", PGN 2. |
+
+**The two groups reporting 0x01 mean different things.** For a PDU2 range entry the mask
+really does cover 256 PGNs. For a **PDU1** entry the PDU Specific byte is the *destination
+address*, so ignoring it means "this one PGN, sent to any destination" - not 256 PGNs. A
+host that expands every 0x01 into a 256-PGN block will mis-describe nine of the eleven.
+The test is the PDU Format byte: below `0xF0` the PGN is PDU1 and addressed.
+
+> **The mask is a reporting field.** It tells a host how wide the device's match for that
+> entry is; it is not a control a host can narrow or widen to change what the device
+> receives. A mask written with [Rx PGN Enable](rx-pgn-enable.md) (0x46) is stored and is
+> reported back by both commands, but the width a frame is actually matched at comes from
+> the PGN definition's own range and does not follow it. Read the value; do not rely on
+> writing it.
+
+> **Older firmware reported 0x00 for every entry**, whatever the definition, because the
+> value was a fixed constant rather than the entry's own mask. A list in which the
+> proprietary range entries report 0x00 is from such a device, and its mask column says
+> nothing about that device's state.
 
 ### Multi-Message Transfer
 
@@ -111,17 +149,21 @@ Response showing a small Rx PGN Enable List with 3 PGNs in a single message:
 | 26 | Sub-List Size | 03H | 3 PGNs in this message |
 | **27-32** | **PGN Entries** | ... | **6 bytes: 3 × (index + mask)** |
 | 27 | PGN Index 0 | 05H | PGN Index 5 (e.g., PGN 127250 Vessel Heading) |
-| 28 | Rx Mask 0 | 03H | CAN and Virtual (both sources) |
+| 28 | Rx Mask 0 | 00H | Match PGN - this entry covers 1 PGN |
 | 29 | PGN Index 1 | 0AH | PGN Index 10 (e.g., PGN 129025 Position Rapid) |
-| 30 | Rx Mask 1 | 01H | CAN Only |
-| 31 | PGN Index 2 | 0FH | PGN Index 15 (e.g., PGN 129029 GNSS Position) |
-| 32 | Rx Mask 2 | 01H | CAN Only |
+| 30 | Rx Mask 1 | 00H | Match PGN - this entry covers 1 PGN |
+| 31 | PGN Index 2 | 0BH | PGN Index 11 (e.g., PGN 65280, the proprietary single-frame range) |
+| 32 | Rx Mask 2 | 01H | Match PDU Format - this entry covers 256 PGNs (65280-65535) |
 
 **PGN Index to PGN ID Conversion**:
 - Query [Supported PGN List](supported-pgn-list.md) to get PGN Index → PGN ID mapping
 - PGN Index 5 → PGN 127250 (Vessel Heading)
 - PGN Index 10 → PGN 129025 (Position, Rapid Update)
-- PGN Index 15 → PGN 129029 (GNSS Position Data)
+- PGN Index 11 → PGN 65280 (Manufacturer Proprietary Single-Frame, non-addressed)
+
+The third entry is a **range** definition. Its PGN Index resolves to the range's base PGN,
+65280, and its Rx Mask of 0x01 is what tells you the entry covers 65280-65535 rather than
+65280 alone. A host that ignores the mask will under-read a list like this one.
 
 ### Example - Rx PGN Enable List F2 Response (Large List, First Message)
 
@@ -177,18 +219,15 @@ Second message continuing the 50 PGN list:
   - Index values are stable within a firmware version
   - Index 0-254 valid, 255 reserved
 
-- **Rx Mask Values**:
-  | Value | Name | Description |
-  |-------|------|-------------|
-  | 0x00 | Disabled | PGN not received from any source |
-  | 0x01 | CAN Only | Receive only from NMEA 2000 bus |
-  | 0x02 | Virtual Only | Receive only from internal/virtual sources |
-  | 0x03 | CAN + Virtual | Receive from both CAN and virtual sources |
+- **Rx Mask Values** - the width of the entry's match, not a source selection:
+  | Value | Name | PGNs covered |
+  |-------|------|--------------|
+  | 0x00 | Match PGN | 1 |
+  | 0x01 | Match PDU Format | 256 |
+  | 0x02 | Match MSN PDU Format | 4096 |
+  | 0x03 | Match Data Page | 65536 |
 
-- **Virtual Sources**: Virtual PGNs are internally generated messages:
-  - Gateway translations (NMEA 0183 → NMEA 2000)
-  - Internally calculated values
-  - Forwarded from other interfaces
+  Reporting only - see the note beside the PGN Entry table above.
 
 - **Transfer ID Handling**:
   - Transfer ID cycles 1-255 (never 0 for valid transfer)

@@ -49,7 +49,32 @@ To set both enable state and custom PGN mask:
 - 0x01: Enable reception (PGN will be passed through)
 - 0x02: Respond mode (device-specific behavior)
 
-**PGN Mask**: 32-bit mask for address filtering. The mask is applied to the received CAN identifier to filter messages by source address or other PGN-specific criteria. If omitted, device uses its default mask for the PGN.
+**PGN Mask**: 32-bit mask giving how **wide** this entry's receive match is - how many PGNs
+the one entry covers. Source Address is "do not care" in every case, and the 3-bit priority
+is always ignored. Exactly four values are defined, plus two parameter sentinels; anything
+else is rejected with `ES10_BSTBEM_MessageInvalid`.
+
+| Value | Name | Matches on | PGNs covered |
+|-------|------|------------|--------------|
+| `0x03FFFF00` | Match PGN | R, DP, PDU Format and PDU Specific | 1 |
+| `0x03FF0000` | Match PDU Format | R, DP and PDU Format | 256 |
+| `0x03F00000` | Match MSN PDU Format | R, DP and the top 4 bits of PDU Format | 4096 |
+| `0x03000000` | Match Data Page | R and DP | 65536 |
+| `0xFFFFFFFE` | Use Defaults | request the device's default mask for this PGN | - |
+| `0xFFFFFFFF` | Do Not Change | leave the stored mask as it is | - |
+
+Omitting the field entirely (a 5-byte data block) also leaves the stored mask unchanged.
+
+The device seeds each entry's mask from its own NMEA 2000 PGN definition at startup, so a
+Get returns that definition's declared width unless a Set has replaced it. The same four
+values appear in compact 8-bit enumerated form (0-3, in the order above) in
+[Rx PGN Enable List F2](rx-pgn-enable-list-f2.md).
+
+> **The mask is a reporting field.** It tells a host how wide the device's match for that
+> entry is; it is not a control a host can narrow or widen to change what the device
+> receives. A mask written here is stored and reported back faithfully by both this command
+> and the list command, but the width a frame is actually matched at comes from the PGN
+> definition's own range and does not follow it. Read the value; do not rely on writing it.
 
 ### Response Data Block
 
