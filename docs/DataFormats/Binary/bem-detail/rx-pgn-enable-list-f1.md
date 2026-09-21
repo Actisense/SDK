@@ -61,10 +61,18 @@ The device returns the Rx PGN Enable List as exactly 2 sequential messages:
 
 **Number of Masks**: Must equal Number of PGNs from Message 1.
 
-**Rx Mask**: 32-bit mask for CAN identifier filtering (same format as [Rx PGN Enable](rx-pgn-enable.md)):
-- 0x00000000: Accept all messages with this PGN
-- 0xFFFFFFFF: Exact match only
-- Other values: Partial matching (mask applied to CAN ID)
+**Rx Mask**: selects how wide the PGN match is, exactly as in [Rx PGN Enable](rx-pgn-enable.md). Only four values ever appear in this list:
+
+| Value | Name | PGNs covered |
+| -- | -- | -- |
+| `0x03FFFF00` | Match PGN | 1 |
+| `0x03FF0000` | Match PDU Format | 256 |
+| `0x03F00000` | Match MSN of PDU Format | 4096 |
+| `0x03000000` | Match Data Page | 65536 |
+
+Source Address is always "do not care" and the 3-bit priority is always ignored. This is not a free-form bit mask: `0x00000000` and `0xFFFFFFFF` are not valid masks and will not be reported here.
+
+> **Note**: this 32-bit "Rx Mask" is a different field from the 8-bit "Rx Mask" reported by [Rx PGN Enable List F2](rx-pgn-enable-list-f2.md), which carries the message *sources* a PGN is received from. The two share a name but are unrelated.
 
 ### Maximum List Size
 

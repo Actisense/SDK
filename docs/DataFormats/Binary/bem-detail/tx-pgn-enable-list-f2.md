@@ -75,7 +75,8 @@ All messages in a response share the same Transfer ID.
 **Tx Rate**: Transmission interval in milliseconds (0-65534):
 - 0: Event-driven (transmit on data change only)
 - 1-65534: Periodic transmission at specified interval
-- 65535 (0xFFFF): Disabled / Use default rate
+- 0: Periodic transmission disabled (event-driven only)
+- 65535 (0xFFFF): Non-periodic. This is a transmit-rate value, not the unsigned 16-bit BEM do-not-change value - see [Message parameter conventions](../bst-bem.md#message-parameter-conventions)
 
 #### Message Type 2: Proprietary PGNs (SV_DIG_PropTxEnableList0)
 
@@ -283,7 +284,7 @@ For a device with 60 standard PGNs and some proprietary PGNs, the response seque
   3. Use [Activate PGN Enable Lists](activate-pgn-enable-lists.md) to apply changes
   4. Use [Commit To EEPROM](commit-to-eeprom.md) for persistence
 
-- **Default Rate**: Tx Rate = 0xFFFF means use the device's default rate for that PGN. Query the default using [Tx PGN Enable](tx-pgn-enable.md).
+- **Non-periodic PGNs**: Tx Rate = 0xFFFF means the PGN is non-periodic - it is transmitted on event or on request rather than on a timer. It does not mean "use the default rate". To restore a PGN's library-defined default rate, send `0xFFFFFFFE` on [Tx PGN Enable](tx-pgn-enable.md).
 
 - **Rate Limitations**:
   - Minimum effective rate depends on CAN bus load

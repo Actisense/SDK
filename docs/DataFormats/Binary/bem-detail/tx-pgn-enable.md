@@ -4,6 +4,10 @@ Enables or disables transmission of specific Parameter Group Numbers (PGNs) on N
 
 This command supports both Get (read current enable state) and Set (enable/disable transmission) operations for individual PGNs. For managing multiple PGNs efficiently, see [Tx PGN Enable List](tx-pgn-enable-list-f2.md).
 
+> **A Tx PGN Enable is always for exactly one PGN.** Unlike [Rx PGN Enable](rx-pgn-enable.md), there is no mask and no way to enable a block of PGNs in one command. Every transmitted PGN needs its own transmit control object to hold its fast-packet sequence ID, transmit rate and transmit priority, so each must be enabled individually — including proprietary PGNs.
+>
+> This applies to the manufacturer proprietary ranges. Enabling `0x0FF00` (65280) enables only PGN 65280, **not** the 65280-65535 block; to transmit PGN 65535 you must enable 65535. The base PGN of a proprietary range must never be used as a stand-in for the range on transmit.
+
 ## Command Ids
 
 | Type | BST ID | BEM Id |
@@ -49,9 +53,26 @@ To set enable state and custom transmission rate:
 - 0x01: Enable transmission (PGN will be transmitted at configured rate)
 - 0x02: Respond mode (transmit only when requested)
 
-**Tx Rate**: Transmission rate in milliseconds. Valid range depends on the PGN (typically 0-60000 ms). Special values:
-- 0: Disable periodic transmission (event-driven only)
-- 0xFFFFFFFF: Use device default rate for this PGN
+**Tx Rate**: Transmission rate in milliseconds. Valid range depends on the PGN (typically 0-60000 ms).
+
+| Value | Meaning |
+| -- | -- |
+| `0` | Disable periodic transmission (event-driven only) |
+| `1` - `65534` | Transmission interval in milliseconds |
+| `0xFFFF` and above | Ignored by current firmware - the rate is left unchanged |
+
+Note the difference from the [Port Baudrate](port-baudrate.md) command, which
+implements the standard unsigned 32-bit BEM parameter values in full. Here,
+`0xFFFFFFFF` (do not change) produces the correct result because any value at or
+above `0xFFFF` is ignored — but `0xFFFFFFFE` (use defaults) is ignored in exactly
+the same way, so it does **not** restore the PGN's library-defined rate. See
+[Message parameter conventions](../bst-bem.md#message-parameter-conventions) for
+the conventions themselves.
+
+Omitting the Tx Rate field leaves the current rate unchanged; it does not restore
+the default. There is currently no way to restore a PGN's default transmit rate
+through this command — the NMEA Request Group Function (PGN 126208) does support
+it, so the two interfaces disagree about the same setting.
 
 ### Response Data Block
 
@@ -168,7 +189,7 @@ Response showing PGN 127488 enabled with 100ms rate, priority 3:
   - Enable List (0x4F): Best for configuring multiple PGNs at once or retrieving complete transmission state
   - Both methods manage the same underlying configuration
 
-- **Default Values**: If Tx Rate is omitted from the Set request, the device uses its library-defined default rate and priority for that PGN. Defaults are typically specified by NMEA 2000 / J1939 standards for each PGN.
+- **Default Values**: a PGN's rate and priority start at the library-defined defaults, which are typically specified by NMEA 2000 / J1939 for each PGN. Omitting Tx Rate or Tx Priority from a Set request leaves the current value alone — it does not restore the default. Current firmware ignores any Tx Rate at or above `0xFFFF` and any Tx Priority above `7`, so neither field has a working "restore the default" value; query the current values with the Get form.
 
 - **Persistence**: Changes made with this command are **not automatically persistent**. To save the Tx PGN Enable configuration:
   1. Enable/disable desired PGNs with this command

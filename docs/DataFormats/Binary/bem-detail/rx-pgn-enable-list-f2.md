@@ -76,6 +76,13 @@ These are the same four masks [Rx PGN Enable](rx-pgn-enable.md) (0x46) carries a
 32-bit values - `0x03FFFF00`, `0x03FF0000`, `0x03F00000` and `0x03000000` respectively.
 This list reports them in their compact enumerated form.
 
+> **This supersedes an earlier description of this byte as a message *source* selector**
+> (0x00 Disabled / 0x01 CAN Only / 0x02 Virtual Only / 0x03 CAN and Virtual). No firmware
+> has ever encoded that: the device fills this byte from the entry's PGN match width. The
+> two readings are easy to confuse because both use the range 0-3, and a host following
+> the older description reads a device's real single-PGN match (0x00) as "PGN not
+> received". There is no source-selection field in this list.
+
 Most entries report 0x00, because most PGN definitions describe a single PGN - 187 of the
 200 definitions in the NMEA 2000 library. The other 13 report a wider mask:
 

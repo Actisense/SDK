@@ -49,32 +49,45 @@ To set both enable state and custom PGN mask:
 - 0x01: Enable reception (PGN will be passed through)
 - 0x02: Respond mode (device-specific behavior)
 
-**PGN Mask**: 32-bit mask giving how **wide** this entry's receive match is - how many PGNs
-the one entry covers. Source Address is "do not care" in every case, and the 3-bit priority
-is always ignored. Exactly four values are defined, plus two parameter sentinels; anything
-else is rejected with `ES10_BSTBEM_MessageInvalid`.
+**PGN Mask**: a 32-bit value giving how **wide** this entry's receive match is - one PGN, or
+a block of PGNs. It is not a free-form bit mask and it does not filter on Source Address:
+Source Address is "do not care" in every case, and the 3-bit priority is always ignored.
 
-| Value | Name | Matches on | PGNs covered |
-|-------|------|------------|--------------|
+Only the following values are accepted; anything else is rejected with
+`ES10_BSTBEM_MessageInvalid`.
+
+| Value | Name | Fields matched | PGNs covered |
+|-------|------|----------------|--------------|
 | `0x03FFFF00` | Match PGN | R, DP, PDU Format and PDU Specific | 1 |
 | `0x03FF0000` | Match PDU Format | R, DP and PDU Format | 256 |
-| `0x03F00000` | Match MSN PDU Format | R, DP and the top 4 bits of PDU Format | 4096 |
+| `0x03F00000` | Match MSN of PDU Format | R, DP and the top 4 bits of PDU Format | 4096 |
 | `0x03000000` | Match Data Page | R and DP | 65536 |
-| `0xFFFFFFFE` | Use Defaults | request the device's default mask for this PGN | - |
-| `0xFFFFFFFF` | Do Not Change | leave the stored mask as it is | - |
+| `0xFFFFFFFE` | Use Defaults | request the device's default mask for this PGN | per PGN |
+| `0xFFFFFFFF` | Do Not Change | leave the stored mask as it is | unchanged |
 
-Omitting the field entirely (a 5-byte data block) also leaves the stored mask unchanged.
+The last two are the standard unsigned 32-bit BEM parameter values - see
+[Message parameter conventions](../bst-bem.md#message-parameter-conventions). Omitting the
+field altogether (the short, 5-byte Set form) also leaves the stored mask unchanged.
 
 The device seeds each entry's mask from its own NMEA 2000 PGN definition at startup, so a
 Get returns that definition's declared width unless a Set has replaced it. The same four
 values appear in compact 8-bit enumerated form (0-3, in the order above) in
 [Rx PGN Enable List F2](rx-pgn-enable-list-f2.md).
 
+Because a single Rx enable can cover a block of PGNs, enabling a definition that represents
+a block enables reception of every PGN in it. Transmission works differently: a Tx PGN
+Enable is only ever for a single PGN - see [Tx PGN Enable](tx-pgn-enable.md).
+
 > **The mask is a reporting field.** It tells a host how wide the device's match for that
 > entry is; it is not a control a host can narrow or widen to change what the device
 > receives. A mask written here is stored and reported back faithfully by both this command
 > and the list command, but the width a frame is actually matched at comes from the PGN
 > definition's own range and does not follow it. Read the value; do not rely on writing it.
+
+> **`0xFFFFFFFE` (Use Defaults) does not currently restore the library default.** Firmware
+> resolves it to a Match PGN mask whatever the definition declares, so a block definition
+> asked for its default has its reported width narrowed to a single PGN. Omit the field
+> instead if you want the seeded default left alone.
 
 ### Response Data Block
 
@@ -116,16 +129,16 @@ Enable reception of PGN 129025 (Position, Rapid Update) using device default mas
 
 ### Example - Set Rx PGN Enable (Extended with Mask)
 
-Enable PGN 60928 (ISO Address Claim) with custom mask 0x00FF0000:
+Enable reception of the whole 256-PGN proprietary single-frame block (65280-65535) by enabling PGN 65280 with the Match PDU Format mask:
 
 | Offset | Field | Value | Description |
 |--------|-------|-------|-------------|
 | 0 | BST ID | A1H | Rx PGN Enable BEM command |
 | 1 | BST Length | 0AH | BEM ID (1) + PGN ID (4) + Enable (1) + Mask (4) = 10 bytes |
 | 2 | BEM Id | 46H | Rx PGN Enable identifier |
-| 3-6 | PGN ID | 00 EE 00 00 | PGN 60928 (0x00EE00) (LE) |
+| 3-6 | PGN ID | 00 FF 00 00 | PGN 65280 (0x00FF00) (LE) |
 | 7 | Enable Flag | 01H | Enable reception |
-| 8-11 | PGN Mask | 00 00 FF 00 | Mask 0x00FF0000 (LE) |
+| 8-11 | PGN Mask | 00 00 FF 03 | Match PDU Format, 0x03FF0000 (LE) - a 256-PGN block |
 
 ### Example - Disable Rx PGN
 
@@ -173,7 +186,7 @@ Response showing PGN 129025 enabled with mask 0xFFFFFFFF (accept from all source
   - Enable List (0x4E): Best for configuring multiple PGNs at once or retrieving complete filter state
   - Both methods manage the same underlying filter configuration
 
-- **Default Masks**: If PGN Mask is omitted from the Set request, the device uses its library-defined default mask for that PGN. Default masks are typically PGN-specific (some PGNs need source address filtering, others don't).
+- **Default Masks**: If PGN Mask is omitted from the Set request, the device uses its library-defined default mask for that PGN. Defaults are PGN-specific: a single-PGN definition defaults to a Match PGN mask, while a definition that represents a block of PGNs — such as the manufacturer proprietary ranges — defaults to the mask covering its whole block.
 
 - **Persistence**: Changes made with this command are **not automatically persistent**. To save the Rx PGN Enable configuration:
   1. Enable/disable desired PGNs with this command
@@ -186,15 +199,12 @@ Response showing PGN 129025 enabled with mask 0xFFFFFFFF (accept from all source
 
 - **Performance Impact**: Enabling too many PGNs on a busy NMEA 2000 network can impact device performance and increase bus loading. Enable only the PGNs your application actually needs.
 
-- **Broadcast vs Addressed**: The PGN Mask can distinguish between:
-  - Broadcast PGNs (destination = 255): Received by all devices
-  - Addressed PGNs (destination = specific address): Intended for a specific device
-  - Proprietary PGNs: Manufacturer-specific messages
+- **What the mask cannot do**: the PGN Mask selects match width only. It cannot filter by Source Address (always "do not care") and it cannot distinguish a broadcast PGN from a destination-addressed one — for a PDU1 PGN the destination byte sits in the PDU Specific field, which the Match PGN mask includes as part of the PGN itself.
 
 - **Typical Workflow**:
   1. Query [Supported PGN List](supported-pgn-list.md) to see what PGNs the device supports
   2. Enable specific PGNs needed for your application using this command
-  3. Optionally customize masks for address filtering
+  3. Optionally widen a mask to cover a block of PGNs rather than one
   4. Send [Commit To EEPROM](commit-to-eeprom.md) to save configuration
   5. Send [Activate PGN Enable Lists](activate-pgn-enable-lists.md) if needed
   6. Device now filters Rx messages based on enabled PGNs
@@ -214,7 +224,10 @@ Response showing PGN 129025 enabled with mask 0xFFFFFFFF (accept from all source
   Bits 7-0:   Source Address (8 bits)
   ```
 
-  Masks can filter on any combination of these fields.
+  The four accepted masks progressively drop the low-order fields — PDU Specific,
+  then the bottom 4 bits of PDU Format, then PDU Format entirely — to widen the
+  match from one PGN to 256, 4096 and 65536. Arbitrary combinations are not
+  accepted.
 
 - **Common PGNs for Rx Enable**:
   - 59392 (0xE800): ISO Acknowledgement
