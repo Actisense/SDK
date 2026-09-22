@@ -70,8 +70,9 @@ The last two are the standard unsigned 32-bit BEM parameter values - see
 field altogether (the short, 5-byte Set form) also leaves the stored mask unchanged.
 
 The device seeds each entry's mask from its own NMEA 2000 PGN definition at startup, so a
-Get returns that definition's declared width unless a Set has replaced it. The same four
-values appear in compact 8-bit enumerated form (0-3, in the order above) in
+Get returns that definition's declared width unless a Set has replaced it, and `0xFFFFFFFE`
+puts that declared width back - per definition, so a block entry returns to the block. The
+same four values appear in compact 8-bit enumerated form (0-3, in the order above) in
 [Rx PGN Enable List F2](rx-pgn-enable-list-f2.md).
 
 Because a single Rx enable can cover a block of PGNs, enabling a definition that represents
@@ -84,10 +85,13 @@ Enable is only ever for a single PGN - see [Tx PGN Enable](tx-pgn-enable.md).
 > and the list command, but the width a frame is actually matched at comes from the PGN
 > definition's own range and does not follow it. Read the value; do not rely on writing it.
 
-> **`0xFFFFFFFE` (Use Defaults) does not currently restore the library default.** Firmware
-> resolves it to a Match PGN mask whatever the definition declares, so a block definition
-> asked for its default has its reported width narrowed to a single PGN. Omit the field
-> instead if you want the seeded default left alone.
+> **Older firmware did not restore the library default.** `0xFFFFFFFE` was resolved to a
+> Match PGN mask whatever the definition declared, so a block definition asked for its
+> default had its reported width narrowed to a single PGN - the response echoed
+> `0x03FFFF00` where it should echo `0x03FF0000`, and the entry then reported 0x00 instead
+> of 0x01 in the F2 list. A device that answers a default request that way is such a
+> device; on one, name the mask explicitly or omit the field to leave the seeded value
+> alone.
 
 ### Response Data Block
 
