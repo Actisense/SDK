@@ -60,6 +60,8 @@ Tx Timeout and Tx Priority travel together: to send a priority, send a Tx Timeou
 
 The **band** is 1/10th of the PGN's default rate (but never below 50 ms) up to 10 times its default rate (but never above 60000 ms), unless the NMEA 2000 Standard defines a range for the PGN. Today Heartbeat (126993) is the only such PGN: 1000 ms to 60000 ms.
 
+A PGN whose default rate is not a period — non periodic (`0xFFFF`) or 0 — has the band **50 ms to 60000 ms**. That covers the manufacturer proprietary ranges (including each PGN's own rate within a range), the J1939 Catch All range, non-periodic PGNs such as ISO Request (59904), and Lighting Device Enumeration (130564), whose default is 0. So a rate of 1000 ms on proprietary PGN 65290 is stored, and 49 ms is refused with `ES9_N2000_PGN_TXRATE_BELOW_MIN`.
+
 **Tx Priority**:
 
 | Value | Result |
