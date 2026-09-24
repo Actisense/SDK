@@ -40,11 +40,27 @@ namespace Actisense
 		/// Tx PGN Enable extended SET request data size (9 bytes: PGN + enable + rate)
 		static constexpr std::size_t kTxPgnEnableExtendedSetRequestSize = 9;
 
-		/// Special Tx rate value: Use device default rate
-		static constexpr uint32_t kTxRateDefault = 0xFFFFFFFF;
+		/// Tx rate value: restore the PGN's library-defined default rate
+		/// (the BST-BEM unsigned 32-bit 'use defaults' value)
+		static constexpr uint32_t kTxRateDefault = 0xFFFFFFFE;
 
-		/// Special Tx rate value: Event-driven only (no periodic transmission)
-		static constexpr uint32_t kTxRateEventDriven = 0;
+		/// Tx rate value: leave the current rate unchanged
+		/// (the BST-BEM unsigned 32-bit 'do not change' value)
+		static constexpr uint32_t kTxRateDoNotChange = 0xFFFFFFFF;
+
+		/// Tx rate value: non-periodic. Legal on every PGN except one whose
+		/// NMEA-defined maximum is below it (Heartbeat 126993). A device also
+		/// reports it for a PGN whose default is non-periodic.
+		static constexpr uint32_t kTxRateNonPeriodic = 0xFFFF;
+
+		/// Tx rate value: 0, 'disabled'. Stored as the rate; the Enable flag
+		/// remains the on/off switch. Refused on a mandatory Tx PGN.
+		static constexpr uint32_t kTxRateDisabled = 0;
+
+		/// Former name of kTxRateDisabled. A rate of 0 does not make a PGN
+		/// event-driven.
+		[[deprecated("use kTxRateDisabled")]]
+		static constexpr uint32_t kTxRateEventDriven = kTxRateDisabled;
 
 		/* Data Structures ------------------------------------------------------ */
 
@@ -145,7 +161,8 @@ namespace Actisense
 		 \brief      Encode Tx PGN Enable extended SET request data (with rate)
 		 \param[in]  pgn        PGN ID to configure
 		 \param[in]  enable     Enable flag
-		 \param[in]  txRate     Transmission rate in milliseconds
+		 \param[in]  txRate     Transmission rate in milliseconds, or kTxRateDisabled,
+		                        kTxRateNonPeriodic, kTxRateDefault or kTxRateDoNotChange
 		 \param[out] outData    Encoded request data
 		 *******************************************************************************/
 		inline void encodeTxPgnEnableSetRequestWithRate(uint32_t pgn, TxPgnEnableFlag enable,
@@ -197,8 +214,14 @@ namespace Actisense
 			if (txRate == kTxRateDefault) {
 				return "Default";
 			}
-			if (txRate == kTxRateEventDriven) {
-				return "Event-driven";
+			if (txRate == kTxRateDoNotChange) {
+				return "Unchanged";
+			}
+			if (txRate == kTxRateNonPeriodic) {
+				return "Non-periodic";
+			}
+			if (txRate == kTxRateDisabled) {
+				return "Disabled";
 			}
 			return std::to_string(txRate) + " ms";
 		}

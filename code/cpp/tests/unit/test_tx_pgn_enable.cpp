@@ -98,10 +98,35 @@ TEST_F(TxPgnEnableTest, EncodeSetRequest_WithDefaultRate)
 	EXPECT_TRUE(m_error.empty());
 }
 
-TEST_F(TxPgnEnableTest, EncodeSetRequest_EventDriven)
+TEST_F(TxPgnEnableTest, EncodeSetRequest_Disabled)
 {
-	EXPECT_TRUE(m_protocol.buildSetTxPgnEnableWithRate(127488, 0x01, kTxRateEventDriven, m_frame, m_error));
+	EXPECT_TRUE(m_protocol.buildSetTxPgnEnableWithRate(127488, 0x01, kTxRateDisabled, m_frame, m_error));
 	EXPECT_TRUE(m_error.empty());
+}
+
+TEST_F(TxPgnEnableTest, EncodeSetRequest_NonPeriodic)
+{
+	EXPECT_TRUE(m_protocol.buildSetTxPgnEnableWithRate(127488, 0x01, kTxRateNonPeriodic, m_frame, m_error));
+	EXPECT_TRUE(m_error.empty());
+}
+
+TEST_F(TxPgnEnableTest, EncodeSetRequest_DoNotChangeRate)
+{
+	EXPECT_TRUE(m_protocol.buildSetTxPgnEnableWithRate(127488, 0x01, kTxRateDoNotChange, m_frame, m_error));
+	EXPECT_TRUE(m_error.empty());
+}
+
+/* The rate values go on the wire as the 32-bit little-endian values the
+   firmware decodes (NGXSW-4783): 0xFFFFFFFE is BST-BEM 'use defaults' */
+TEST_F(TxPgnEnableTest, EncodeRequestData_DefaultRateIsUseDefaults)
+{
+	std::vector<uint8_t> data;
+	encodeTxPgnEnableSetRequestWithRate(127488, TxPgnEnableFlag::Enabled, kTxRateDefault, data);
+	ASSERT_EQ(data.size(), kTxPgnEnableExtendedSetRequestSize);
+	EXPECT_EQ(data[5], 0xFE);
+	EXPECT_EQ(data[6], 0xFF);
+	EXPECT_EQ(data[7], 0xFF);
+	EXPECT_EQ(data[8], 0xFF);
 }
 
 /* Decode Response Tests ---------------------------------------------------- */
@@ -270,7 +295,9 @@ TEST_F(TxPgnEnableTest, FlagToString_AllValues)
 TEST_F(TxPgnEnableTest, FormatTxRate_SpecialValues)
 {
 	EXPECT_EQ(formatTxRate(kTxRateDefault), "Default");
-	EXPECT_EQ(formatTxRate(kTxRateEventDriven), "Event-driven");
+	EXPECT_EQ(formatTxRate(kTxRateDoNotChange), "Unchanged");
+	EXPECT_EQ(formatTxRate(kTxRateNonPeriodic), "Non-periodic");
+	EXPECT_EQ(formatTxRate(kTxRateDisabled), "Disabled");
 	EXPECT_EQ(formatTxRate(100), "100 ms");
 	EXPECT_EQ(formatTxRate(1000), "1000 ms");
 }
@@ -283,8 +310,30 @@ TEST_F(TxPgnEnableTest, Constants)
 	EXPECT_EQ(kTxPgnEnableGetRequestSize, 4u);
 	EXPECT_EQ(kTxPgnEnableBasicSetRequestSize, 5u);
 	EXPECT_EQ(kTxPgnEnableExtendedSetRequestSize, 9u);
-	EXPECT_EQ(kTxRateDefault, 0xFFFFFFFFu);
-	EXPECT_EQ(kTxRateEventDriven, 0u);
+	/* the BST-BEM unsigned 32-bit parameter values, and the NMEA 2000
+	   library's two special rates (NGXSW-4783) */
+	EXPECT_EQ(kTxRateDefault, 0xFFFFFFFEu);
+	EXPECT_EQ(kTxRateDoNotChange, 0xFFFFFFFFu);
+	EXPECT_EQ(kTxRateNonPeriodic, 0xFFFFu);
+	EXPECT_EQ(kTxRateDisabled, 0u);
+}
+
+/* The deprecated former name still compiles and still means 0 */
+TEST_F(TxPgnEnableTest, DeprecatedEventDrivenAliasIsDisabled)
+{
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#else
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+	EXPECT_EQ(kTxRateEventDriven, kTxRateDisabled);
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#else
+#pragma GCC diagnostic pop
+#endif
 }
 
 } /* namespace Test */

@@ -135,6 +135,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   install tree. *(Install-tree layout change — consumers that hard-coded
   `include/actisense/` must adjust; no released consumer existed.)*
 
+- **Tx PGN Enable rate constants now carry the BST-BEM values (NGXSW-4783).**
+  `kTxRateDefault` was `0xFFFFFFFF` and documented as "use device default", but
+  `0xFFFFFFFF` is the BST-BEM *do not change* value, so a caller asking for the
+  default got no change at all. It is now `0xFFFFFFFE` (use defaults), which
+  current firmware honours by restoring the PGN's library-defined rate. New
+  constants `kTxRateDoNotChange` (`0xFFFFFFFF`), `kTxRateNonPeriodic`
+  (`0xFFFF`) and `kTxRateDisabled` (`0`); `kTxRateEventDriven` is kept as a
+  `[[deprecated]]` alias of `kTxRateDisabled`, because a rate of 0 does not
+  make a PGN event-driven. `formatTxRate()` names all four. *(Source
+  compatible, but a behaviour change for any caller passing `kTxRateDefault`:
+  it now restores the default instead of leaving the rate alone.)* Firmware
+  with the same ticket also starts refusing values it used to acknowledge
+  without applying - an out-of-band rate, a priority above 7 - so a host may
+  see error responses where it saw success before.
+
 ### Removed
 
 - **`actisense_console` example removed.** The console demo was built
@@ -168,6 +183,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Port discovery and configuration](../../docs/Guides/port-discovery-and-configuration.md):
   discover a device's ports by name, label its live traffic statistics, and set
   session or stored baud rates without hard-coding a port number.
+
+- **Tx PGN Enable page rewritten to describe the firmware as built
+  (NGXSW-4783).** `docs/DataFormats/Binary/bem-detail/tx-pgn-enable.md` now
+  documents every Tx Rate and Tx Priority value and its result, the error code
+  for each refusal, that a command is validated in full before any of it is
+  applied, and the Heartbeat exception. It no longer describes rate 0 as
+  "event-driven", no longer tells hosts to follow a change with Commit To
+  EEPROM (the device saves it), and drops an error-code list that named codes
+  this command never returns.
 
 ### Guardrails
 

@@ -1,8 +1,8 @@
 # Get / Set Tx PGN Enable
 
-Enables or disables transmission of specific Parameter Group Numbers (PGNs) on NMEA 2000 or J1939 interfaces. This command allows selective control of transmitted messages by PGN with configurable transmission rate and priority.
+Enables or disables transmission of specific Parameter Group Numbers (PGNs) on NMEA 2000 or J1939 interfaces, and sets each PGN's transmit rate and transmit priority.
 
-This command supports both Get (read current enable state) and Set (enable/disable transmission) operations for individual PGNs. For managing multiple PGNs efficiently, see [Tx PGN Enable List](tx-pgn-enable-list-f2.md).
+This command supports both Get (read the current settings) and Set (change them) for one PGN at a time. For managing multiple PGNs efficiently, see [Tx PGN Enable List](tx-pgn-enable-list-f2.md).
 
 > **A Tx PGN Enable is always for exactly one PGN.** Unlike [Rx PGN Enable](rx-pgn-enable.md), there is no mask and no way to enable a block of PGNs in one command. Every transmitted PGN needs its own transmit control object to hold its fast-packet sequence ID, transmit rate and transmit priority, so each must be enabled individually — including proprietary PGNs.
 >
@@ -17,9 +17,7 @@ This command supports both Get (read current enable state) and Set (enable/disab
 
 ## BEM Data Block details
 
-### Get Request (Query current PGN enable state)
-
-To query the current enable state for a specific PGN:
+### Get Request (Query current settings)
 
 | Offset  | Description              | Size           |
 | ------- | ------------------------ | ---------------|
@@ -27,78 +25,87 @@ To query the current enable state for a specific PGN:
 
 **PGN ID**: 24-bit NMEA 2000 / J1939 PGN identifier (0-131071), stored in a 32-bit field with upper 8 bits zero.
 
-### Set Request (Enable or disable PGN)
+### Set Request
 
-#### Basic Set (Enable/Disable only)
-
-To set only the enable/disable state (rate and priority use device defaults):
-
-| Offset  | Description              | Size           |
-| ------- | ------------------------ | ---------------|
-| 0-3     | PGN ID                   | 4 bytes (uint32_t, LE) |
-| 4       | Enable flag              | 1 byte (uint8_t) |
-
-#### Extended Set (with custom rate)
-
-To set enable state and custom transmission rate:
+A Set carries the PGN followed by as many of the remaining fields as the host wants to send, in this order. A field that is left off is left unchanged — it does **not** restore the default.
 
 | Offset  | Description              | Size           |
 | ------- | ------------------------ | ---------------|
 | 0-3     | PGN ID                   | 4 bytes (uint32_t, LE) |
 | 4       | Enable flag              | 1 byte (uint8_t) |
 | 5-8     | Tx Rate                  | 4 bytes (uint32_t, LE) |
+| 9-12    | Tx Timeout (ignored)     | 4 bytes (uint32_t, LE) |
+| 13      | Tx Priority              | 1 byte (uint8_t) |
 
-**Enable Flag**: Controls PGN transmission
-- 0x00: Disable transmission (PGN will not be transmitted)
-- 0x01: Enable transmission (PGN will be transmitted at configured rate)
-- 0x02: Respond mode (transmit only when requested)
+Tx Timeout and Tx Priority travel together: to send a priority, send a Tx Timeout (any value, it is ignored) in front of it.
 
-**Tx Rate**: Transmission rate in milliseconds. Valid range depends on the PGN (typically 0-60000 ms).
+**Enable Flag**:
 
 | Value | Meaning |
 | -- | -- |
-| `0` | Disable periodic transmission (event-driven only) |
-| `1` - `65534` | Transmission interval in milliseconds |
-| `0xFFFF` and above | Ignored by current firmware - the rate is left unchanged |
+| `0x00` | Disable transmission |
+| any other value | Enable transmission. `0x02` (Respond mode) is not distinguished from `0x01`, and reads back as `0x01` |
 
-Note the difference from the [Port Baudrate](port-baudrate.md) command, which
-implements the standard unsigned 32-bit BEM parameter values in full. Here,
-`0xFFFFFFFF` (do not change) produces the correct result because any value at or
-above `0xFFFF` is ignored — but `0xFFFFFFFE` (use defaults) is ignored in exactly
-the same way, so it does **not** restore the PGN's library-defined rate. See
-[Message parameter conventions](../bst-bem.md#message-parameter-conventions) for
-the conventions themselves.
+**Tx Rate** (milliseconds):
 
-Omitting the Tx Rate field leaves the current rate unchanged; it does not restore
-the default. There is currently no way to restore a PGN's default transmit rate
-through this command — the NMEA Request Group Function (PGN 126208) does support
-it, so the two interfaces disagree about the same setting.
+| Value | Result |
+| -- | -- |
+| `0` | Stored and reported as 0 ("disabled"). The Enable flag remains the on/off switch. Refused with `ES9_N2000_PGN_DENIED` on a mandatory transmit PGN (see below) |
+| a rate within the PGN's band | Stored |
+| a rate below / above the band | Refused with `ES9_N2000_PGN_TXRATE_BELOW_MIN` / `ES9_N2000_PGN_TXRATE_ABOVE_MAX` |
+| `0xFFFF` | Stored and reported as 65535 ("non periodic"). Refused with `ES9_N2000_PGN_TXRATE_ABOVE_MAX` on Heartbeat (126993), whose NMEA-defined maximum is 60000 ms |
+| `0x10000` - `0xFFFFFFFD` | Refused with `ES9_N2000_PGN_TXRATE_ABOVE_MAX` |
+| `0xFFFFFFFE` | *Use defaults*: restores the PGN's library-defined default rate, whatever it is — including a non-periodic default (`0xFFFF`) and a default of 0 |
+| `0xFFFFFFFF` | *Do not change*: the rate is left as it is |
+
+The **band** is 1/10th of the PGN's default rate (but never below 50 ms) up to 10 times its default rate (but never above 60000 ms), unless the NMEA 2000 Standard defines a range for the PGN. Today Heartbeat (126993) is the only such PGN: 1000 ms to 60000 ms.
+
+**Tx Priority**:
+
+| Value | Result |
+| -- | -- |
+| `0` - `7` | Stored. 0 is the highest priority, 7 the lowest |
+| `8` - `0xFD` | Refused with `ES10_BST_INVALID_PARAMETER_VAL` |
+| `0xFE` | *Use defaults*: restores the PGN's library-defined default priority |
+| `0xFF` | *Do not change*: the priority is left as it is |
+
+These are the standard BST-BEM unsigned parameter values described in [Message parameter conventions](../bst-bem.md#message-parameter-conventions). The NMEA Command Group Function (PGN 126208) uses `0x08` / `0x09` for its own "do not change" / "restore default" priority values; they are **not** recognised here, where they are simply out of range.
+
+**Mandatory transmit PGNs** — the ISO protocol PGNs (59392, 59904, 60160, 60416, 60928), 126208, 126464, 126720, Heartbeat (126993), Product Information (126996) and Configuration Information (126998) — cannot be given a rate of 0. Heartbeat is the reason: it is the one PGN the device schedules from its stored rate, so a rate of 0 would stop it.
+
+### How a Set is applied
+
+- **All or nothing.** The device reads every field in the command and checks all of them before it applies any. If one is refused, nothing changes — not the enable, not the rate, not the priority — and the response carries the error code together with the settings as they still are.
+- **Every data virtual device.** A Set configures the PGN on every virtual device that transmits data, and clears any per-device rate or priority an NMEA Request / Command Group Function (126208) set earlier, so the new value applies everywhere.
+- **One PGN of a proprietary range.** On a PGN inside one of the manufacturer proprietary ranges, the rate and priority belong to that PGN alone; *use defaults* returns that one PGN to the range's own value and leaves the other 255 as they are. If the device cannot allocate storage for that PGN's own value, the response carries `ES1_NO_MEMORY` and the PGN keeps the range's value; in that case the enable in the same command has already been applied.
+- **Persistent and immediate.** A successful Set is saved by the device and takes effect straight away. No [Commit To EEPROM](commit-to-eeprom.md) or [Activate PGN Enable Lists](activate-pgn-enable-lists.md) is needed; both are still accepted.
+- **What the rate does.** The device stores, saves and reports the rate for every PGN, but only Heartbeat's transmission is scheduled from it. Other PGNs are transmitted as their data arrives.
+
+The NMEA Request Group Function (126208) applies the same rules to a transmission interval — the same band, `0xFFFF` accepted except on Heartbeat, anything wider than 16 bits refused — with its own encodings of the refusals and of "restore default". Its interval 0 differs: there it switches the PGN's transmission off for that virtual device, and is refused on a proprietary or J1939 Catch All range and on a mandatory transmit PGN.
 
 ### Response Data Block
 
-The response contains the complete PGN transmission configuration:
+The response is the same for Get and Set:
 
 | Offset  | Description              | Size           |
 | ------- | ------------------------ | ---------------|
 | 0-3     | PGN ID                   | 4 bytes (uint32_t, LE) |
 | 4       | Enable flag              | 1 byte (uint8_t) |
 | 5-8     | Tx Rate                  | 4 bytes (uint32_t, LE) |
-| 9-12    | Tx Timeout (deprecated)  | 4 bytes (uint32_t, LE) |
+| 9-12    | Tx Timeout (unused)      | 4 bytes (uint32_t, LE) |
 | 13      | Tx Priority              | 1 byte (uint8_t) |
 
-**Tx Rate**: Configured transmission rate in milliseconds.
+**PGN ID**: the PGN as it was requested — for a PGN inside a range this is that PGN, not the range's base PGN.
 
-**Tx Timeout**: Deprecated field, typically 0. Not used in current firmware.
+**Tx Rate**: the rate currently in effect, in milliseconds, including `0` and `65535` (non periodic). A non-periodic PGN whose rate was never changed reports 65535.
 
-**Tx Priority**: CAN priority level (0-7):
-- 0: Highest priority (emergency/control messages)
-- 3: Default priority (most standard messages)
-- 6: Lower priority (slow-changing data)
-- 7: Lowest priority (non-critical information)
+**Tx Timeout**: always 0.
+
+**Tx Priority**: the priority currently in effect, 0-7.
 
 ### Example - Get Tx PGN Enable
 
-Query the enable state for PGN 126992 (System Time):
+Query the settings for PGN 126992 (System Time):
 
 | Offset | Field | Value | Description |
 | -------- | ------- | ------- | ------------- |
@@ -107,9 +114,9 @@ Query the enable state for PGN 126992 (System Time):
 | 2 | BEM Id | 47H | Tx PGN Enable identifier |
 | 3-6 | PGN ID | 10 F0 01 00 | PGN 126992 (0x01F010) (LE) |
 
-### Example - Set Tx PGN Enable (Basic)
+### Example - Set Tx PGN Enable (Enable only)
 
-Enable transmission of PGN 129025 (Position, Rapid Update) using device defaults:
+Enable transmission of PGN 129025 (Position, Rapid Update), leaving its rate and priority as they are:
 
 | Offset | Field | Value | Description |
 |--------|-------|-------|-------------|
@@ -119,9 +126,9 @@ Enable transmission of PGN 129025 (Position, Rapid Update) using device defaults
 | 3-6 | PGN ID | 01 F8 01 00 | PGN 129025 (0x01F801) (LE) |
 | 7 | Enable Flag | 01H | Enable transmission |
 
-### Example - Set Tx PGN Enable (Extended with Rate)
+### Example - Set Tx PGN Enable (with Rate)
 
-Enable PGN 127488 (Engine Parameters) with 100ms transmission rate:
+Enable PGN 127488 (Engine Parameters, Rapid Update) with a 100 ms rate:
 
 | Offset | Field | Value | Description |
 |--------|-------|-------|-------------|
@@ -131,6 +138,21 @@ Enable PGN 127488 (Engine Parameters) with 100ms transmission rate:
 | 3-6 | PGN ID | 00 F2 01 00 | PGN 127488 (0x01F200) (LE) |
 | 7 | Enable Flag | 01H | Enable transmission |
 | 8-11 | Tx Rate | 64 00 00 00 | 100 ms (LE) |
+
+### Example - Restore the default rate and priority
+
+Put PGN 127488 back on its library-defined rate and priority, leaving it enabled:
+
+| Offset | Field | Value | Description |
+|--------|-------|-------|-------------|
+| 0 | BST ID | A1H | Tx PGN Enable BEM command |
+| 1 | BST Length | 0FH | BEM ID (1) + PGN ID (4) + Enable (1) + Rate (4) + Timeout (4) + Priority (1) = 15 bytes |
+| 2 | BEM Id | 47H | Tx PGN Enable identifier |
+| 3-6 | PGN ID | 00 F2 01 00 | PGN 127488 (0x01F200) (LE) |
+| 7 | Enable Flag | 01H | Enable transmission |
+| 8-11 | Tx Rate | FE FF FF FF | Use defaults (LE) |
+| 12-15 | Tx Timeout | 00 00 00 00 | Ignored |
+| 16 | Tx Priority | FEH | Use defaults |
 
 ### Example - Disable Tx PGN
 
@@ -162,104 +184,40 @@ Response showing PGN 127488 enabled with 100ms rate, priority 3:
 | 19-22 | PGN ID | 00 F2 01 00 | PGN 127488 (LE) |
 | 23 | Enable Flag | 01H | Enabled |
 | 24-27 | Tx Rate | 64 00 00 00 | 100 ms (LE) |
-| 28-31 | Tx Timeout (deprecated) | 00 00 00 00 | Not used |
-| 32 | Tx Priority | 03H | Priority 3 (default) |
+| 28-31 | Tx Timeout (unused) | 00 00 00 00 | Always 0 |
+| 32 | Tx Priority | 03H | Priority 3 |
 
 ## Notes
 
-- **PGN Support**: Before enabling a PGN for transmission, verify it's supported by the device using [Supported PGN List](supported-pgn-list.md). Attempting to enable an unsupported PGN will result in an error response.
+- **Error codes** this command returns in the response header:
 
-- **Transmission Rates**: The Tx Rate determines how often the device transmits this PGN:
-  - **Fast rates** (10-100ms): For rapidly changing data (engine RPM, position updates)
-  - **Medium rates** (250-1000ms): For moderately changing data (speed, heading)
-  - **Slow rates** (1000-10000ms): For slowly changing data (configuration, static info)
-  - **0 (event-driven)**: Transmit only when data changes or on request
-  - Device may have minimum/maximum rate limits per PGN
+  | Code | When |
+  | -- | -- |
+  | `ES9_N2000_PGN_TXRATE_BELOW_MIN` | Tx Rate below the PGN's band |
+  | `ES9_N2000_PGN_TXRATE_ABOVE_MAX` | Tx Rate above the band, wider than 16 bits, or `0xFFFF` on Heartbeat |
+  | `ES9_N2000_PGN_DENIED` | Tx Rate 0 on a mandatory transmit PGN |
+  | `ES10_BST_INVALID_PARAMETER_VAL` | Tx Priority from 8 to `0xFD` |
+  | `ES9_N2000_PGN_ENABLE_LIST_FULL` | Enabling one more PGN of the J1939 Catch All Data range when its list is full; the rate and priority in the same command are not applied |
+  | `ES1_NO_MEMORY` | No storage for a proprietary PGN's own rate or priority |
+  | `ES11_DecodeBadCommsData` | The command is too short to carry a PGN ID |
 
-- **Priority Levels**: CAN priority affects bus arbitration:
-  - **0-2**: Emergency, control, and safety-critical messages (highest priority)
-  - **3**: Standard operational messages (most common)
-  - **4-5**: Informational messages
-  - **6-7**: Non-critical, background data (lowest priority)
+  Earlier firmware answered `ES_NoError` to rate and priority values it did not apply; a host written against it may now see these errors for the same requests.
 
-  Lower priority numbers win arbitration on busy buses. Choose appropriately based on message criticality.
+- **PGN Support**: Before enabling a PGN for transmission, check that the device supports it using [Supported PGN List](supported-pgn-list.md). This command does not report an unsupported PGN as an error.
 
-- **Enable List vs Individual**:
-  - Individual enable (this command): Best for enabling/disabling single PGNs dynamically
-  - Enable List (0x4F): Best for configuring multiple PGNs at once or retrieving complete transmission state
-  - Both methods manage the same underlying configuration
+- **SDK constants**: `kTxRateDisabled` (0), `kTxRateNonPeriodic` (`0xFFFF`), `kTxRateDefault` (`0xFFFFFFFE`, use defaults) and `kTxRateDoNotChange` (`0xFFFFFFFF`) in `protocols/bem/bem_commands/tx_pgn_enable.hpp`.
 
-- **Default Values**: a PGN's rate and priority start at the library-defined defaults, which are typically specified by NMEA 2000 / J1939 for each PGN. Omitting Tx Rate or Tx Priority from a Set request leaves the current value alone — it does not restore the default. Current firmware ignores any Tx Rate at or above `0xFFFF` and any Tx Priority above `7`, so neither field has a working "restore the default" value; query the current values with the Get form.
+- **Priority Levels**: CAN priority affects bus arbitration — lower numbers win on a busy bus. Choose according to how critical the message is.
 
-- **Persistence**: Changes made with this command are **not automatically persistent**. To save the Tx PGN Enable configuration:
-  1. Enable/disable desired PGNs with this command
-  2. Set transmission rates as needed
-  3. Send [Commit To EEPROM](commit-to-eeprom.md) to save
-  4. Configuration will persist across device resets
+- **Bus Loading**: Be cautious when enabling many PGNs with fast transmission rates. NMEA 2000 runs at 250 kbit/s; keep total bus loading well under capacity and disable PGNs that are not needed.
 
-  Without commit, changes are lost on power cycle.
+- **Multi-Frame PGNs**: PGNs sent as NMEA 2000 Fast Packet (up to 223 bytes, e.g. PGN 126996 Product Information) or J1939 Transport Protocol (up to 1785 bytes) consume more bus bandwidth per transmission.
 
-- **Activation**: After changing PGN enable settings, you may need to send [Activate PGN Enable Lists](activate-pgn-enable-lists.md) to apply the new configuration immediately. Some devices apply changes automatically, others require explicit activation.
-
-- **Bus Loading**: Be cautious when enabling multiple PGNs with fast transmission rates:
-  - NMEA 2000 bus capacity is limited (250 kbps)
-  - Too many fast-transmitting PGNs can saturate the bus
-  - Calculate bus loading: (Message bytes × 1000 / Rate) per PGN
-  - Keep total bus loading under 30-40% for reliable operation
-  - Adjust rates or disable unnecessary PGNs if bus becomes congested
-
-- **Respond Mode**: When Enable = 0x02 (Respond mode):
-  - PGN is not transmitted periodically
-  - PGN is transmitted when requested via ISO Request (PGN 59904)
-  - Useful for infrequently-needed data
-  - Reduces bus loading compared to periodic transmission
-
-- **Typical Workflow**:
-  1. Query [Supported PGN List](supported-pgn-list.md) to see what PGNs the device can transmit
-  2. Enable specific PGNs needed for your application using this command
-  3. Configure appropriate transmission rates based on data update frequency
-  4. Send [Commit To EEPROM](commit-to-eeprom.md) to save configuration
-  5. Send [Activate PGN Enable Lists](activate-pgn-enable-lists.md) if needed
-  6. Device now transmits enabled PGNs at configured rates
-
-- **Error Handling**: Common error responses:
-  - ES11_COMMAND_DATA_OUT_OF_RANGE (-1159): Invalid PGN ID, unsupported PGN, or rate out of range
-  - ES11_DecodeBadCommsData (-1140): Malformed command (wrong data size)
-  - ES11_COMMAND_TIMEOUT (-1158): Device busy or unable to configure PGN
-
-- **Rate Validation**: Devices may reject rate values that are:
-  - Too fast for the PGN (exceeds update rate capability)
-  - Too slow for the PGN (below minimum required by standard)
-  - Would cause bus overload (combined with other enabled PGNs)
-  - Check device response for adjusted rate if device modifies your request
-
-- **Multi-Frame PGNs**: Some PGNs use NMEA 2000 Fast Packet or J1939 Transport Protocol for multi-frame transmission:
-  - Fast Packet: Up to 223 bytes (e.g., PGN 126996 Product Information)
-  - Transport Protocol: Up to 1785 bytes
-  - These consume more bus bandwidth per transmission
-  - Consider slower rates for large multi-frame PGNs
-
-- **Common PGNs for Tx Enable**:
-  - 126992 (0x1F010): System Time (1000ms typical)
-  - 126996 (0x1F014): Product Information (respond mode)
-  - 127488 (0x1F200): Engine Parameters, Rapid Update (100ms typical)
-  - 127505 (0x1F211): Fluid Level (2500ms typical)
-  - 129025 (0x1F801): Position, Rapid Update (100-1000ms typical)
-  - 129026 (0x1F802): COG & SOG, Rapid Update (250-1000ms typical)
-  - 129029 (0x1F805): GNSS Position Data (1000ms typical)
-  - 130306 (0x1FD02): Wind Data (100-1000ms typical)
-
-- **Network Certification**: For NMEA 2000 certified products:
-  - Transmission rates must comply with NMEA 2000 specification
-  - Priority levels must match NMEA 2000 requirements
-  - Excessive transmission rates may fail certification
-  - Consult NMEA 2000 Appendix A for PGN-specific requirements
+- **Enable List vs Individual**: this command suits changing single PGNs; [Tx PGN Enable List](tx-pgn-enable-list-f2.md) reads the complete transmit state. Both manage the same configuration.
 
 - **See Also**:
   - [Tx PGN Enable List](tx-pgn-enable-list-f2.md) - Retrieve complete list of enabled Tx PGNs
   - [Rx PGN Enable](rx-pgn-enable.md) - Configure reception of PGNs
   - [Supported PGN List](supported-pgn-list.md) - Query which PGNs device supports
-  - [Activate PGN Enable Lists](activate-pgn-enable-lists.md) - Apply PGN configuration changes
   - [Delete PGN Enable Lists](delete-pgn-enable-lists.md) - Clear all Rx/Tx enable lists
-  - [Commit To EEPROM](commit-to-eeprom.md) - Save configuration persistently
   - NMEA 2000 Appendix A - PGN transmission requirements
