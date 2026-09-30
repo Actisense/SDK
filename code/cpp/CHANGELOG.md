@@ -84,7 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   via a `RemoteDevice` regardless of the stream, since that is a property of
   the target rather than the local link. See
   `docs/nmea0183-encapsulation.md`.
-- **`OperatingMode::Iec450Mode1` (IEC450-201).** New operating mode value 25,
+- **`OperatingMode::Iec450Mode1`.** New operating mode value 25,
   mirroring the firmware `OM_IEC450_MODE_1` — the IEC 61162-450/460 network
   mode introduced alongside (and mutually exclusive with) `NsiMode1`.
   `OperatingModeName()` reports it as "IEC 450 Mode 1".
@@ -140,7 +140,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   install tree. *(Install-tree layout change — consumers that hard-coded
   `include/actisense/` must adjust; no released consumer existed.)*
 
-- **Tx PGN Enable rate constants now carry the BST-BEM values (NGXSW-4783).**
+- **Tx PGN Enable rate constants now carry the BST-BEM values.**
   `kTxRateDefault` was `0xFFFFFFFF` and documented as "use device default", but
   `0xFFFFFFFF` is the BST-BEM *do not change* value, so a caller asking for the
   default got no change at all. It is now `0xFFFFFFFE` (use defaults), which
@@ -189,8 +189,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   discover a device's ports by name, label its live traffic statistics, and set
   session or stored baud rates without hard-coding a port number.
 
-- **Tx PGN Enable page rewritten to describe the firmware as built
-  (NGXSW-4783).** `docs/DataFormats/Binary/bem-detail/tx-pgn-enable.md` now
+- **Tx PGN Enable page rewritten to describe the firmware as built.**
+  `docs/DataFormats/Binary/bem-detail/tx-pgn-enable.md` now
   documents every Tx Rate and Tx Priority value and its result, the error code
   for each refusal, that a command is validated in full before any of it is
   applied, and the Heartbeat exception. It no longer describes rate 0 as

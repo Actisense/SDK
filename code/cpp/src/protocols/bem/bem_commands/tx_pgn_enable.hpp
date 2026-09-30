@@ -59,8 +59,8 @@ namespace Actisense
 
 		/// Former name of kTxRateDisabled. A rate of 0 does not make a PGN
 		/// event-driven.
-		[[deprecated("use kTxRateDisabled")]]
-		static constexpr uint32_t kTxRateEventDriven = kTxRateDisabled;
+		[[deprecated("use kTxRateDisabled")]] static constexpr uint32_t kTxRateEventDriven =
+			kTxRateDisabled;
 
 		/* Data Structures ------------------------------------------------------ */
 
@@ -162,7 +162,7 @@ namespace Actisense
 		 \param[in]  pgn        PGN ID to configure
 		 \param[in]  enable     Enable flag
 		 \param[in]  txRate     Transmission rate in milliseconds, or kTxRateDisabled,
-		                        kTxRateNonPeriodic, kTxRateDefault or kTxRateDoNotChange
+								kTxRateNonPeriodic, kTxRateDefault or kTxRateDoNotChange
 		 \param[out] outData    Encoded request data
 		 *******************************************************************************/
 		inline void encodeTxPgnEnableSetRequestWithRate(uint32_t pgn, TxPgnEnableFlag enable,
