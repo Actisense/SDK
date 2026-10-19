@@ -2,6 +2,22 @@
 
 > :memo: **Note:** The "$MXPGN" sentence is not an approved NMEA 0183 sentence, nor does it follow the rules for manufacturer Proprietary sentences, putting it in a 'grey area'.
 
+> :warning: **Byte order change in Actisense firmware v3.121 - upgrade recommended.**
+> Actisense firmware up to and including **v3.120** wrote and read the `$MXPGN` data field in CAN
+> bus order (first data byte first). That does not match the ShipModul definition, which writes
+> the data as one hexadecimal number, MSB to LSB, so the **last** data byte comes first. From
+> **v3.121** Actisense devices send and accept the data field in ShipModul order, as described
+> below, with no option to keep the old order.
+>
+> * If you consume `$MXPGN` from an Actisense device, **upgrade the device to v3.121 or later as
+>   soon as possible**. It is then compatible with ShipModul MiniPlex gateways and with any
+>   software that follows the ShipModul definition.
+> * If your software reverses the data field only for Actisense devices (for example the
+>   canboatjs `mxpgnBusOrder` option), remove that workaround once the device runs v3.121 or
+>   later. Firmware v3.120 and earlier needs it; v3.121 and later decodes correctly without it.
+> * Devices on v3.120 or earlier and devices on v3.121 or later disagree on the byte order, so
+>   `$MXPGN` passed directly between them arrives with its data reversed. Upgrade them together.
+
 Tx Format `NMEA 0183`, with additional setup required in NMEA 0183 settings to enable $MXPGN output. 
 
 ## Description
@@ -28,7 +44,11 @@ Only some applications support this format. As this format uses ASCII, it uses m
 
 Example: Here is an example of how an NMEA 2000 battery message looks in NMEA 0183:
 
-$MXPGN,01F214,6842,00B004FF7FFFFFFF\*1F
+$MXPGN,01F214,6842,FFFFFF7FFF04B000\*1F
+
+This is PGN 127508 (Battery Status) from source address 0x42. On the CAN bus its eight data bytes
+are `00 B0 04 FF 7F FF FF FF`: instance 0, voltage 0x04B0 = 12.00 V, and current, temperature
+and SID not available. The data field writes them last byte first, `FFFFFF7FFF04B000`.
 
 Messages sent in this format have the following form:
 
@@ -61,6 +81,18 @@ Depending on the Send bit, this field contains the Source Address (S=0) or the D
 #### c--c: Data field of the NMEA 2000 message
 
 Organized as one large number in hexadecimal notation from MSB to LSB. This is in accordance with NMEA 2000 Appendix D, chapter D.1, "Data Placement within the CAN Frame". The size of this field depends on the DLC value and can be 1 to 8 bytes (2 to 16 hexadecimal characters).
+
+In other words, the last byte of the CAN frame is written first and the first byte last. To recover
+the bytes in CAN bus order, split the field into pairs of hex digits and reverse their order. Two
+examples from the ShipModul documentation:
+
+* `$MXPGN,01F112,A800,FC7FFF7FFF168012*65`: PGN 127250 (Vessel Heading), bus bytes
+  `12 80 16 FF 7F FF 7F FC` - SID 18, heading 0.576 rad, reference True.
+* `$MXPGN,01F801,280A,03EB71821F9B7F2D*66`: PGN 129025 (Position, Rapid Update) from source
+  address 0x0A, bus bytes `2D 7F 9B 1F 82 71 EB 03` - latitude 53.0284 N, longitude 6.5762 E.
+
+Actisense firmware v3.120 and earlier wrote this field in bus order instead - see the note at the
+top of this page.
 
 #### Carriage Return / Line Feed
 
