@@ -154,6 +154,22 @@ static const std::unordered_set<uint32_t> kTxOnlySkipPgns = {
 	126998,
 };
 
+/* Excluded from the Rx-filter sweep only. Mandatory Rx PGNs: the device's
+   own stack needs them, so they are always received and the device refuses
+   an Rx-enable SET of 0 with ES9_N2000_PGN_DENIED - there is no Rx filter to
+   sweep. (126208 is already in kSkipPgns.) In receive-all mode every Rx PGN
+   is mandatory, so there each disable SET is refused and the PGN is reported
+   SKIP_SET_REJECTED rather than as a filter failure.
+     59904   ISO Request
+     60160   ISO Transport Protocol, Data Transfer
+     60416   ISO Transport Protocol, Connection Management
+     60928   ISO Address Claim
+     65240   ISO Commanded Address
+     126720  Proprietary fast-packet, addressed */
+static const std::unordered_set<uint32_t> kRxOnlySkipPgns = {
+	59904, 60160, 60416, 60928, 65240, 126720,
+};
+
 /* Verdict taxonomy, SweepRecord and the report artifacts live in
    tests/support/pgn_sweep_report.hpp, shared with the hermetic unit tests. */
 
@@ -654,6 +670,8 @@ protected:
 		std::unordered_set<uint32_t> skipPgns = kSkipPgns;
 		if (toggleTx) {
 			skipPgns.insert(kTxOnlySkipPgns.begin(), kTxOnlySkipPgns.end());
+		} else {
+			skipPgns.insert(kRxOnlySkipPgns.begin(), kRxOnlySkipPgns.end());
 		}
 		const char* full = std::getenv("ACTISENSE_TEST_FULL_SWEEP");
 		const bool fullSweep = (full != nullptr && std::string(full) == "1");

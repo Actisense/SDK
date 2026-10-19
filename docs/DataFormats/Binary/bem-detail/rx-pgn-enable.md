@@ -45,9 +45,11 @@ To set the enable state and name the PGN Mask - which must be one the device acc
 | 5-8     | PGN Mask                 | 4 bytes (uint32_t, LE) |
 
 **Enable Flag**: Controls PGN reception
-- 0x00: Disable reception (PGN will be filtered out)
+- 0x00: Disable reception (PGN will be filtered out). Refused with `ES9_N2000_PGN_DENIED` on a mandatory receive PGN (see below)
 - 0x01: Enable reception (PGN will be passed through)
 - 0x02: Respond mode (device-specific behavior)
+
+**Mandatory receive PGNs** - the ISO protocol PGNs (59904, 60160, 60416, 60928, 65240), 126208 and 126720 - cannot be switched off. The device's own NMEA 2000 stack needs them, so they are always received: a Set with Enable `0x00` is refused with `ES9_N2000_PGN_DENIED`, nothing else in the command is applied, and a Get always reports them enabled. 126720 is an addressed PGN, so this holds for every PGN from 126720 to 126975. In receive-all mode **every** receive PGN is mandatory, so every Rx switch-off is refused. Enabling a mandatory PGN is accepted. Earlier firmware acknowledged the switch-off and kept receiving the PGN; for a proprietary PGN in receive-all mode it then reported the PGN as disabled while still receiving it.
 
 **PGN Mask**: a 32-bit value giving how **wide** this entry's receive match is - one PGN, or
 a block of PGNs. It is not a free-form bit mask and it does not filter on Source Address:
@@ -221,6 +223,7 @@ Response showing PGN 129025 enabled, reporting its single-PGN mask:
 - **Error Handling**: Common error responses:
   - ES11_COMMAND_DATA_OUT_OF_RANGE (-1159): Invalid PGN ID or unsupported PGN
   - ES11_DecodeBadCommsData (-1140): Malformed command (wrong data size)
+  - ES9_N2000_PGN_DENIED (-955): Enable `0x00` on a mandatory receive PGN. Nothing in the command is applied.
   - ES9_N2000_INVALID_PGN_MASK (-979): a PGN Mask other than Do Not Change, Use Defaults or the PGN's declared width. Nothing in the command is applied.
 
 - **CAN Identifier Structure**: The PGN Mask operates on the 29-bit CAN identifier:

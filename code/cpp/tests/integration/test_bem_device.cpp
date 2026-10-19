@@ -1709,8 +1709,8 @@ TEST_F(BemDeviceTest, PgnEnable_ComprehensiveSweep)
 		          << ")" << std::endl;
 	}
 
-	/* A Tx SET of 0 on a mandatory Tx PGN is refused with
-	   ES9_N2000_PGN_DENIED (-955); the Tx setter reports it with this marker. */
+	/* An Rx or Tx SET of 0 on a mandatory PGN is refused with
+	   ES9_N2000_PGN_DENIED (-955); both setters report it with this marker. */
 	static constexpr uint32_t kPgnDeniedArl = 0xFFFFFC45u;
 	static const std::string kMandatoryRefused = "mandatory-refused";
 
@@ -1751,16 +1751,17 @@ TEST_F(BemDeviceTest, PgnEnable_ComprehensiveSweep)
 			}
 			const bool baselineEnabled = *baseline;
 
-			/* Flip SET. A mandatory Tx PGN reads back enabled and cannot be
-			   switched off: the device refuses the flip with
+			/* Flip SET. A mandatory Rx or Tx PGN reads back enabled and cannot
+			   be switched off: the device refuses the flip with
 			   ES9_N2000_PGN_DENIED (earlier firmware acked it and left the
-			   PGN on). Either way it is stack-gated, not a failure. */
+			   PGN on). Either way it is stack-gated, not a failure. In
+			   receive-all mode every Rx PGN is mandatory. */
 			std::string setErr;
 			if (!setEnableBool(er.pgn, !baselineEnabled, setErr)) {
 				if (setErr == kMandatoryRefused) {
 					er.outcome = Outcome::StackGated;
 					er.detail = "flip SET refused (ES9_N2000_PGN_DENIED): "
-					            "mandatory Tx PGN";
+					            "mandatory " + std::string(dirName) + " PGN";
 					results.push_back(std::move(er));
 					continue;
 				}
@@ -1830,7 +1831,9 @@ TEST_F(BemDeviceTest, PgnEnable_ComprehensiveSweep)
 				session_->setRxPgnEnable(pgn, enable ? 1 : 0, t, std::move(cb));
 			});
 			if (r.errorCode != ErrorCode::Ok) {
-				err = r.errorMsg;
+				const bool denied = !enable && r.response.has_value() &&
+				                    r.response->header.errorCode == kPgnDeniedArl;
+				err = denied ? kMandatoryRefused : r.errorMsg;
 				return false;
 			}
 			return true;

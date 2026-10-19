@@ -221,6 +221,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pages, the F1 list example and the `setRxPgnEnableWithMask()` documentation
   no longer describe the mask as a source or address filter.
 
+- **Mandatory receive PGNs cannot be switched off.**
+  `docs/DataFormats/Binary/bem-detail/rx-pgn-enable.md` now states that an Rx
+  PGN Enable Set with Enable `0x00` on a mandatory receive PGN (the ISO
+  protocol PGNs 59904, 60160, 60416, 60928 and 65240, 126208, and 126720 with
+  its addressed range) is refused with `ES9_N2000_PGN_DENIED`, and that in
+  receive-all mode every receive PGN is mandatory. Earlier firmware
+  acknowledged the switch-off and kept receiving the PGN. The PGN enable sweep
+  integration test now leaves the mandatory receive PGNs out of its Rx-filter
+  sweep, and the comprehensive per-PGN device sweep counts a refused Rx
+  switch-off as stack-gated, as it already did for Tx.
+
 ### Guardrails
 
 - **Example/public-header boundary is now enforced at build time.**
