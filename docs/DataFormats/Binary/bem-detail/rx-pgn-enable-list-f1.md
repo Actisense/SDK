@@ -132,14 +132,13 @@ Second message containing corresponding Rx Masks:
 | 3-13 | BEM Header | ... | Standard response header |
 | **14-26** | **Data Block** | ... | **13 bytes: count + 3 masks** |
 | 14 | Number of Masks | 03H | 3 masks (must match PGN count) |
-| **15-18** | **Rx Mask 0** | FF FF FF FF | Exact match for PGN 127250 |
-| **19-22** | **Rx Mask 1** | 00 00 FF 00 | Source address filter for 129025 |
-| **23-26** | **Rx Mask 2** | FF FF FF FF | Exact match for PGN 129029 |
+| **15-18** | **Rx Mask 0** | 00 FF FF 03 | Match PGN (0x03FFFF00) for PGN 127250 |
+| **19-22** | **Rx Mask 1** | 00 FF FF 03 | Match PGN (0x03FFFF00) for PGN 129025 |
+| **23-26** | **Rx Mask 2** | 00 FF FF 03 | Match PGN (0x03FFFF00) for PGN 129029 |
 
 **Mask Interpretation**:
-- Mask 0 (0xFFFFFFFF): Accept only exact PGN 127250
-- Mask 1 (0x00FF0000): Filter by source address byte (accepts any source for PGN 129025)
-- Mask 2 (0xFFFFFFFF): Accept only exact PGN 129029
+- Each mask is the width of that entry's receive match - one of the four values in [Rx PGN Enable](rx-pgn-enable.md). All three PGNs here are single-PGN definitions, so each reports Match PGN.
+- The mask never filters on Source Address, and it is a reporting field: a host cannot change it - see [Rx PGN Enable](rx-pgn-enable.md).
 
 ### Reassembling the List
 

@@ -209,7 +209,7 @@ namespace Actisense
 			 \brief      Build Set Rx PGN Enable command (with mask)
 			 \param[in]  pgn         PGN to configure (24-bit)
 			 \param[in]  enable      Enable flag value
-			 \param[in]  mask        PGN mask for filtering
+			 \param[in]  mask        PGN mask (declared width, 0xFFFFFFFE or 0xFFFFFFFF)
 			 \param[out] outFrame    Complete BDTP-framed message
 			 \param[out] outError    Error message if encoding fails
 			 \return     True on success

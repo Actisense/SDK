@@ -1,6 +1,6 @@
 # Get / Set Rx PGN Enable
 
-Enables or disables reception of specific Parameter Group Numbers (PGNs) on NMEA 2000 or J1939 interfaces. This command allows selective filtering of received messages by PGN with configurable mask settings for address filtering.
+Enables or disables reception of specific Parameter Group Numbers (PGNs) on NMEA 2000 or J1939 interfaces. This command allows selective filtering of received messages by PGN, and reports how wide each PGN's receive match is (its PGN Mask).
 
 This command supports both Get (read current enable state) and Set (enable/disable reception) operations for individual PGNs. For managing multiple PGNs efficiently, see [Rx PGN Enable List](rx-pgn-enable-list-f2.md).
 
@@ -27,16 +27,16 @@ To query the current enable state for a specific PGN:
 
 #### Basic Set (Enable/Disable only)
 
-To set only the enable/disable state (mask uses device default):
+To set only the enable/disable state (the stored mask is left unchanged):
 
 | Offset  | Description              | Size           |
 | ------- | ------------------------ | ---------------|
 | 0-3     | PGN ID                   | 4 bytes (uint32_t, LE) |
 | 4       | Enable flag              | 1 byte (uint8_t) |
 
-#### Extended Set (with custom mask)
+#### Extended Set (with mask)
 
-To set both enable state and custom PGN mask:
+To set the enable state and name the PGN Mask - which must be one the device accepts (see below):
 
 | Offset  | Description              | Size           |
 | ------- | ------------------------ | ---------------|

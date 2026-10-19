@@ -329,7 +329,7 @@ namespace Actisense
 			 \brief      Send Set Rx PGN Enable command with mask
 			 \param[in]  pgn         PGN to configure
 			 \param[in]  enable      Enable flag
-			 \param[in]  mask        PGN mask for filtering
+			 \param[in]  mask        PGN mask (declared width, 0xFFFFFFFE or 0xFFFFFFFF)
 			 \param[in]  timeout     Timeout for response
 			 \param[in]  callback    Callback invoked on response or timeout
 			 *******************************************************************************/
