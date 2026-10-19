@@ -209,6 +209,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   EEPROM (the device saves it), and drops an error-code list that named codes
   this command never returns.
 
+- **The Rx PGN Mask cannot be changed by a Set.**
+  `docs/DataFormats/Binary/bem-detail/rx-pgn-enable.md` and
+  `rx-pgn-enable-list-f2.md` now state that the mask reports the width of an
+  entry's receive match and that Rx PGN Enable accepts only Do Not Change
+  (`0xFFFFFFFF`), Use Defaults (`0xFFFFFFFE`) or the width the PGN's own
+  definition declares. Any other mask is refused with
+  `ES9_N2000_INVALID_PGN_MASK` and nothing in the command is applied, the
+  Enable flag included. Earlier firmware accepted, stored and reported such a
+  mask without receiving any differently, and lost it at the next restart. The
+  pages, the F1 list example and the `setRxPgnEnableWithMask()` documentation
+  no longer describe the mask as a source or address filter.
+
 ### Guardrails
 
 - **Example/public-header boundary is now enforced at build time.**
