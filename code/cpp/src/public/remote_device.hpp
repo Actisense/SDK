@@ -218,7 +218,10 @@ namespace Actisense
 								BemResultCallback callback);
 
 			/**************************************************************************/ /**
-			 \brief      Set Rx-enable for a PGN with an explicit instance/group mask.
+			 \brief      Set Rx-enable for a PGN, naming its Rx PGN Mask explicitly.
+			 \details    The mask must be the width the PGN's definition declares, 0xFFFFFFFE
+						 (use defaults) or 0xFFFFFFFF (do not change); see
+						 Session::setRxPgnEnableWithMask().
 			 *******************************************************************************/
 			void setRxPgnEnableWithMask(uint32_t pgn, uint8_t enable, uint32_t mask,
 										std::chrono::milliseconds timeout,

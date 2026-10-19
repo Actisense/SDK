@@ -198,10 +198,14 @@ namespace Actisense
 								BemResultCallback callback);
 
 			/**************************************************************************/ /**
-			 \brief      Set Rx-enable for a PGN with an explicit instance/group mask.
+			 \brief      Set Rx-enable for a PGN, naming its Rx PGN Mask explicitly.
 			 \param[in]  pgn       PGN to configure
 			 \param[in]  enable    0 = disabled, 1 = enabled, 2 = respond mode
-			 \param[in]  mask      PGN mask for instance/group filtering
+			 \param[in]  mask      the width the PGN's definition declares, 0xFFFFFFFE (use
+								   defaults) or 0xFFFFFFFF (do not change). The mask reports
+								   match width and cannot be changed: any other value is
+								   refused with ES9_N2000_INVALID_PGN_MASK and the enable is
+								   not applied either.
 			 \param[in]  timeout   Response timeout
 			 \param[in]  callback  Invoked with the device's acknowledgement
 			 *******************************************************************************/

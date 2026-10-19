@@ -40,7 +40,8 @@ namespace Actisense
 		/// Rx PGN Enable extended SET request data size (9 bytes: PGN + enable + mask)
 		static constexpr std::size_t kRxPgnEnableExtendedSetRequestSize = 9;
 
-		/// Default mask: accept from all sources
+		/// 0xFFFFFFFF is BEM "Do Not Change": the stored mask is left as it is. (The name is
+		/// historical - the mask never selected sources.)
 		static constexpr uint32_t kRxPgnMaskAcceptAll = 0xFFFFFFFF;
 
 		/* Data Structures ------------------------------------------------------ */
@@ -136,7 +137,9 @@ namespace Actisense
 		 \brief      Encode Rx PGN Enable extended SET request data (with mask)
 		 \param[in]  pgn        PGN ID to configure
 		 \param[in]  enable     Enable flag
-		 \param[in]  mask       PGN mask for filtering
+		 \param[in]  mask       PGN mask: the width the PGN's definition declares, 0xFFFFFFFE (use
+								defaults) or 0xFFFFFFFF (do not change). The device refuses any
+								other value with ES9_N2000_INVALID_PGN_MASK.
 		 \param[out] outData    Encoded request data
 		 *******************************************************************************/
 		inline void encodeRxPgnEnableSetRequestWithMask(uint32_t pgn, RxPgnEnableFlag enable,

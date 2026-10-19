@@ -101,10 +101,12 @@ The test is the PDU Format byte: below `0xF0` the PGN is PDU1 and addressed.
 
 > **The mask is a reporting field.** It tells a host how wide the device's match for that
 > entry is; it is not a control a host can narrow or widen to change what the device
-> receives. A mask written with [Rx PGN Enable](rx-pgn-enable.md) (0x46) is stored and is
-> reported back by both commands, but the width a frame is actually matched at comes from
-> the PGN definition's own range and does not follow it. Read the value; do not rely on
-> writing it.
+> receives. The width a frame is actually matched at comes from the PGN definition's own
+> range, so each entry always reports the width its definition declares.
+> [Rx PGN Enable](rx-pgn-enable.md) (0x46) refuses a mask other than that one with
+> `ES9_N2000_INVALID_PGN_MASK`, and changes nothing. (Older firmware accepted and
+> reported such a mask without receiving any differently, and lost it at the next
+> restart.)
 
 > **Older firmware reported 0x00 for every entry**, whatever the definition, because the
 > value was a fixed constant rather than the entry's own mask. A list in which the
@@ -234,7 +236,7 @@ Second message continuing the 50 PGN list:
   | 0x02 | Match MSN PDU Format | 4096 |
   | 0x03 | Match Data Page | 65536 |
 
-  Reporting only - see the note beside the PGN Entry table above.
+  Reporting only; a host cannot change it - see the note beside the PGN Entry table above.
 
 - **Transfer ID Handling**:
   - Transfer ID cycles 1-255 (never 0 for valid transfer)

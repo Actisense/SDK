@@ -53,8 +53,10 @@ To set both enable state and custom PGN mask:
 a block of PGNs. It is not a free-form bit mask and it does not filter on Source Address:
 Source Address is "do not care" in every case, and the 3-bit priority is always ignored.
 
-Only the following values are accepted; anything else is rejected with
-`ES10_BSTBEM_MessageInvalid`.
+The mask can be read but not changed. A Set accepts exactly three mask values - Do Not
+Change, Use Defaults, or the one width the PGN's own definition declares (the value a Get
+returns) - and refuses anything else with `ES9_N2000_INVALID_PGN_MASK` (see the note
+below). The values a Get can report, and a Set can name, are:
 
 | Value | Name | Fields matched | PGNs covered |
 |-------|------|----------------|--------------|
@@ -70,20 +72,28 @@ The last two are the standard unsigned 32-bit BEM parameter values - see
 field altogether (the short, 5-byte Set form) also leaves the stored mask unchanged.
 
 The device seeds each entry's mask from its own NMEA 2000 PGN definition at startup, so a
-Get returns that definition's declared width unless a Set has replaced it, and `0xFFFFFFFE`
-puts that declared width back - per definition, so a block entry returns to the block. The
-same four values appear in compact 8-bit enumerated form (0-3, in the order above) in
+Get returns that definition's declared width, and `0xFFFFFFFE` names that same declared
+width - per definition, so a block entry stays the block. The same four values appear in
+compact 8-bit enumerated form (0-3, in the order above) in
 [Rx PGN Enable List F2](rx-pgn-enable-list-f2.md).
 
 Because a single Rx enable can cover a block of PGNs, enabling a definition that represents
 a block enables reception of every PGN in it. Transmission works differently: a Tx PGN
 Enable is only ever for a single PGN - see [Tx PGN Enable](tx-pgn-enable.md).
 
-> **The mask is a reporting field.** It tells a host how wide the device's match for that
-> entry is; it is not a control a host can narrow or widen to change what the device
-> receives. A mask written here is stored and reported back faithfully by both this command
-> and the list command, but the width a frame is actually matched at comes from the PGN
-> definition's own range and does not follow it. Read the value; do not rely on writing it.
+> **The mask is a reporting field, and a Set cannot change it.** It tells a host how wide
+> the device's match for that entry is; the width a frame is actually matched at comes from
+> the PGN definition's own range. A Set naming any other width - narrower or wider - is
+> refused with `ES9_N2000_INVALID_PGN_MASK`, and the whole command is refused with it:
+> the Enable flag in the same request is not applied either, and nothing is saved. The
+> response then carries the error with the entry's unchanged settings, including the mask
+> it still has rather than the one requested. To change only the enable, omit the mask
+> (the 5-byte form) or send `0xFFFFFFFF`.
+>
+> Older firmware accepted any of the four widths, stored and reported it, and still
+> received exactly as before; the stored value was also lost at the next restart. A host
+> that writes a mask other than the declared one gets an error from current firmware for
+> a write that never had an effect.
 
 > **Older firmware did not restore the library default.** `0xFFFFFFFE` was resolved to a
 > Match PGN mask whatever the definition declared, so a block definition asked for its
@@ -158,7 +168,7 @@ Disable reception of PGN 127488 (Engine Parameters):
 
 ### Example - Rx PGN Enable Response
 
-Response showing PGN 129025 enabled with mask 0xFFFFFFFF (accept from all sources):
+Response showing PGN 129025 enabled, reporting its single-PGN mask:
 
 | Offset | Field | Value | Description |
 |--------|-------|-------|-------------|
@@ -173,17 +183,13 @@ Response showing PGN 129025 enabled with mask 0xFFFFFFFF (accept from all source
 | **19-27** | **Data Block** | ... | **9 bytes: PGN + enable + mask** |
 | 19-22 | PGN ID | 01 F8 01 00 | PGN 129025 (LE) |
 | 23 | Enable Flag | 01H | Enabled |
-| 24-27 | PGN Mask | FF FF FF FF | 0xFFFFFFFF = Accept all (LE) |
+| 24-27 | PGN Mask | 00 FF FF 03 | Match PGN, 0x03FFFF00 (LE) |
 
 ## Notes
 
 - **PGN Support**: Before enabling a PGN, verify it's supported by the device using [Supported PGN List](supported-pgn-list.md). Attempting to enable an unsupported PGN will result in an error response.
 
-- **Mask Behavior**: The PGN Mask filters received messages based on the CAN identifier. Common mask patterns:
-  - 0xFFFFFFFF: Accept from all sources (no filtering)
-  - 0x00FF0000: Filter by source address (bits 16-23)
-  - 0x00000000: Block all instances of this PGN
-  - Device-specific masks may filter by PDU format, Data Page, or other CAN ID fields
+- **Mask Behavior**: The PGN Mask reports how wide the entry's match is - one of the four widths in the table above. A Set can only name the width already declared, or use Do Not Change / Use Defaults; see the note beside that table.
 
 - **Enable List vs Individual**:
   - Individual enable (this command): Best for enabling/disabling single PGNs dynamically
@@ -208,15 +214,14 @@ Response showing PGN 129025 enabled with mask 0xFFFFFFFF (accept from all source
 - **Typical Workflow**:
   1. Query [Supported PGN List](supported-pgn-list.md) to see what PGNs the device supports
   2. Enable specific PGNs needed for your application using this command
-  3. Optionally widen a mask to cover a block of PGNs rather than one
-  4. Send [Commit To EEPROM](commit-to-eeprom.md) to save configuration
-  5. Send [Activate PGN Enable Lists](activate-pgn-enable-lists.md) if needed
-  6. Device now filters Rx messages based on enabled PGNs
+  3. Send [Commit To EEPROM](commit-to-eeprom.md) to save configuration
+  4. Send [Activate PGN Enable Lists](activate-pgn-enable-lists.md) if needed
+  5. Device now filters Rx messages based on enabled PGNs
 
 - **Error Handling**: Common error responses:
   - ES11_COMMAND_DATA_OUT_OF_RANGE (-1159): Invalid PGN ID or unsupported PGN
   - ES11_DecodeBadCommsData (-1140): Malformed command (wrong data size)
-  - ES11_COMMAND_INVALID_ADDRESS (-1154): Invalid mask pattern
+  - ES9_N2000_INVALID_PGN_MASK (-979): a PGN Mask other than Do Not Change, Use Defaults or the PGN's declared width. Nothing in the command is applied.
 
 - **CAN Identifier Structure**: The PGN Mask operates on the 29-bit CAN identifier:
   ```
@@ -230,8 +235,8 @@ Response showing PGN 129025 enabled with mask 0xFFFFFFFF (accept from all source
 
   The four accepted masks progressively drop the low-order fields — PDU Specific,
   then the bottom 4 bits of PDU Format, then PDU Format entirely — to widen the
-  match from one PGN to 256, 4096 and 65536. Arbitrary combinations are not
-  accepted.
+  match from one PGN to 256, 4096 and 65536. Each PGN definition declares one of
+  them, and that is the only width a Set may name.
 
 - **Common PGNs for Rx Enable**:
   - 59392 (0xE800): ISO Acknowledgement
