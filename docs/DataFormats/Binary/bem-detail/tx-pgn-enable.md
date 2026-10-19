@@ -43,7 +43,7 @@ Tx Timeout and Tx Priority travel together: to send a priority, send a Tx Timeou
 
 | Value | Meaning |
 | -- | -- |
-| `0x00` | Disable transmission |
+| `0x00` | Disable transmission. Refused with `ES9_N2000_PGN_DENIED` on a mandatory transmit PGN (see below) |
 | any other value | Enable transmission. `0x02` (Respond mode) is not distinguished from `0x01`, and reads back as `0x01` |
 
 **Tx Rate** (milliseconds):
@@ -73,7 +73,9 @@ A PGN whose default rate is not a period — non periodic (`0xFFFF`) or 0 — ha
 
 These are the standard BST-BEM unsigned parameter values described in [Message parameter conventions](../bst-bem.md#message-parameter-conventions). The NMEA Command Group Function (PGN 126208) uses `0x08` / `0x09` for its own "do not change" / "restore default" priority values; they are **not** recognised here, where they are simply out of range.
 
-**Mandatory transmit PGNs** — the ISO protocol PGNs (59392, 59904, 60160, 60416, 60928), 126208, 126464, 126720, Heartbeat (126993), Product Information (126996) and Configuration Information (126998) — cannot be given a rate of 0. Heartbeat is the reason: it is the one PGN the device schedules from its stored rate, so a rate of 0 would stop it.
+**Mandatory transmit PGNs** — the ISO protocol PGNs (59392, 59904, 60160, 60416, 60928), 126208, 126464, 126720, Heartbeat (126993), Product Information (126996) and Configuration Information (126998) — cannot be switched off and cannot be given a rate of 0. The device's own NMEA 2000 stack needs them, so their transmit enable is always on: a Set with Enable `0x00` is refused with `ES9_N2000_PGN_DENIED`, and a Get always reports them enabled. A rate of 0 is refused because of Heartbeat: it is the one PGN the device schedules from its stored rate, so a rate of 0 would stop it.
+
+Because their enable is always on, the transmit enable list never blocks these PGNs. Earlier firmware answered `ES_NoError` to Enable `0x00` on one of them and left it enabled, so a host could believe it had stopped one that was still passing to the bus.
 
 ### How a Set is applied
 
@@ -197,13 +199,13 @@ Response showing PGN 127488 enabled with 100ms rate, priority 3:
   | -- | -- |
   | `ES9_N2000_PGN_TXRATE_BELOW_MIN` | Tx Rate below the PGN's band |
   | `ES9_N2000_PGN_TXRATE_ABOVE_MAX` | Tx Rate above the band, wider than 16 bits, or `0xFFFF` on Heartbeat |
-  | `ES9_N2000_PGN_DENIED` | Tx Rate 0 on a mandatory transmit PGN |
+  | `ES9_N2000_PGN_DENIED` | Enable `0x00` or Tx Rate 0 on a mandatory transmit PGN |
   | `ES10_BST_INVALID_PARAMETER_VAL` | Tx Priority from 8 to `0xFD` |
   | `ES9_N2000_PGN_ENABLE_LIST_FULL` | Enabling one more PGN of the J1939 Catch All Data range when its list is full; the rate and priority in the same command are not applied |
   | `ES1_NO_MEMORY` | No storage for a proprietary PGN's own rate or priority |
   | `ES11_DecodeBadCommsData` | The command is too short to carry a PGN ID |
 
-  Earlier firmware answered `ES_NoError` to rate and priority values it did not apply; a host written against it may now see these errors for the same requests.
+  Earlier firmware answered `ES_NoError` to rate and priority values it did not apply, and to Enable `0x00` on a mandatory transmit PGN; a host written against it may now see these errors for the same requests.
 
 - **PGN Support**: Before enabling a PGN for transmission, check that the device supports it using [Supported PGN List](supported-pgn-list.md). This command does not report an unsupported PGN as an error.
 

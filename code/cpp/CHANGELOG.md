@@ -189,6 +189,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   discover a device's ports by name, label its live traffic statistics, and set
   session or stored baud rates without hard-coding a port number.
 
+- **Mandatory transmit PGNs cannot be switched off.**
+  `docs/DataFormats/Binary/bem-detail/tx-pgn-enable.md` now states that a Tx
+  PGN Enable Set with Enable `0x00` on a mandatory transmit PGN (the ISO
+  protocol PGNs, 126208, 126464, 126720, Heartbeat 126993, Product Information
+  126996 and Configuration Information 126998) is refused with
+  `ES9_N2000_PGN_DENIED`, and that the transmit enable list never blocks these
+  PGNs. Earlier firmware acknowledged the switch-off and left the PGN enabled.
+  The PGN enable sweep integration test now leaves 126996 and 126998 out of
+  its Tx-filter sweep (their Rx filter is still swept), and the comprehensive per-PGN device sweep counts a refused
+  switch-off of a mandatory Tx PGN as stack-gated rather than a SET failure.
+
 - **Tx PGN Enable page rewritten to describe the firmware as built.**
   `docs/DataFormats/Binary/bem-detail/tx-pgn-enable.md` now
   documents every Tx Rate and Tx Priority value and its result, the error code

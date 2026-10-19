@@ -143,6 +143,17 @@ static const std::unordered_set<uint32_t> kSkipPgns = {
 	127508,
 };
 
+/* Excluded from the Tx-filter sweep only. Mandatory Tx PGNs: the device's
+   own stack needs them, so their Tx enable is always on and the device
+   refuses a Tx-enable SET of 0 with ES9_N2000_PGN_DENIED - there is no Tx
+   filter to sweep. Their Rx filter is an ordinary one and is still swept.
+     126996  Product Information
+     126998  Configuration Information */
+static const std::unordered_set<uint32_t> kTxOnlySkipPgns = {
+	126996,
+	126998,
+};
+
 /* Verdict taxonomy, SweepRecord and the report artifacts live in
    tests/support/pgn_sweep_report.hpp, shared with the hermetic unit tests. */
 
@@ -638,15 +649,19 @@ protected:
 		return payload;
 	}
 
-	[[nodiscard]] std::vector<PgnManifestEntry> candidates() const
+	[[nodiscard]] std::vector<PgnManifestEntry> candidates(bool toggleTx) const
 	{
+		std::unordered_set<uint32_t> skipPgns = kSkipPgns;
+		if (toggleTx) {
+			skipPgns.insert(kTxOnlySkipPgns.begin(), kTxOnlySkipPgns.end());
+		}
 		const char* full = std::getenv("ACTISENSE_TEST_FULL_SWEEP");
 		const bool fullSweep = (full != nullptr && std::string(full) == "1");
 		/* A single-PGN focus always draws from the full candidate pool, not
 		   the smoke subset — the point is to debug one specific PGN. */
 		if (const char* only = std::getenv("ACTISENSE_TEST_ONLY_PGN"); only && *only) {
 			const uint32_t wanted = static_cast<uint32_t>(std::strtoul(only, nullptr, 10));
-			auto all = selectSweepCandidates(manifest_, /*fullSweep=*/true, kSkipPgns);
+			auto all = selectSweepCandidates(manifest_, /*fullSweep=*/true, skipPgns);
 			std::vector<PgnManifestEntry> filtered;
 			for (const auto& entry : all) {
 				if (entry.pgn == wanted) {
@@ -655,7 +670,7 @@ protected:
 			}
 			return filtered;
 		}
-		return selectSweepCandidates(manifest_, fullSweep, kSkipPgns);
+		return selectSweepCandidates(manifest_, fullSweep, skipPgns);
 	}
 
 	/* The transmitter's SID byte cannot be compared when its firmware rewrites
@@ -702,7 +717,7 @@ protected:
 	void runSweep(Endpoint& transmitter, Endpoint& observer, bool toggleTx,
 				  const std::string& direction)
 	{
-		const auto sweepSet = candidates();
+		const auto sweepSet = candidates(toggleTx);
 		if (sweepSet.empty()) {
 			GTEST_SKIP() << "Candidate set is empty (check the manifest and"
 						 << " ACTISENSE_TEST_ONLY_PGN)";

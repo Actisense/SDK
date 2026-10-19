@@ -1709,6 +1709,11 @@ TEST_F(BemDeviceTest, PgnEnable_ComprehensiveSweep)
 		          << ")" << std::endl;
 	}
 
+	/* A Tx SET of 0 on a mandatory Tx PGN is refused with
+	   ES9_N2000_PGN_DENIED (-955); the Tx setter reports it with this marker. */
+	static constexpr uint32_t kPgnDeniedArl = 0xFFFFFC45u;
+	static const std::string kMandatoryRefused = "mandatory-refused";
+
 	/* 3. Per-direction sweep helper. RxPgnEnableResponse and
 	   TxPgnEnableResponse both carry a .enable flag with Disabled/Enabled
 	   values at the same numeric values (0/1), so the per-direction
@@ -1746,9 +1751,19 @@ TEST_F(BemDeviceTest, PgnEnable_ComprehensiveSweep)
 			}
 			const bool baselineEnabled = *baseline;
 
-			/* Flip SET. */
+			/* Flip SET. A mandatory Tx PGN reads back enabled and cannot be
+			   switched off: the device refuses the flip with
+			   ES9_N2000_PGN_DENIED (earlier firmware acked it and left the
+			   PGN on). Either way it is stack-gated, not a failure. */
 			std::string setErr;
 			if (!setEnableBool(er.pgn, !baselineEnabled, setErr)) {
+				if (setErr == kMandatoryRefused) {
+					er.outcome = Outcome::StackGated;
+					er.detail = "flip SET refused (ES9_N2000_PGN_DENIED): "
+					            "mandatory Tx PGN";
+					results.push_back(std::move(er));
+					continue;
+				}
 				er.outcome = Outcome::SetFailed;
 				er.detail = "flip SET: " + setErr;
 				results.push_back(std::move(er));
@@ -1851,7 +1866,9 @@ TEST_F(BemDeviceTest, PgnEnable_ComprehensiveSweep)
 				session_->setTxPgnEnable(pgn, enable ? 1 : 0, t, std::move(cb));
 			});
 			if (r.errorCode != ErrorCode::Ok) {
-				err = r.errorMsg;
+				const bool denied = !enable && r.response.has_value() &&
+				                    r.response->header.errorCode == kPgnDeniedArl;
+				err = denied ? kMandatoryRefused : r.errorMsg;
 				return false;
 			}
 			return true;
@@ -1877,7 +1894,8 @@ TEST_F(BemDeviceTest, PgnEnable_ComprehensiveSweep)
 		std::cout << "  " << dirName << " entries probed: " << rs.size() << std::endl;
 		std::cout << "    OK            : " << tally[Outcome::Ok] << std::endl;
 		std::cout << "    STACK_GATED   : " << tally[Outcome::StackGated]
-		          << " (SET ack'd, GET unchanged — mandatory PGNs)" << std::endl;
+		          << " (SET refused, or ack'd with GET unchanged — mandatory PGNs)"
+		          << std::endl;
 		std::cout << "    SET_FAILED    : " << tally[Outcome::SetFailed] << std::endl;
 		std::cout << "    GET_FAILED    : " << tally[Outcome::GetFailed] << std::endl;
 		std::cout << "    NO_LOOKUP     : " << tally[Outcome::NoPgnLookup]
