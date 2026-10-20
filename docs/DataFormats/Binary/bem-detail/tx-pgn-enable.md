@@ -50,7 +50,7 @@ Tx Timeout and Tx Priority travel together: to send a priority, send a Tx Timeou
 
 | Value | Result |
 | -- | -- |
-| `0` | Stored and reported as 0 ("disabled"). The Enable flag remains the on/off switch. Refused with `ES9_N2000_PGN_DENIED` on a mandatory transmit PGN (see below) |
+| `0` | Switches the PGN's transmissions off on every data virtual device, and is reported as 0. The PGN stays enabled: it is still listed in the Tx PGN List (126464) and still answers an ISO Request or a 126208 Request for it. Refused with `ES9_N2000_PGN_DENIED` on a mandatory transmit PGN (see below). On a PGN of a proprietary range, a range's base PGN or a J1939 Catch All PGN it is stored and reported but does not stop transmission |
 | a rate within the PGN's band | Stored |
 | a rate below / above the band | Refused with `ES9_N2000_PGN_TXRATE_BELOW_MIN` / `ES9_N2000_PGN_TXRATE_ABOVE_MAX` |
 | `0xFFFF` | Stored and reported as 65535 ("non periodic"). Refused with `ES9_N2000_PGN_TXRATE_ABOVE_MAX` on Heartbeat (126993), whose NMEA-defined maximum is 60000 ms |
@@ -80,12 +80,14 @@ Because their enable is always on, the transmit enable list never blocks these P
 ### How a Set is applied
 
 - **All or nothing.** The device reads every field in the command and checks all of them before it applies any. If one is refused, nothing changes — not the enable, not the rate, not the priority — and the response carries the error code together with the settings as they still are.
-- **Every data virtual device.** A Set configures the PGN on every virtual device that transmits data, and clears any per-device rate or priority an NMEA Request / Command Group Function (126208) set earlier, so the new value applies everywhere.
+- **Every data virtual device.** A Set configures the PGN on every virtual device that transmits data, and clears any per-device rate or priority an NMEA Request / Command Group Function (126208) set earlier, so the new value applies everywhere. A rate of 0 is the exception: it is stored for each data virtual device, as a 126208 interval of 0 is.
 - **One PGN of a proprietary range.** On a PGN inside one of the manufacturer proprietary ranges, the rate and priority belong to that PGN alone; *use defaults* returns that one PGN to the range's own value and leaves the other 255 as they are. If the device cannot allocate storage for that PGN's own value, the response carries `ES1_NO_MEMORY` and the PGN keeps the range's value; in that case the enable in the same command has already been applied.
 - **Persistent and immediate.** A successful Set is saved by the device and takes effect straight away. No [Commit To EEPROM](commit-to-eeprom.md) or [Activate PGN Enable Lists](activate-pgn-enable-lists.md) is needed; both are still accepted.
-- **What the rate does.** The device stores, saves and reports the rate for every PGN, but only Heartbeat's transmission is scheduled from it. Other PGNs are transmitted as their data arrives.
+- **What the rate does.** The device stores, saves and reports the rate for every PGN, but only Heartbeat's transmission is scheduled from it. Other PGNs are transmitted as their data arrives, unless the rate is 0, which stops them.
 
-The NMEA Request Group Function (126208) applies the same rules to a transmission interval — the same band, `0xFFFF` accepted except on Heartbeat, anything wider than 16 bits refused — with its own encodings of the refusals and of "restore default". Its interval 0 differs: there it switches the PGN's transmission off for that virtual device, and is refused on a proprietary or J1939 Catch All range and on a mandatory transmit PGN.
+The NMEA Request Group Function (126208) applies the same rules to a transmission interval — the same band, `0xFFFF` accepted except on Heartbeat, anything wider than 16 bits refused — with its own encodings of the refusals and of "restore default". Its interval 0 does what a Tx Rate of 0 does here, for the one virtual device it is addressed to, and is refused on a proprietary or J1939 Catch All range and on a mandatory transmit PGN.
+
+**Lifting a rate of 0.** A Set with a non-zero rate, *use defaults* or a [Default](default-pgn-enable-list.md) Tx PGN Enable List makes the PGN transmit again; so does a 126208 Restore Default or accepted interval, on the one virtual device it is addressed to. A Delete Tx PGN Enable List clears the rate of 0 but also disables the PGN. The Enable flag is separate from the rate: a Set with Enable `0x01` and the rate *do not change* lists a disabled PGN again, but if that PGN also carries a rate of 0 it stays silent until a rate is sent. Units whose firmware once switched a PGN off by clearing its enable and storing a rate of 0 keep that state after an upgrade.
 
 ### Response Data Block
 

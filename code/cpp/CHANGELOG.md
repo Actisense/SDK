@@ -232,6 +232,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sweep, and the comprehensive per-PGN device sweep counts a refused Rx
   switch-off as stack-gated, as it already did for Tx.
 
+- **A Tx Rate of 0 switches a PGN's transmissions off.**
+  `docs/DataFormats/Binary/bem-detail/tx-pgn-enable.md` now states that a
+  Tx PGN Enable Set with a Tx Rate of 0 stops the PGN being transmitted on
+  every data virtual device while it stays enabled, listed in the Tx PGN List
+  (126464) and answering an ISO Request or 126208 Request for it - what a
+  126208 Transmission Interval of 0 does. A non-zero rate, Use Defaults, a
+  Default or Delete Tx PGN Enable List, or a 126208 Restore Default lifts it.
+  Earlier firmware stored and reported the 0 and kept transmitting.
+
 ### Guardrails
 
 - **Example/public-header boundary is now enforced at build time.**
