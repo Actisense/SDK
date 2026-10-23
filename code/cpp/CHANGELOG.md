@@ -244,8 +244,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/DataFormats/Binary/bem-detail/tx-pgn-enable.md` now states that a Tx
   PGN Enable Set with a Tx Rate of 0 on a PGN of a proprietary range, a
   range's base PGN or a J1939 Catch All PGN is refused with
-  `ES9_N2000_PGN_DENIED`, and nothing in the command is applied. A range is
-  switched on or off as a whole, so the 0 would not stop the PGN. Earlier
+  `ES9_N2000_PGN_DENIED`, and nothing in the command is applied. The PGNs of a
+  range share one transmission switch, so the 0 would not stop the PGN; Enable
+  `0x00` on that PGN does. Earlier
   firmware stored and acknowledged a 0 on one PGN of a proprietary range; a
   unit that took one still reports it, sending it again is refused, and Use
   Defaults clears it.
