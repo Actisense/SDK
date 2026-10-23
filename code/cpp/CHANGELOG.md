@@ -240,6 +240,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   126208 Transmission Interval of 0 does. A non-zero rate, Use Defaults, a
   Default or Delete Tx PGN Enable List, or a 126208 Restore Default lifts it.
   Earlier firmware stored and reported the 0 and kept transmitting.
+- **A Tx Rate of 0 is refused on every PGN of a range.**
+  `docs/DataFormats/Binary/bem-detail/tx-pgn-enable.md` now states that a Tx
+  PGN Enable Set with a Tx Rate of 0 on a PGN of a proprietary range, a
+  range's base PGN or a J1939 Catch All PGN is refused with
+  `ES9_N2000_PGN_DENIED`, and nothing in the command is applied. A range is
+  switched on or off as a whole, so the 0 would not stop the PGN. Earlier
+  firmware stored and acknowledged a 0 on one PGN of a proprietary range; a
+  unit that took one still reports it, sending it again is refused, and Use
+  Defaults clears it.
 
 ### Guardrails
 

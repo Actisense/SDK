@@ -50,7 +50,7 @@ Tx Timeout and Tx Priority travel together: to send a priority, send a Tx Timeou
 
 | Value | Result |
 | -- | -- |
-| `0` | Switches the PGN's transmissions off on every data virtual device, and is reported as 0. The PGN stays enabled: it is still listed in the Tx PGN List (126464) and still answers an ISO Request or a 126208 Request for it. Refused with `ES9_N2000_PGN_DENIED` on a mandatory transmit PGN (see below). On a PGN of a proprietary range, a range's base PGN or a J1939 Catch All PGN it is stored and reported but does not stop transmission |
+| `0` | Switches the PGN's transmissions off on every data virtual device, and is reported as 0. The PGN stays enabled: it is still listed in the Tx PGN List (126464) and still answers an ISO Request or a 126208 Request for it. Refused with `ES9_N2000_PGN_DENIED` on a mandatory transmit PGN (see below), and on every PGN of a range entry: a PGN of a proprietary range (for example 65290 or 130817), a range's base PGN (65280, 130816) or a J1939 Catch All PGN (61440 and the PGNs it covers). Nothing in the command is applied. A range is not switched PGN by PGN, so a 0 there would not stop transmission (see *Range PGNs* below) |
 | a rate within the PGN's band | Stored |
 | a rate below / above the band | Refused with `ES9_N2000_PGN_TXRATE_BELOW_MIN` / `ES9_N2000_PGN_TXRATE_ABOVE_MAX` |
 | `0xFFFF` | Stored and reported as 65535 ("non periodic"). Refused with `ES9_N2000_PGN_TXRATE_ABOVE_MAX` on Heartbeat (126993), whose NMEA-defined maximum is 60000 ms |
@@ -76,6 +76,8 @@ These are the standard BST-BEM unsigned parameter values described in [Message p
 **Mandatory transmit PGNs** — the ISO protocol PGNs (59392, 59904, 60160, 60416, 60928), 126208, 126464, 126720, Heartbeat (126993), Product Information (126996) and Configuration Information (126998) — cannot be switched off and cannot be given a rate of 0. The device's own NMEA 2000 stack needs them, so their transmit enable is always on: a Set with Enable `0x00` is refused with `ES9_N2000_PGN_DENIED`, and a Get always reports them enabled. A rate of 0 is refused because of Heartbeat: it is the one PGN the device schedules from its stored rate, so a rate of 0 would stop it.
 
 Because their enable is always on, the transmit enable list never blocks these PGNs. Earlier firmware answered `ES_NoError` to Enable `0x00` on one of them and left it enabled, so a host could believe it had stopped one that was still passing to the bus.
+
+**Range PGNs** — the manufacturer proprietary ranges (65280-65535 and 130816-131071) and the J1939 Catch All range (61440 and the PGNs it covers) cannot be given a rate of 0. Each range is one entry on the device, switched on or off as a whole, so a rate of 0 on one of its PGNs would be acknowledged without stopping it. A Set with Tx Rate 0 on any of these PGNs is refused with `ES9_N2000_PGN_DENIED`; a non-zero rate and *use defaults* are accepted as before. Earlier firmware stored a 0 on one PGN of a proprietary range and acknowledged it, and a unit that took one keeps it after an upgrade: a Get still reports that 0, sending it again is refused, and *use defaults* clears it back to the range's own rate.
 
 ### How a Set is applied
 
@@ -201,7 +203,7 @@ Response showing PGN 127488 enabled with 100ms rate, priority 3:
   | -- | -- |
   | `ES9_N2000_PGN_TXRATE_BELOW_MIN` | Tx Rate below the PGN's band |
   | `ES9_N2000_PGN_TXRATE_ABOVE_MAX` | Tx Rate above the band, wider than 16 bits, or `0xFFFF` on Heartbeat |
-  | `ES9_N2000_PGN_DENIED` | Enable `0x00` or Tx Rate 0 on a mandatory transmit PGN |
+  | `ES9_N2000_PGN_DENIED` | Enable `0x00` or Tx Rate 0 on a mandatory transmit PGN; Tx Rate 0 on a PGN of a proprietary range, a range's base PGN or a J1939 Catch All PGN |
   | `ES10_BST_INVALID_PARAMETER_VAL` | Tx Priority from 8 to `0xFD` |
   | `ES9_N2000_PGN_ENABLE_LIST_FULL` | Enabling one more PGN of the J1939 Catch All Data range when its list is full; the rate and priority in the same command are not applied |
   | `ES1_NO_MEMORY` | No storage for a proprietary PGN's own rate or priority |
